@@ -99,6 +99,9 @@ RT_CXXFLAGS += "-DRAPIDJSON_HAS_STDSTRING"
 # Set RapidJSON to exact double parsing mode
 RT_CXXFLAGS += "-DRAPIDJSON_PARSE_DEFAULT_FLAGS=kParseFullPrecisionFlag"
 
+# Avoid -Wundef warning in ql2.pb.h.
+RT_CXXFLAGS += -DPROTOBUF_INLINE_NOT_IN_HEADERS=0
+
 # Force 64-bit off_t size on Linux -- also, sizeof(off_t) will be
 # checked by a compile-time assertion.
 ifeq ($(OS),Linux)
