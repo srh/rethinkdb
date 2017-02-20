@@ -1,5 +1,5 @@
 
-version=0.12.2
+version=6.9.5
 
 src_url=http://nodejs.org/dist/v$version/node-v$version.tar.gz
-src_url_sha1=a969f17a0a6c9238584f8946d96e8d39be8eb957
+src_url_sha1=9ff1d8093408a26c6a2e6e84c527476093b9fb7c
