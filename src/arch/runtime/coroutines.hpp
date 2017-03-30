@@ -148,8 +148,6 @@ public:
     const std::string& get_coroutine_type() { return coroutine_type; }
 #endif
 
-    static void set_coroutine_stack_size(size_t size);
-
     coro_stack_t *get_stack();
 
     void set_priority(int _priority) {
@@ -311,5 +309,13 @@ public:
     home_coro_mixin_t();
     void assert_coro();
 };
+
+namespace coroutine {
+extern const size_t stack_size;
+}
+
+inline size_t coroutine_stack_size() {
+    return ::coroutine::stack_size;
+}
 
 #endif // ARCH_RUNTIME_COROUTINES_HPP_
