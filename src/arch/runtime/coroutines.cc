@@ -24,9 +24,6 @@
 #include "thread_local.hpp"
 #include "utils.hpp"
 
-//Default, can be set through `set_coro_stack_size()`
-size_t coro_stack_size = COROUTINE_STACK_SIZE;
-
 // How many unused coroutine stacks to keep around (at most), before they are
 // freed. This value is per thread.
 const size_t COROUTINE_FREE_LIST_SIZE = 64;
@@ -163,7 +160,7 @@ TLS_with_init(int64_t, coro_selfname_counter, 0);
 #endif
 
 coro_t::coro_t() :
-    stack(&coro_t::run, coro_stack_size),
+    stack(&coro_t::run, coroutine_stack_size()),
     current_thread_(linux_thread_pool_t::get_thread_id()),
     notified_(false),
     waiting_(false),
@@ -479,10 +476,6 @@ void coro_t::on_thread_switch() {
     notify_now_deprecated();
 }
 
-void coro_t::set_coroutine_stack_size(size_t size) {
-    coro_stack_size = size;
-}
-
 coro_stack_t* coro_t::get_stack() {
     return &stack;
 }
@@ -625,5 +618,24 @@ home_coro_mixin_t::home_coro_mixin_t()
 void home_coro_mixin_t::assert_coro() {
     rassert(home_coro == coro_t::self());
 }
+
+namespace coroutine {
+size_t compute_coroutine_stack_size() {
+#ifdef _WIN32
+    return (1 << 17);  // 128K
+#else
+    long pagesize = sysconf(_SC_PAGESIZE);
+    if (pagesize > (1 << 15) && pagesize <= (1 << 16)) {
+        // getifaddrs() calls alloca() and it tries to allocate pagesize of memory in
+        // stack frame (if less than 64 KB).  Stack overflow can (apparently) ensue.
+        return (1 << 18);  // 256K
+    } else {
+        return (1 << 17);  // 128K
+    }
+#endif  // _WIN32
+}
+
+const size_t stack_size = compute_coroutine_stack_size();
+}  // namespace coroutine
 
 #endif /* NDEBUG */

@@ -36,10 +36,10 @@ TEST(CoroutineUtilsTest, WithEnoughStackNonBlocking) {
     int res = 0;
     run_in_coro([&]() {
         ASSERT_FINITE_CORO_WAITING;
-        // `COROUTINE_STACK_SIZE` forces a coroutine to be spawned
+        // `coroutine_stack_size()` forces a coroutine to be spawned
         res = call_with_enough_stack<int>([] () {
             return 5;
-        }, COROUTINE_STACK_SIZE);
+        }, coroutine_stack_size());
     });
     EXPECT_EQ(res, 5);
 }
@@ -47,11 +47,11 @@ TEST(CoroutineUtilsTest, WithEnoughStackNonBlocking) {
 TEST(CoroutineUtilsTest, WithEnoughStackBlocking) {
     int res = 0;
     run_in_coro([&]() {
-        // `COROUTINE_STACK_SIZE` forces a coroutine to be spawned
+        // `coroutine_stack_size()` forces a coroutine to be spawned
         res = call_with_enough_stack<int>([] () {
             nap(5);
             return 5;
-        }, COROUTINE_STACK_SIZE);
+        }, coroutine_stack_size());
     });
     EXPECT_EQ(res, 5);
 }
@@ -84,10 +84,10 @@ TEST(CoroutineUtilsTest, WithEnoughStackException) {
     bool got_exception = false;
     run_in_coro([&]() {
         try {
-            // `COROUTINE_STACK_SIZE` forces a coroutine to be spawned
+            // `coroutine_stack_size()` forces a coroutine to be spawned
             call_with_enough_stack([] () {
                 throw std::runtime_error("This is a test exception");
-            }, COROUTINE_STACK_SIZE);
+            }, coroutine_stack_size());
         } catch (const std::exception &) {
             got_exception = true;
         }
@@ -153,7 +153,7 @@ TEST(CoroutineUtilsTest, WithEnoughStackBenchmark) {
                 // our code.
                 sum += call_with_enough_stack<int>([&] () {
                     return test_function();
-                }, COROUTINE_STACK_SIZE);
+                }, coroutine_stack_size());
             }
             double dur = ticks_to_secs(get_ticks() - start_ticks);
             EXPECT_EQ(sum, NUM_REPETITIONS);
@@ -169,7 +169,7 @@ TEST(CoroutineUtilsTest, WithEnoughStackBenchmark) {
                 // our code.
                 sum += call_with_enough_stack<int>([&] () {
                     return test_function_blocking();
-                }, COROUTINE_STACK_SIZE);
+                }, coroutine_stack_size());
             }
             double dur = ticks_to_secs(get_ticks() - start_ticks);
             EXPECT_EQ(sum, NUM_REPETITIONS);

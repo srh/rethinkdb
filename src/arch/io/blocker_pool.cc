@@ -4,7 +4,7 @@
 #include <string.h>
 
 #include "arch/compiler.hpp"
-#include "config/args.hpp"
+#include "arch/runtime/coroutines.hpp"
 #include "utils.hpp"
 
 THREAD_LOCAL int thread_is_blocker_pool_thread = 0;
@@ -93,15 +93,10 @@ blocker_pool_t::blocker_pool_t(int nthreads, linux_event_queue_t *_queue)
         int res = pthread_attr_init(&attr);
         guarantee_xerr(res == 0, res, "pthread_attr_init failed.");
 
-        // The coroutine stack size should be enough for blocker pool stacks.  Right
-        // now that's 128 KB.
-        static_assert(COROUTINE_STACK_SIZE == 131072,
-                      "Expecting COROUTINE_STACK_SIZE to be 131072.  If you changed "
-                      "it, please double-check whether the value is appropriate for "
-                      "blocker pool threads.");
         // Disregard failure -- we'll just use the default stack size if this somehow
         // fails.
-        UNUSED int ignored_res = pthread_attr_setstacksize(&attr, COROUTINE_STACK_SIZE);
+        UNUSED int ignored_res
+            = pthread_attr_setstacksize(&attr, std::max<size_t>(131072, coroutine_stack_size()));
 
         res = pthread_create(&threads[i], &attr,
             &blocker_pool_t::event_loop, reinterpret_cast<void*>(this));

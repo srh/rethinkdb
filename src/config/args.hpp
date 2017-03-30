@@ -141,8 +141,6 @@
 // block infos.
 #define LBA_RECONSTRUCTION_BATCH_SIZE             1024
 
-#define COROUTINE_STACK_SIZE                      131072
-
 
 /**
  * Message scheduler configuration
