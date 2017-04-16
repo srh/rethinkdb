@@ -1,4 +1,5 @@
 // Copyright 2010-2014 RethinkDB, all rights reserved.
+// This file has been modified by Sam Hughes.
 #ifndef CONCURRENCY_MUTEX_ASSERTION_HPP_
 #define CONCURRENCY_MUTEX_ASSERTION_HPP_
 
@@ -56,8 +57,14 @@ struct mutex_assertion_t : public home_thread_mixin_t {
     // Unimplemented because nobody uses this yet.
     void operator=(mutex_assertion_t &&movee) = delete;
 
+    bool is_locked() const { return locked; }
+
     ~mutex_assertion_t() { reset(); }
     void reset() { rassert(!locked); }
+    void swap(mutex_assertion_t &other) {
+        rassert(!locked);
+        rassert(!other.locked);
+    }
 
     void rethread(threadnum_t new_thread) {
         rassert(!locked);
@@ -193,6 +200,8 @@ struct mutex_assertion_t {
     mutex_assertion_t(mutex_assertion_t &&) { }
     void reset() { }
     void rethread(threadnum_t) { }
+    // is_locked not defined
+    void swap(mutex_assertion_t &) { }
 private:
     DISABLE_COPYING(mutex_assertion_t);
 };

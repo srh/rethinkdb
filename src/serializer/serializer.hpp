@@ -1,4 +1,5 @@
 // Copyright 2010-2014 RethinkDB, all rights reserved.
+// This file has been modified by Sam Hughes.
 #ifndef SERIALIZER_SERIALIZER_HPP_
 #define SERIALIZER_SERIALIZER_HPP_
 
@@ -110,7 +111,8 @@ public:
 
     // Returns block tokens in the same order as write_infos.
     virtual std::vector<counted_t<standard_block_token_t> >
-    block_writes(const std::vector<buf_write_info_t> &write_infos,
+    block_writes(const buf_write_info_t *write_infos,
+                 size_t num_write_infos,
                  file_account_t *io_account,
                  iocallback_t *cb) = 0;
 

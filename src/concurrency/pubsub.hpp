@@ -1,4 +1,5 @@
 // Copyright 2010-2014 RethinkDB, all rights reserved.
+// This file has been modified by Sam Hughes.
 #ifndef CONCURRENCY_PUBSUB_HPP_
 #define CONCURRENCY_PUBSUB_HPP_
 
@@ -92,6 +93,12 @@ private:
         rassert(subscriptions.empty());
     }
 
+    void swap(publisher_t &other) {
+        rassert(subscriptions.empty());
+        rassert(other.subscriptions.empty());
+        mutex.swap(other.mutex);
+    }
+
     publisher_t(publisher_t &&movee)
         : subscriptions(std::move(movee.subscriptions)),
           mutex(std::move(movee.mutex)) {
@@ -148,6 +155,10 @@ public:
 
     void reset() {
         publisher.reset();
+    }
+
+    void swap(publisher_controller_t &other) {
+        publisher.swap(other.publisher);
     }
 
 private:

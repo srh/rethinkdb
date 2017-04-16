@@ -1,4 +1,5 @@
 // Copyright 2010-2014 RethinkDB, all rights reserved.
+// This file has been modified by Sam Hughes.
 #ifndef BUFFER_CACHE_TYPES_HPP_
 #define BUFFER_CACHE_TYPES_HPP_
 
@@ -14,6 +15,13 @@ ARCHIVE_PRIM_MAKE_RANGED_SERIALIZABLE(write_durability_t, int8_t,
                                       write_durability_t::SOFT,
                                       write_durability_t::HARD);
 
+#define DEFAULT_FLUSH_INTERVAL 5000
+// Converting this value from millis to nanos is less than half of 2^63.
+#define NEVER_FLUSH_INTERVAL (0x100000000ll * 1000ll)
+
+struct flush_interval_t {
+    int64_t millis;
+};
 
 typedef uint32_t block_magic_comparison_t;
 

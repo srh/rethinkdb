@@ -1,4 +1,5 @@
 // Copyright 2010-2015 RethinkDB, all rights reserved.
+// This file has been modified by Sam Hughes.
 #include "clustering/administration/persist/file_keys.hpp"
 
 #include "rpc/connectivity/server_id.hpp"
@@ -48,10 +49,19 @@ metadata_file_t::key_t<table_raft_stored_snapshot_t>
         mdprefix_table_raft_snapshot() {
     return metadata_file_t::key_t<table_raft_stored_snapshot_t>("table.snapshot/");
 }
+metadata_file_t::key_t<table_raft_versioned_user_value_t>
+        mdprefix_table_raft_snapshot_extension() {
+    return metadata_file_t::key_t<table_raft_versioned_user_value_t>("table.snapshot_extension/");
+}
+
 
 metadata_file_t::key_t<raft_log_entry_t<table_raft_state_t> >
         mdprefix_table_raft_log() {
     return metadata_file_t::key_t<raft_log_entry_t<table_raft_state_t> >("table.log/");
+}
+metadata_file_t::key_t<user_value_t>
+        mdprefix_table_raft_log_extension() {
+    return metadata_file_t::key_t<user_value_t>("table.log_extension/");
 }
 
 metadata_file_t::key_t<branch_birth_certificate_t>

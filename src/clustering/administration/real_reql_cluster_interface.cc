@@ -1,4 +1,5 @@
 // Copyright 2010-2014 RethinkDB, all rights reserved.
+// This file has been modified by Sam Hughes.
 #include "clustering/administration/real_reql_cluster_interface.hpp"
 
 #include "clustering/administration/artificial_reql_cluster_interface.hpp"
@@ -334,6 +335,7 @@ bool real_reql_cluster_interface_t::table_create(
 
         config.config.write_ack_config = write_ack_config_t::MAJORITY;
         config.config.durability = durability;
+        config.config.user_value = default_user_value();
 
         table_id = generate_uuid();
         m_table_meta_client->create(table_id, config, &interruptor_on_home);
@@ -689,6 +691,7 @@ void real_reql_cluster_interface_t::reconfigure_internal(
     new_config.config.sindexes = old_config.config.sindexes;
     new_config.config.write_ack_config = old_config.config.write_ack_config;
     new_config.config.durability = old_config.config.durability;
+    new_config.config.user_value = old_config.config.user_value;
 
     calculate_split_points_intelligently(
         table_id,

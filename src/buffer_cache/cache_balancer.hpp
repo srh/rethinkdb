@@ -1,3 +1,4 @@
+// This file has been modified by Sam Hughes.
 #ifndef BUFFER_CACHE_CACHE_BALANCER_HPP_
 #define BUFFER_CACHE_CACHE_BALANCER_HPP_
 
@@ -138,8 +139,15 @@ private:
         explicit cache_data_t(alt::evicter_t *_evicter);
 
         alt::evicter_t *evicter;
+
         uint64_t new_size;
         uint64_t old_size;
+
+        // The three components of actual memory usage by the cache
+        uint64_t unevictable_size;
+        uint64_t evictable_disk_backed_size;
+        uint64_t evictable_unbacked_size;
+
         int64_t bytes_loaded;
         uint64_t access_count;
     };

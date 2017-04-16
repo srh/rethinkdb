@@ -1,4 +1,5 @@
 // Copyright 2010-2014 RethinkDB, all rights reserved.
+// This file has been modified by Sam Hughes.
 #include "unittest/gtest.hpp"
 
 #include "arch/io/disk.hpp"
@@ -57,7 +58,8 @@ TPTEST(BtreeMetainfo, MetainfoTest) {
         &get_global_perfmon_collection());
 
     dummy_cache_balancer_t balancer(GIGABYTE);
-    cache_t cache(&serializer, &balancer, &get_global_perfmon_collection());
+    cache_t cache(&serializer, &balancer, &get_global_perfmon_collection(),
+                  which_cpu_shard_t{0, 1});
     cache_conn_t cache_conn(&cache);
 
     {

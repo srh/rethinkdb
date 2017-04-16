@@ -1,4 +1,5 @@
 // Copyright 2010-2014 RethinkDB, all rights reserved.
+// This file has been modified by Sam Hughes.
 #ifndef CLUSTERING_ADMINISTRATION_TABLES_TABLE_METADATA_HPP_
 #define CLUSTERING_ADMINISTRATION_TABLES_TABLE_METADATA_HPP_
 
@@ -46,6 +47,15 @@ ARCHIVE_PRIM_MAKE_RANGED_SERIALIZABLE(
     write_ack_config_t::SINGLE,
     write_ack_config_t::MAJORITY);
 
+class user_value_t {
+public:
+    ql::datum_t datum;
+};
+
+RDB_DECLARE_SERIALIZABLE(user_value_t);
+
+user_value_t default_user_value();
+
 /* `table_config_t` describes the complete contents of the `rethinkdb.table_config`
 artificial table. */
 
@@ -74,12 +84,15 @@ public:
     optional<write_hook_config_t> write_hook;
     write_ack_config_t write_ack_config;
     write_durability_t durability;
+    user_value_t user_value;
 };
 
 RDB_DECLARE_EQUALITY_COMPARABLE(table_config_t);
 
 RDB_DECLARE_SERIALIZABLE(table_config_t::shard_t);
 RDB_DECLARE_EQUALITY_COMPARABLE(table_config_t::shard_t);
+
+flush_interval_t get_flush_interval(const table_config_t &);
 
 class table_shard_scheme_t {
 public:

@@ -1,4 +1,5 @@
 // Copyright 2010-2016 RethinkDB, all rights reserved.
+// This file has been modified by Sam Hughes.
 #include "clustering/administration/persist/migrate/migrate_v2_1.hpp"
 
 #include "clustering/administration/metadata.hpp"
@@ -78,9 +79,10 @@ void migrate_metadata_v2_1_to_v2_3(cluster_version_t serialization_version,
     case cluster_version_t::v2_3:
         migrate_metadata_v2_1_to_v2_3<cluster_version_t::v2_3>(txn, interruptor);
         break;
-    case cluster_version_t::v2_4_is_latest:
-        migrate_metadata_v2_1_to_v2_3<cluster_version_t::v2_4>(txn, interruptor);
+    case cluster_version_t::v2_4_is_latest_disk:
+        migrate_metadata_v2_1_to_v2_3<cluster_version_t::v2_4_is_latest_disk>(txn, interruptor);
         break;
+    case cluster_version_t::v2_4_ext:
     case cluster_version_t::v1_14:
     case cluster_version_t::v1_15:
     case cluster_version_t::v1_16:

@@ -1,10 +1,12 @@
 // Copyright 2010-2015 RethinkDB, all rights reserved.
+// This file has been modified by Sam Hughes.
 #ifndef CLUSTERING_TABLE_MANAGER_TABLE_MANAGER_HPP_
 #define CLUSTERING_TABLE_MANAGER_TABLE_MANAGER_HPP_
 
 #include "clustering/table_contract/coordinator/coordinator.hpp"
 #include "clustering/table_contract/executor/executor.hpp"
 #include "clustering/table_manager/backfill_progress_tracker.hpp"
+#include "clustering/table_manager/flush_interval_manager.hpp"
 #include "clustering/table_manager/server_name_cache_updater.hpp"
 #include "clustering/table_manager/sindex_manager.hpp"
 #include "clustering/table_manager/table_metadata.hpp"
@@ -179,6 +181,10 @@ private:
     /* The `sindex_manager` watches the `table_config_t` and changes the sindexes on
     `multistore_ptr` according to what it sees. */
     sindex_manager_t sindex_manager;
+
+    /* The `flush_interval_manager` watches the `table_config_t` and changes the flush
+    interval according to what it sees. */
+    flush_interval_manager_t flush_interval_manager;
 
     auto_drainer_t drainer;
 

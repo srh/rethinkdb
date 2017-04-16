@@ -1,4 +1,5 @@
 // Copyright 2010-2014 RethinkDB, all rights reserved.
+// This file has been modified by Sam Hughes.
 #include "buffer_cache/alt.hpp"
 #include "buffer_cache/blob.hpp"
 #include "buffer_cache/cache_balancer.hpp"
@@ -295,7 +296,8 @@ TPTEST(BlobTest, AllTests) {
             &get_global_perfmon_collection());
 
     dummy_cache_balancer_t balancer(GIGABYTE);
-    cache_t cache(&log_serializer, &balancer, &get_global_perfmon_collection());
+    cache_t cache(&log_serializer, &balancer, &get_global_perfmon_collection(),
+                  which_cpu_shard_t{0, 1});
 
     run_tests(&cache);
 }

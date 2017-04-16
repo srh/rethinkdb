@@ -1,4 +1,5 @@
 // Copyright 2010-2013 RethinkDB, all rights reserved.
+// This file has been modified by Sam Hughes.
 #ifndef CONTAINERS_INTRUSIVE_PRIORITY_QUEUE_HPP_
 #define CONTAINERS_INTRUSIVE_PRIORITY_QUEUE_HPP_
 
@@ -7,8 +8,7 @@
 
 #include "errors.hpp"
 
-// TODO: Make this type generally not be awful: Make intrusive_priority_queue_node_t not have
-// virtual functions, make it not use an O(n) vector.
+// TODO: For some reason I wanted this to not use an O(n) vector.
 
 template <class node_t>
 class intrusive_priority_queue_t;

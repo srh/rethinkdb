@@ -1,4 +1,5 @@
 // Copyright 2010-2014 RethinkDB, all rights reserved.
+// This file has been modified by Sam Hughes.
 #ifndef CONCURRENCY_SIGNAL_HPP_
 #define CONCURRENCY_SIGNAL_HPP_
 
@@ -106,6 +107,9 @@ protected:
     }
 
     void reset();
+
+    // You can only call this when it's safe to destruct or reset both objects.
+    void swap(signal_t &other);
 
 private:
     static void call(subscription_t *subscription) THROWS_NOTHING {

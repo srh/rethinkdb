@@ -1,4 +1,5 @@
 // Copyright 2010-2012 RethinkDB, all rights reserved.
+// This file has been modified by Sam Hughes.
 #ifndef CONCURRENCY_COND_VAR_HPP_
 #define CONCURRENCY_COND_VAR_HPP_
 
@@ -15,6 +16,11 @@ public:
     cond_t() { }
     cond_t(cond_t &&movee) : signal_t(std::move(movee)) { }
     void pulse_if_not_already_pulsed();
+
+    void swap(cond_t &other) {
+        signal_t &sig_other = other;
+        signal_t::swap(sig_other);
+    }
 
     using signal_t::pulse;
     using signal_t::reset;

@@ -1,4 +1,5 @@
 // Copyright 2010-2012 RethinkDB, all rights reserved.
+// This file has been modified by Sam Hughes.
 #include "concurrency/signal.hpp"
 
 #include "arch/runtime/coroutines.hpp"
@@ -49,6 +50,15 @@ signal_t::signal_t(signal_t &&movee)
       publisher_controller(std::move(movee.publisher_controller)),
       lock(std::move(movee.lock)) {
     movee.pulsed = false;
+}
+
+void signal_t::swap(signal_t &other) {
+    assert_thread();
+    other.assert_thread();
+
+    std::swap(pulsed, other.pulsed);
+    publisher_controller.swap(other.publisher_controller);
+    lock.swap(other.lock);
 }
 
 // The same thing that happens when a signal_t is destructed happens: We crash if
