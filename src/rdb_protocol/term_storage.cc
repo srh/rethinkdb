@@ -1,4 +1,5 @@
 // Copyright 2010-2015 RethinkDB, all rights reserved.
+// File modified by Sam Hughes (2017).
 #include "rdb_protocol/term_storage.hpp"
 
 #include "arch/runtime/coroutines.hpp"
@@ -603,5 +604,9 @@ void serialize_term_tree(write_message_t *wm, const raw_term_t &root_term) {
 
 template void serialize_term_tree<cluster_version_t::LATEST_OVERALL>(
         write_message_t *, const raw_term_t &);
+#ifndef CLUSTER_AND_DISK_VERSIONS_ARE_SAME
+template void serialize_term_tree<cluster_version_t::LATEST_DISK>(
+        write_message_t *, const raw_term_t &);
+#endif
 
 } // namespace ql

@@ -1,4 +1,5 @@
 // Copyright 2010-2015 RethinkDB, all rights reserved.
+// File modified by Sam Hughes (2017).
 #include "clustering/administration/persist/file.hpp"
 
 #include "btree/depth_first_traversal.hpp"
@@ -54,7 +55,7 @@ cluster_version_t magic_to_version(block_magic_t magic) {
     case 'h': return cluster_version_t::v2_0;
     case 'i': return cluster_version_t::v2_1;
     case 'j': return cluster_version_t::v2_2;
-    case 'k': return cluster_version_t::v2_3;
+    case 'k': return cluster_version_t::v2_3_is_latest_disk;
     default:
         fail_due_to_user_error("You're trying to use an earlier version of RethinkDB "
             "to open a database created by a later version of RethinkDB.");
