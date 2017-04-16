@@ -1,4 +1,5 @@
 // Copyright 2010-2014 RethinkDB, all rights reserved.
+// File modified by Sam Hughes (2017).
 #ifndef BUFFER_CACHE_PAGE_CACHE_HPP_
 #define BUFFER_CACHE_PAGE_CACHE_HPP_
 
@@ -25,6 +26,8 @@
 #include "containers/segmented_vector.hpp"
 #include "repli_timestamp.hpp"
 #include "serializer/types.hpp"
+
+// HSI: unordered_map allocates too much, use a different hash table type.
 
 class alt_txn_throttler_t;
 class cache_balancer_t;
