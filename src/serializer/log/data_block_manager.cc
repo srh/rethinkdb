@@ -726,16 +726,17 @@ buf_ptr_t data_block_manager_t::read(int64_t off_in, block_size_t block_size,
 }
 
 std::vector<counted_t<ls_block_token_pointee_t> >
-data_block_manager_t::many_writes(const std::vector<buf_write_info_t> &writes,
+data_block_manager_t::many_writes(const buf_write_info_t *writes,
+                                  size_t writes_count,
                                   file_account_t *io_account,
                                   iocallback_t *cb) {
     // These tokens are grouped by extent.  You can do a contiguous write in each
     // extent.
     std::vector<std::vector<counted_t<ls_block_token_pointee_t> > > token_groups
-        = gimme_some_new_offsets(writes);
+        = gimme_some_new_offsets(writes, writes_count);
 
-    for (auto it = writes.begin(); it != writes.end(); ++it) {
-        it->buf->ser_header.block_id = it->block_id;
+    for (size_t i = 0; i < writes_count; ++i) {
+        writes[i].buf->ser_header.block_id = writes[i].block_id;
     }
 
     struct intermediate_cb_t : public iocallback_t {
@@ -805,7 +806,7 @@ data_block_manager_t::many_writes(const std::vector<buf_write_info_t> &writes,
     intermediate_cb->on_io_complete();
 
     std::vector<counted_t<ls_block_token_pointee_t> > ret;
-    ret.reserve(writes.size());
+    ret.reserve(writes_count);
     for (auto it = token_groups.begin(); it != token_groups.end(); ++it) {
         for (auto jt = it->begin(); jt != it->end(); ++jt) {
             ret.push_back(std::move(*jt));
@@ -1246,7 +1247,8 @@ void data_block_manager_t::write_gcs(
                                                   writes[i].buf->ser_header.block_id));
         }
 
-        new_block_tokens = many_writes(the_writes, choose_gc_io_account(),
+        new_block_tokens = many_writes(the_writes.data(), the_writes.size(),
+                                       choose_gc_io_account(),
                                        &block_write_cond);
 
         guarantee(new_block_tokens.size() == writes.size());
@@ -1419,7 +1421,8 @@ void data_block_manager_t::actually_shutdown() {
 }
 
 std::vector<std::vector<counted_t<ls_block_token_pointee_t> > >
-data_block_manager_t::gimme_some_new_offsets(const std::vector<buf_write_info_t> &writes) {
+data_block_manager_t::gimme_some_new_offsets(const buf_write_info_t *writes,
+                                             size_t writes_count) {
     ASSERT_NO_CORO_WAITING;
 
     // Start a new extent if necessary.
@@ -1434,10 +1437,11 @@ data_block_manager_t::gimme_some_new_offsets(const std::vector<buf_write_info_t>
     std::vector<std::vector<counted_t<ls_block_token_pointee_t> > > ret;
 
     std::vector<counted_t<ls_block_token_pointee_t> > tokens;
-    for (auto it = writes.begin(); it != writes.end(); ++it) {
+    for (size_t i = 0; i < writes_count; ++i) {
+        block_size_t block_size = writes[i].block_size;
         uint32_t relative_offset = valgrind_undefined<uint32_t>(UINT32_MAX);
         unsigned int block_index = valgrind_undefined<unsigned int>(UINT_MAX);
-        if (!active_extent->new_offset(it->block_size,
+        if (!active_extent->new_offset(block_size,
                                        &relative_offset, &block_index)) {
             // Move the active_extent gc_entry_t to the young extent queue (if it's
             // not already empty), and make a new gc_entry_t.
@@ -1453,7 +1457,7 @@ data_block_manager_t::gimme_some_new_offsets(const std::vector<buf_write_info_t>
             }
 
             ++stats->pm_serializer_data_extents_allocated;
-            const bool succeeded = active_extent->new_offset(it->block_size,
+            const bool succeeded = active_extent->new_offset(block_size,
                                                              &relative_offset,
                                                              &block_index);
             guarantee(succeeded);
@@ -1469,7 +1473,7 @@ data_block_manager_t::gimme_some_new_offsets(const std::vector<buf_write_info_t>
         active_extent->was_written = true;
         active_extent->mark_live_tokenwise(block_index);
 
-        tokens.push_back(serializer->generate_block_token(offset, it->block_size));
+        tokens.push_back(serializer->generate_block_token(offset, block_size));
     }
 
     if (!tokens.empty()) {

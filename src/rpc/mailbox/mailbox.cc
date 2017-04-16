@@ -228,7 +228,7 @@ void mailbox_manager_t::mailbox_read_coroutine(
                 }
             }
         } catch (const fake_archive_exc_t &e) {
-            logWRN("Received an invalid cluster message from a peer.");
+            crash("Received an invalid cluster message from a peer.");
         }
     }
 }

@@ -143,16 +143,16 @@ private:
     // This page_t's index into its eviction bag (managed by the page_cache_t -- one
     // of unevictable_pages_, etc).  Which bag we should be in:
     //
-    // if loader_ is non-null:  unevictable_pages_
-    // else if waiters_ is non-empty: unevictable_pages_
-    // else if buf_ is null: evicted_pages_ (and block_token_ is non-null)
-    // else if block_token_ is non-null: evictable_disk_backed_pages_
-    // else: evictable_unbacked_pages_ (buf_ is non-null, block_token_ is null)
+    // if loader_ is non-null:  unevictable_
+    // else if waiters_ is non-empty: unevictable_
+    // else if buf_ is null: evicted_ (and block_token_ is non-null)
+    // else if block_token_ is non-null: evictable_disk_backed_
+    // else: evictable_unbacked_ (buf_ is non-null, block_token_ is null)
     //
     // So, when loader_, waiters_, buf_, or block_token_ is touched, we might
     // need to change this page's eviction bag.
     //
-    // The logic above is implemented in page_cache_t::correct_eviction_category.
+    // The logic above is implemented in evicter_t::correct_eviction_category.
     backindex_bag_index_t eviction_index_;
 
     DISABLE_COPYING(page_t);
@@ -165,23 +165,42 @@ inline backindex_bag_index_t *access_backindex(page_t *page) {
 // A page_ptr_t holds a pointer to a page_t.
 class page_ptr_t {
 public:
-    explicit page_ptr_t(page_t *page)
-        : page_(nullptr) { init(page); }
-    page_ptr_t();
+    explicit page_ptr_t(page_t *page) : page_(nullptr) {
+        init(page);
+    }
+    page_ptr_t() : page_(nullptr) { }
 
     // The page_ptr_t MUST be reset before the destructor is called.
-    ~page_ptr_t();
+    ~page_ptr_t() {
+        rassert(page_ == nullptr);
+    }
 
     // You MUST manually call reset_page_ptr() to reset the page_ptr_t.  Then, please
     // call consider_evicting_current_page if applicable.
     void reset_page_ptr(page_cache_t *page_cache);
 
-    page_ptr_t(page_ptr_t &&movee);
-    page_ptr_t &operator=(page_ptr_t &&movee);
+    page_ptr_t(page_ptr_t &&movee) : page_(movee.page_) {
+        movee.page_ = nullptr;
+    }
+    page_ptr_t &operator=(page_ptr_t &&movee) noexcept {
+        // We can't do true assignment, destructing an old page-having value, because
+        // reset() has to manually be called.  (This assertion is redundant with the one
+        // that'll enforce this fact in tmp's destructor.)
+        rassert(page_ == nullptr);
+
+        page_ptr_t tmp(std::move(movee));
+        swap_with(&tmp);
+        return *this;
+    }
 
     void init(page_t *page);
 
-    page_t *get_page_for_read() const;
+    page_t *get_page_for_read() const {
+        rassert(page_ != nullptr);
+        return page_;
+    }
+
+    // Constructs a new page if there might be snapshot references.
     page_t *get_page_for_write(page_cache_t *page_cache,
                                cache_account_t *account);
 
@@ -213,6 +232,8 @@ public:
     repli_timestamp_t timestamp() const { return timestamp_; }
 
     void reset_page_ptr(page_cache_t *page_cache);
+
+    page_ptr_t &&remove_ptr() && { return std::move(page_ptr_); }
 
 private:
     repli_timestamp_t timestamp_;

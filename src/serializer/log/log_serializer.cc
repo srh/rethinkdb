@@ -665,14 +665,17 @@ log_serializer_t::generate_block_token(int64_t offset, block_size_t block_size) 
 }
 
 std::vector<counted_t<ls_block_token_pointee_t> >
-log_serializer_t::block_writes(const std::vector<buf_write_info_t> &write_infos,
-                               file_account_t *io_account, iocallback_t *cb) {
+log_serializer_t::block_writes(const buf_write_info_t *write_infos,
+                               size_t write_infos_count,
+                               file_account_t *io_account,
+                               iocallback_t *cb) {
     assert_thread();
-    stats->pm_serializer_block_writes += write_infos.size();
+    stats->pm_serializer_block_writes += write_infos_count;
 
     std::vector<counted_t<ls_block_token_pointee_t> > result
-        = data_block_manager->many_writes(write_infos, io_account, cb);
-    guarantee(result.size() == write_infos.size());
+        = data_block_manager->many_writes(write_infos, write_infos_count, io_account,
+                                          cb);
+    guarantee(result.size() == write_infos_count);
     return result;
 }
 

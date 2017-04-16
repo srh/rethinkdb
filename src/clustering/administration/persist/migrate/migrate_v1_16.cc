@@ -301,6 +301,7 @@ void migrate_table(const server_id_t &this_server_id,
             metadata_v1_16::write_ack_config_t::mode_t::single ?
                 ::write_ack_config_t::SINGLE : ::write_ack_config_t::MAJORITY;
     config.config.durability = old_config.config.durability;
+    config.config.user_value = default_user_value();
     config.shard_scheme.split_points = old_config.shard_scheme.split_points;
 
     // Scan the servers in the old shard config - need to remove deleted and nil servers
@@ -429,7 +430,8 @@ void check_for_obsolete_sindexes(io_backender_t *io_backender,
                                       base_path,
                                       info.first,
                                       /* Important: Don't update indexes yet. */
-                                      update_sindexes_t::LEAVE_ALONE);
+                                      update_sindexes_t::LEAVE_ALONE,
+                                      which_cpu_shard_t{index, CPU_SHARDING_FACTOR});
 
                         store.sindex_list(interruptor);
                     });
@@ -477,7 +479,8 @@ void migrate_tables(io_backender_t *io_backender,
                                       io_backender,
                                       base_path,
                                       info.first,
-                                      update_sindexes_t::UPDATE);
+                                      update_sindexes_t::UPDATE,
+                                      which_cpu_shard_t{index, CPU_SHARDING_FACTOR});
 
                         if (index == 0) {
                             sindex_list = store.sindex_list(interruptor);
@@ -558,7 +561,8 @@ void migrate_cluster_metadata_to_v2_1(io_backender_t *io_backender,
                       case cluster_version_t::v2_1:
                       case cluster_version_t::v2_2:
                       case cluster_version_t::v2_3:
-                      case cluster_version_t::v2_4_is_latest:
+                      case cluster_version_t::v2_4:
+                      case cluster_version_t::v2_4_ext_is_latest:
                       default:
                         unreachable();
                       }
@@ -578,7 +582,8 @@ void migrate_cluster_metadata_to_v2_1(io_backender_t *io_backender,
                       case cluster_version_t::v2_1:
                       case cluster_version_t::v2_2:
                       case cluster_version_t::v2_3:
-                      case cluster_version_t::v2_4_is_latest:
+                      case cluster_version_t::v2_4:
+                      case cluster_version_t::v2_4_ext_is_latest:
                       default:
                         unreachable();
                       }
@@ -625,7 +630,7 @@ void migrate_auth_metadata_to_v2_1(io_backender_t *io_backender,
     }
 
     dummy_cache_balancer_t balancer(MEGABYTE);
-    cache_t cache(&serializer, &balancer, &dummy_stats);
+    cache_t cache(&serializer, &balancer, &dummy_stats, which_cpu_shard_t{0, 1});
     cache_conn_t cache_conn(&cache);
 
     txn_t read_txn(&cache_conn, read_access_t::read);
@@ -653,7 +658,8 @@ void migrate_auth_metadata_to_v2_1(io_backender_t *io_backender,
                       case cluster_version_t::v2_1:
                       case cluster_version_t::v2_2:
                       case cluster_version_t::v2_3:
-                      case cluster_version_t::v2_4_is_latest:
+                      case cluster_version_t::v2_4:
+                      case cluster_version_t::v2_4_ext_is_latest:
                       default:
                           unreachable();
                       }
@@ -674,7 +680,8 @@ void migrate_auth_metadata_to_v2_1(io_backender_t *io_backender,
                       case cluster_version_t::v2_1:
                       case cluster_version_t::v2_2:
                       case cluster_version_t::v2_3:
-                      case cluster_version_t::v2_4_is_latest:
+                      case cluster_version_t::v2_4:
+                      case cluster_version_t::v2_4_ext_is_latest:
                       default:
                           unreachable();
                       }

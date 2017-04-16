@@ -15,6 +15,7 @@
 #include "clustering/immediate_consistency/remote_replicator_server.hpp"
 #include "clustering/query_routing/primary_query_client.hpp"
 #include "clustering/query_routing/primary_query_server.hpp"
+#include "buffer_cache/alt.hpp"
 #include "buffer_cache/cache_balancer.hpp"
 #include "unittest/dummy_metadata_controller.hpp"
 #include "unittest/gtest.hpp"
@@ -65,7 +66,8 @@ public:
             store(region_t::universe(), serializer.get(), balancer.get(),
                 temp_file.name().permanent_path(), true,
                 &get_global_perfmon_collection(), ctx, io_backender, base_path_t("."),
-                generate_uuid(), update_sindexes_t::UPDATE) {
+                generate_uuid(), update_sindexes_t::UPDATE,
+                which_cpu_shard_t({0, 1})) {
         /* Initialize store metadata */
         cond_t non_interruptor;
         write_token_t token;

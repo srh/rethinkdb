@@ -17,6 +17,8 @@ class table_inactive_persistent_state_t;
 class table_raft_state_t;
 class table_raft_stored_header_t;
 class table_raft_stored_snapshot_t;
+class user_value_t;
+class table_raft_versioned_user_value_t;
 
 /* This file defines the keys that are used to index the `metadata_file_t`. Changing
 these keys will break the on-disk format. */
@@ -42,11 +44,23 @@ metadata_file_t::key_t<table_raft_stored_header_t>
     mdprefix_table_raft_header();
 metadata_file_t::key_t<table_raft_stored_snapshot_t>
     mdprefix_table_raft_snapshot();
+// The table_config_t's user_value_t is stored out-of-band, so that the file format is
+// backwards compatible to official v2.3.x releases.  We check that the user value has
+// the same term/log index as the table_raft_stored_snapshot_t value, so that migrations
+// that go v2_3_ext -> v2_3 -> v2_3_ext don't pick up some old user value.
+metadata_file_t::key_t<table_raft_versioned_user_value_t>
+    mdprefix_table_raft_snapshot_extension();
 
 /* This prefix should be followed by a string of the form `TABLE/LOG_INDEX`, where
 `TABLE` is a UUID as before, and `LOG_INDEX` is a 16-digit hexadecimal. */
 metadata_file_t::key_t<raft_log_entry_t<table_raft_state_t> >
     mdprefix_table_raft_log();
+// The table_config_t's user_value_t is stored out-of-band, so that the file format is
+// backwards compatible to official v2.3.x releases.  Only entries for
+// set_table_config_and_shards_t values (of table_config_and_shards_change_t in the log
+// entries) will be stored.
+metadata_file_t::key_t<user_value_t>
+    mdprefix_table_raft_log_extension();
 
 /* This prefix should be followed by a string of the form `TABLE/BRANCH_ID`, where
 `TABLE` and `BRANCH_ID` are UUIDs as formatted by `uuid_to_str()`. */

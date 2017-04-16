@@ -10,9 +10,8 @@ enum class obsolete_cluster_version_t {
     v1_13_2_is_latest = v1_13_2
 };
 enum class cluster_version_t {
-    // The versions are _currently_ contiguously numbered.  If this becomes untrue,
-    // be sure to carefully replace the ARCHIVE_PRIM_MAKE_RANGED_SERIALIZABLE line
-    // that implements serialization.
+    // Beware that adding/removing new values requires updates to the serialization
+    // function.
     v1_14 = 2,
     v1_15 = 3,
     v1_16 = 4,
@@ -22,17 +21,28 @@ enum class cluster_version_t {
     v2_3 = 8,
     v2_4 = 9,
 
+    // The v2.3-ext serialization format is only used over the cluster.  We keep the
+    // disk format backwards compatible with the official v2.3 releases -- extra
+    // information (which we will add to table_config_t) will get stored "out of band."
+
+    // We never use the v2.3-ext format in this version (2.4-ext) of the software.
+
+    // v2_3_ext = 0x7f - v2_3,
+
+    // Likewise with v2_4.
+    v2_4_ext = 0x7f - v2_4,
+
     // This is used in places where _something_ needs to change when a new cluster
     // version is created.  (Template instantiations, switches on version number,
     // etc.)
-    v2_4_is_latest = v2_4,
+    v2_4_ext_is_latest = v2_4_ext,
 
     // Like the *_is_latest version, but for code that's only concerned with disk
     // serialization. Must be changed whenever LATEST_DISK gets changed.
     v2_4_is_latest_disk = v2_4,
 
     // The latest version, max of CLUSTER and LATEST_DISK
-    LATEST_OVERALL = v2_4_is_latest,
+    LATEST_OVERALL = v2_4_ext_is_latest,
 
     // The latest version for disk serialization can sometimes be different from the
     // version we use for cluster serialization.  This is also the latest version of
@@ -44,10 +54,11 @@ enum class cluster_version_t {
     CLUSTER = LATEST_OVERALL,
 };
 
-// Uncomment this if cluster_version_t::LATEST_DISK != cluster_version_t::CLUSTER.
+// Uncomment this if cluster_version_t::LATEST_DISK == cluster_version_t::CLUSTER.
 // Comment it otherwise. This macro is used to avoid instantiating the same version
 // twice in the `INSTANTIATE_SERIALIZE_FOR_CLUSTER_AND_DISK` macro.
-#define CLUSTER_AND_DISK_VERSIONS_ARE_SAME
+
+// #define CLUSTER_AND_DISK_VERSIONS_ARE_SAME
 
 #ifdef CLUSTER_AND_DISK_VERSIONS_ARE_SAME
 static_assert(cluster_version_t::CLUSTER == cluster_version_t::LATEST_DISK,
@@ -67,8 +78,9 @@ static_assert(cluster_version_t::CLUSTER != cluster_version_t::LATEST_DISK,
 // metablock.
 //
 // At some point the set of cluster versions and disk versions that we support might
-// diverge.  It's likely that we'd support a larger window of serialization versions
-// in the on-disk format.
+// diverge.  It's likely that we'd support a larger window of serialization versions in
+// the on-disk format.  Or maybe, the cluster version marches forward, but as a
+// compatibility hack, the disk version remains the same.
 //
 // Also, note: it's possible that versions will not be linearly ordered: Suppose we
 // release v1.17 and then v1.18.  Perhaps v1.17 supports v1_16 and v1_17 and v1.18

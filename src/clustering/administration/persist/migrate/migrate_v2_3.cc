@@ -30,8 +30,9 @@ void migrate_metadata_v2_3_to_v2_4(cluster_version_t serialization_version,
     case cluster_version_t::v2_3:
         migrate_metadata_v2_3_to_v2_4<cluster_version_t::v2_3>(txn, interruptor);
         break;
-    case cluster_version_t::v2_4_is_latest:
+    case cluster_version_t::v2_4_is_latest_disk:
         break;
+    case cluster_version_t::v2_4_ext_is_latest:
     case cluster_version_t::v1_14:
     case cluster_version_t::v1_15:
     case cluster_version_t::v1_16:

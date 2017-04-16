@@ -58,7 +58,7 @@ void timer_handler_t::on_oneshot() {
             token_queue.push(token);
         }
 
-        token->callback->on_timer();
+        token->callback->on_timer(real_ticks);
 
         // Delete nonrepeating timer tokens.
         if (token->interval_nanos == 0) {
@@ -72,14 +72,14 @@ void timer_handler_t::on_oneshot() {
     }
 }
 
-timer_token_t *timer_handler_t::add_timer_internal(const int64_t ms, timer_callback_t *callback, const bool once) {
-    const int64_t nanos = ms * MILLION;
-    rassert(nanos > 0);
-
-    const int64_t next_time_in_nanos = get_ticks() + nanos;
+timer_token_t *timer_handler_t::add_timer_internal(
+        const int64_t next_time_in_nanos, const int64_t interval_ms,
+        timer_callback_t *callback) {
+    rassert(next_time_in_nanos >= 0);
+    rassert(interval_ms >= 0);
 
     timer_token_t *const token = new timer_token_t;
-    token->interval_nanos = once ? 0 : nanos;
+    token->interval_nanos = interval_ms * MILLION;
     token->next_time_in_nanos = next_time_in_nanos;
     token->callback = callback;
 
@@ -104,12 +104,24 @@ void timer_handler_t::cancel_timer(timer_token_t *token) {
 
 
 
+timer_token_t *add_timer2(int64_t next_time_in_nanos, int64_t interval_ms,
+                          timer_callback_t *callback) {
+    rassert(interval_ms > 0);
+    return linux_thread_pool_t::get_thread()->timer_handler.add_timer_internal(
+        next_time_in_nanos, interval_ms, callback);
+}
+
 timer_token_t *add_timer(int64_t ms, timer_callback_t *callback) {
-    return linux_thread_pool_t::get_thread()->timer_handler.add_timer_internal(ms, callback, false);
+    rassert(ms > 0);
+    int64_t next_time_in_nanos = get_ticks() + ms * MILLION;
+    return linux_thread_pool_t::get_thread()->timer_handler.add_timer_internal(
+        next_time_in_nanos, ms, callback);
 }
 
 timer_token_t *fire_timer_once(int64_t ms, timer_callback_t *callback) {
-    return linux_thread_pool_t::get_thread()->timer_handler.add_timer_internal(ms, callback, true);
+    int64_t next_time_in_nanos = get_ticks() + ms * MILLION;
+    return linux_thread_pool_t::get_thread()->timer_handler.add_timer_internal(
+        next_time_in_nanos, 0, callback);
 }
 
 void cancel_timer(timer_token_t *timer) {

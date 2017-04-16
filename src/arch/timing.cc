@@ -60,7 +60,7 @@ bool signal_timer_t::is_running() const {
     return is_pulsed() || timer != nullptr;
 }
 
-void signal_timer_t::on_timer() {
+void signal_timer_t::on_timer(ticks_t) {
     timer = nullptr;
     pulse();
 }
@@ -69,6 +69,9 @@ void signal_timer_t::on_timer() {
 
 repeating_timer_t::repeating_timer_t(
         int64_t interval_ms, const std::function<void()> &_ringee) :
+    interval(interval_ms),
+    last_ticks(get_ticks()),
+    expected_next_ticks(last_ticks + interval * MILLION),
     ringee(_ringee) {
     rassert(interval_ms > 0);
     timer = add_timer(interval_ms, this);
@@ -76,6 +79,9 @@ repeating_timer_t::repeating_timer_t(
 
 repeating_timer_t::repeating_timer_t(
         int64_t interval_ms, repeating_timer_callback_t *_cb) :
+    interval(interval_ms),
+    last_ticks(get_ticks()),
+    expected_next_ticks(last_ticks + interval * MILLION),
     ringee([_cb]() { _cb->on_ring(); }) {
     rassert(interval_ms > 0);
     timer = add_timer(interval_ms, this);
@@ -83,6 +89,27 @@ repeating_timer_t::repeating_timer_t(
 
 repeating_timer_t::~repeating_timer_t() {
     cancel_timer(timer);
+}
+
+void repeating_timer_t::change_interval(int64_t interval_ms) {
+    if (interval_ms == interval) {
+        return;
+    }
+
+    interval = interval_ms;
+    cancel_timer(timer);
+    expected_next_ticks = std::min<int64_t>(last_ticks + interval_ms * MILLION,
+                                            expected_next_ticks);
+    timer = add_timer2(expected_next_ticks, interval_ms, this);
+}
+
+void repeating_timer_t::clamp_next_ring(int64_t delay_ms) {
+    int64_t t = last_ticks + delay_ms * MILLION;
+    if (t < int64_t(expected_next_ticks)) {
+        cancel_timer(timer);
+        expected_next_ticks = t;
+        timer = add_timer2(expected_next_ticks, interval, this);
+    }
 }
 
 void call_ringer(std::function<void()> ringee) {
@@ -93,8 +120,10 @@ void call_ringer(std::function<void()> ringee) {
     ringee();
 }
 
-void repeating_timer_t::on_timer() {
+void repeating_timer_t::on_timer(ticks_t ticks) {
     // Spawn _now_, otherwise the repeating_timer_t lifetime might end
     // before ring gets used.
+    last_ticks = ticks;
+    expected_next_ticks = last_ticks + interval * MILLION;
     coro_t::spawn_now_dangerously(std::bind(call_ringer, ringee));
 }

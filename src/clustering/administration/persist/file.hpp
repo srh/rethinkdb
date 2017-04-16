@@ -168,13 +168,13 @@ class write_txn_t : public read_txn_t {
 public:
     write_txn_t(metadata_file_t *file, signal_t *interruptor);
 
-    template<class T>
+    template<class T, cluster_version_t W = cluster_version_t::LATEST_DISK>
     void write(
             const key_t<T> &key,
             const T &value,
             signal_t *interruptor) {
         write_message_t wm;
-        serialize<cluster_version_t::LATEST_DISK>(&wm, value);
+        serialize<W>(&wm, value);
         write_bin(key.key, &wm, interruptor);
     }
 
