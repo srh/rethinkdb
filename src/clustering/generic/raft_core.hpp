@@ -1,4 +1,5 @@
 // Copyright 2010-2015 RethinkDB, all rights reserved.
+// This file has been modified by Sam Hughes.
 #ifndef CLUSTERING_GENERIC_RAFT_CORE_HPP_
 #define CLUSTERING_GENERIC_RAFT_CORE_HPP_
 
@@ -308,8 +309,8 @@ public:
     }
 
     /* Appends the given entry ot the log. */
-    void append(const raft_log_entry_t<state_t> &entry) {
-        entries.push_back(entry);
+    void append(raft_log_entry_t<state_t> entry) {
+        entries.push_back(std::move(entry));
     }
 
     /* The equality and inequality operators are for testing. */
