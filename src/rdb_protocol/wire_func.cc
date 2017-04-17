@@ -227,9 +227,15 @@ archive_result_t deserialize<cluster_version_t::v2_2>(
 }
 
 template <>
-archive_result_t deserialize<cluster_version_t::v2_3_is_latest>(
+archive_result_t deserialize<cluster_version_t::v2_3>(
         read_stream_t *s, wire_func_t *wf) {
-    return deserialize_wire_func<cluster_version_t::v2_3_is_latest>(s, wf);
+    return deserialize_wire_func<cluster_version_t::v2_3>(s, wf);
+}
+
+template <>
+archive_result_t deserialize<cluster_version_t::v2_3_ext>(
+        read_stream_t *s, wire_func_t *wf) {
+    return deserialize_wire_func<cluster_version_t::v2_3_ext>(s, wf);
 }
 
 template <cluster_version_t W>
