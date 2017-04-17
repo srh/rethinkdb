@@ -41,6 +41,10 @@ archive_result_t deserialize(UNUSED read_stream_t *s, user_value_t *out) {
     return archive_result_t::SUCCESS;
 }
 
+INSTANTIATE_SERIALIZABLE_FOR_VERSION(user_value_t, cluster_version_t::v2_1);
+INSTANTIATE_SERIALIZABLE_FOR_VERSION(user_value_t, cluster_version_t::v2_2);
+INSTANTIATE_SERIALIZABLE_FOR_VERSION(user_value_t, cluster_version_t::v2_3);
+
 // Implement actual serialization for clustering.
 RDB_MAKE_SERIALIZABLE_1_FOR_CLUSTER(user_value_t, datum);
 

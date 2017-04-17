@@ -86,5 +86,14 @@ private:
     raft_persistent_state_t<table_raft_state_t> state;
 };
 
+class table_raft_versioned_user_value_t {
+public:
+    raft_term_t log_prev_term;
+    raft_log_index_t log_prev_index;
+    user_value_t user_value;
+};
+
+RDB_DECLARE_SERIALIZABLE(table_raft_versioned_user_value_t);
+
 #endif /* CLUSTERING_ADMINISTRATION_PERSIST_RAFT_STORAGE_INTERFACE_HPP_ */
 
