@@ -264,4 +264,10 @@ size_t serialized_size_for_version(cluster_version_t version,
     template archive_result_t deserialize<cluster_version_t::CLUSTER>( \
             read_stream_t *, typ *)
 
+#define INSTANTIATE_SERIALIZABLE_FOR_VERSION(typ, version) \
+    template size_t serialized_size<version>(const typ&); \
+    template void serialize<version>(write_message_t *, const typ &); \
+    template archive_result_t deserialize<version>(read_stream_t *, typ *)
+
+
 #endif  // CONTAINERS_ARCHIVE_VERSIONED_HPP_

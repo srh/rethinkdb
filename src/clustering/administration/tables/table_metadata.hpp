@@ -52,6 +52,8 @@ public:
     ql::datum_t datum;
 };
 
+RDB_DECLARE_SERIALIZABLE(user_value_t);
+
 user_value_t default_user_value();
 
 /* `table_config_t` describes the complete contents of the `rethinkdb.table_config`
