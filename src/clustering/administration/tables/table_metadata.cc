@@ -18,10 +18,39 @@ RDB_IMPL_SERIALIZABLE_3_SINCE_v2_1(table_config_t::shard_t,
 RDB_IMPL_EQUALITY_COMPARABLE_3(table_config_t::shard_t,
     all_replicas, nonvoting_replicas, primary_replica);
 
-RDB_IMPL_SERIALIZABLE_5_SINCE_v2_1(table_config_t,
-    basic, shards, sindexes, write_ack_config, durability);
-RDB_IMPL_EQUALITY_COMPARABLE_5(table_config_t,
-    basic, shards, sindexes, write_ack_config, durability);
+// We start with an empty object, not null -- because a good user would set fields of
+// that object.
+user_value_t default_user_value() {
+    return user_value_t{ql::datum_t::empty_object()};
+}
+// Implement zero-size serialization for v2_3 user values.
+
+template <cluster_version_t W>
+size_t serialized_size(const user_value_t &) {
+    return 0;
+}
+
+template <cluster_version_t W>
+void serialize(UNUSED write_message_t *wm, UNUSED const user_value_t &x) {
+    // do nothing
+}
+
+template <cluster_version_t W>
+archive_result_t deserialize(UNUSED read_stream_t *s, user_value_t *out) {
+    *out = default_user_value();
+    return archive_result_t::SUCCESS;
+}
+
+// Implement actual serialization for clustering.
+RDB_MAKE_SERIALIZABLE_1_FOR_CLUSTER(user_value_t, datum);
+
+RDB_IMPL_EQUALITY_COMPARABLE_1(user_value_t, datum);
+
+// Note that user_value serializes to nothing (gets discarded) except for v2_3_ext.
+RDB_IMPL_SERIALIZABLE_6_SINCE_v2_1(table_config_t,
+    basic, shards, sindexes, write_ack_config, durability, user_value);
+RDB_IMPL_EQUALITY_COMPARABLE_6(table_config_t,
+    basic, shards, sindexes, write_ack_config, durability, user_value);
 
 RDB_IMPL_SERIALIZABLE_1_SINCE_v1_16(table_shard_scheme_t, split_points);
 RDB_IMPL_EQUALITY_COMPARABLE_1(table_shard_scheme_t, split_points);
