@@ -1,4 +1,5 @@
 // Copyright 2010-2015 RethinkDB, all rights reserved.
+// File modified by Sam Hughes (2017).
 #include "clustering/table_contract/emergency_repair.hpp"
 
 /* Returns `true` if `servers` is a subset of `dead`. */
@@ -123,6 +124,7 @@ void calculate_emergency_repair(
         new_state_out->config.config.write_ack_config =
             old_state.config.config.write_ack_config;
         new_state_out->config.config.durability = old_state.config.config.durability;
+        new_state_out->config.config.user_value = old_state.config.config.user_value;
 
         /* We first calculate all the voting and nonvoting replicas for each range in a
         `range_map_t`. */

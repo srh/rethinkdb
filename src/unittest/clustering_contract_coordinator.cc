@@ -1,4 +1,5 @@
 // Copyright 2010-2015 RethinkDB, all rights reserved.
+// File modified by Sam Hughes (2017).
 #include "unittest/gtest.hpp"
 
 #include "clustering/table_contract/coordinator/calculate_contracts.hpp"
@@ -52,6 +53,7 @@ public:
         cs.config.basic.primary_key = "id";
         cs.config.write_ack_config = write_ack_config_t::MAJORITY;
         cs.config.durability = write_durability_t::HARD;
+        cs.config.user_value = default_user_value();
 
         key_range_t::right_bound_t prev_right(store_key_t::min());
         for (const quick_shard_args_t &qs : qss) {
