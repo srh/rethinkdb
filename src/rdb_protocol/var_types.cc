@@ -1,4 +1,5 @@
 // Copyright 2010-2014 RethinkDB, all rights reserved.
+// File modified by Sam Hughes (2017).
 #include "rdb_protocol/var_types.hpp"
 
 #include "containers/archive/stl_types.hpp"
@@ -193,6 +194,8 @@ deserialize<cluster_version_t::v2_1>(read_stream_t *s, var_scope_t *);
 template archive_result_t
 deserialize<cluster_version_t::v2_2>(read_stream_t *s, var_scope_t *);
 template archive_result_t
-deserialize<cluster_version_t::v2_3_is_latest>(read_stream_t *s, var_scope_t *);
+deserialize<cluster_version_t::v2_3>(read_stream_t *s, var_scope_t *);
+template archive_result_t
+deserialize<cluster_version_t::v2_3_ext>(read_stream_t *s, var_scope_t *);
 
 }  // namespace ql

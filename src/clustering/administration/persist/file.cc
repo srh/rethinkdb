@@ -349,6 +349,7 @@ metadata_file_t::metadata_file_t(
         } break;
     case cluster_version_t::v2_3_is_latest_disk:
         break; // Up-to-date, do nothing
+    case cluster_version_t::v2_3_ext:
     default: unreachable();
     }
 }

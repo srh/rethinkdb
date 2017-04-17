@@ -1,4 +1,5 @@
 // Copyright 2010-2015 RethinkDB, all rights reserved.
+// File modified by Sam Hughes (2017).
 #include "clustering/administration/persist/migrate/migrate_v1_16.hpp"
 
 #include "buffer_cache/alt.hpp"
@@ -557,7 +558,8 @@ void migrate_cluster_metadata_to_v2_1(io_backender_t *io_backender,
                       case cluster_version_t::v2_0:
                       case cluster_version_t::v2_1:
                       case cluster_version_t::v2_2:
-                      case cluster_version_t::v2_3_is_latest:
+                      case cluster_version_t::v2_3:
+                      case cluster_version_t::v2_3_ext_is_latest:
                       default:
                         unreachable();
                       }
@@ -576,7 +578,8 @@ void migrate_cluster_metadata_to_v2_1(io_backender_t *io_backender,
                       case cluster_version_t::v1_15:
                       case cluster_version_t::v2_1:
                       case cluster_version_t::v2_2:
-                      case cluster_version_t::v2_3_is_latest:
+                      case cluster_version_t::v2_3:
+                      case cluster_version_t::v2_3_ext_is_latest:
                       default:
                         unreachable();
                       }
@@ -650,7 +653,8 @@ void migrate_auth_metadata_to_v2_1(io_backender_t *io_backender,
                       case cluster_version_t::v2_0:
                       case cluster_version_t::v2_1:
                       case cluster_version_t::v2_2:
-                      case cluster_version_t::v2_3_is_latest:
+                      case cluster_version_t::v2_3:
+                      case cluster_version_t::v2_3_ext_is_latest:
                       default:
                           unreachable();
                       }
@@ -670,7 +674,8 @@ void migrate_auth_metadata_to_v2_1(io_backender_t *io_backender,
                       case cluster_version_t::v1_15:
                       case cluster_version_t::v2_1:
                       case cluster_version_t::v2_2:
-                      case cluster_version_t::v2_3_is_latest:
+                      case cluster_version_t::v2_3:
+                      case cluster_version_t::v2_3_ext_is_latest:
                       default:
                           unreachable();
                       }
