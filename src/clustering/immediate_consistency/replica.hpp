@@ -42,7 +42,7 @@ public:
         const write_t &write,
         state_timestamp_t timestamp,
         order_token_t order_token,
-        write_durability_t durability,
+        txn_durability_t durability,
         signal_t *interruptor,
         write_response_t *response_out);
 

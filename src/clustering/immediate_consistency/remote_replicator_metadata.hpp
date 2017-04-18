@@ -26,7 +26,7 @@ public:
         mailbox_t<void()>::address_t
         )> write_async_mailbox_t;
     typedef mailbox_t<void(
-        write_t, state_timestamp_t, order_token_t, write_durability_t,
+        write_t, state_timestamp_t, order_token_t, txn_durability_t,
         mailbox_t<void(write_response_t)>::address_t
         )> write_sync_mailbox_t;
     typedef mailbox_t<void(

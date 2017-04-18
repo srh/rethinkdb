@@ -400,7 +400,7 @@ void remote_replicator_client_t::on_write_async(
         cleanup_rwlock_acq.reset();
 
         write_response_t dummy_response;
-        replica_->do_write(write, timestamp, order_token, write_durability_t::SOFT,
+        replica_->do_write(write, timestamp, order_token, txn_durability_t::SOFT(),
             interruptor, &dummy_response);
     } else {
         region_t clip_region;
@@ -432,13 +432,13 @@ void remote_replicator_client_t::on_write_async(
 #endif
                 write_response_t dummy_response;
                 store_->write(DEBUG_ONLY(checker, ) new_metainfo, subwrite,
-                    &dummy_response, write_durability_t::SOFT, timestamp, order_token,
+                    &dummy_response, txn_durability_t::SOFT(), timestamp, order_token,
                     &token, interruptor);
             } else {
                 /* The write doesn't actually affect any keys in this region, but we
                 still have to update the metainfo for consistency's sake. */
                 store_->set_metainfo(new_metainfo, order_token, &token,
-                    write_durability_t::SOFT, interruptor);
+                    txn_durability_t::SOFT(), interruptor);
             }
         }
     }
@@ -451,7 +451,7 @@ void remote_replicator_client_t::on_write_sync(
         const write_t &write,
         state_timestamp_t timestamp,
         order_token_t order_token,
-        write_durability_t durability,
+        txn_durability_t durability,
         const mailbox_t<void(write_response_t)>::address_t &ack_addr)
         THROWS_ONLY(interrupted_exc_t) {
     /* The current implementation of the dispatcher will never send us an async write
