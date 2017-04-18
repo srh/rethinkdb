@@ -50,7 +50,7 @@ public:
             const write_t &write,
             state_timestamp_t timestamp,
             order_token_t order_token,
-            write_durability_t durability,
+            txn_durability_t durability,
             signal_t *interruptor,
             write_response_t *response_out) = 0;
         virtual void do_write_async(
@@ -123,7 +123,7 @@ public:
         write_callback_t();
         /* `get_default_write_durability()` returns the write durability that this write
         should use if the write itself didn't specify. */
-        virtual write_durability_t get_default_write_durability() = 0;
+        virtual txn_durability_t get_default_write_durability() = 0;
         /* Every time the write is acked, `on_ack()` is called. When no more replicas
         will ack the write, `on_end()` is called. */
         virtual void on_ack(const server_id_t &, write_response_t &&) = 0;
@@ -184,12 +184,12 @@ private:
     public:
         incomplete_write_t(
             const write_t &w, state_timestamp_t ts, order_token_t ot,
-            write_durability_t durability, write_callback_t *cb);
+            txn_durability_t durability, write_callback_t *cb);
         ~incomplete_write_t();
         write_t write;
         state_timestamp_t timestamp;
         order_token_t order_token;
-        write_durability_t durability;
+        txn_durability_t durability;
         write_callback_t *callback;
     };
 
