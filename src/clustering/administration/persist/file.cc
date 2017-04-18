@@ -163,12 +163,13 @@ metadata_file_t::read_txn_t::read_txn_t(
     rwlock_acq(&file->rwlock, access_t::read, interruptor)
     { }
 
+// HSI: Understand why a read_txn_t is making a write txn_t.
 metadata_file_t::read_txn_t::read_txn_t(
         metadata_file_t *f,
         write_access_t,
         signal_t *interruptor) :
     file(f),
-    txn(file->cache_conn.get(), write_durability_t::HARD, 1),
+    txn(file->cache_conn.get(), txn_durability_t::HARD(), 1),
     rwlock_acq(&file->rwlock, access_t::write, interruptor)
     { }
 

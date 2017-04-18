@@ -94,7 +94,7 @@ private:
             const write_t &write,
             state_timestamp_t timestamp,
             order_token_t order_token,
-            write_durability_t durability,
+            txn_durability_t durability,
             const mailbox_t<void(write_response_t)>::address_t &ack_addr)
         THROWS_ONLY(interrupted_exc_t);
 
