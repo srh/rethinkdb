@@ -1,4 +1,5 @@
 // Copyright 2010-2015 RethinkDB, all rights reserved.
+// File modified by Sam Hughes (2017).
 #include "clustering/immediate_consistency/replica.hpp"
 
 #include "store_view.hpp"
@@ -60,7 +61,7 @@ void replica_t::do_write(
         const write_t &write,
         state_timestamp_t timestamp,
         order_token_t order_token,
-        write_durability_t durability,
+        txn_durability_t durability,
         signal_t *interruptor,
         write_response_t *response_out) {
     assert_thread();

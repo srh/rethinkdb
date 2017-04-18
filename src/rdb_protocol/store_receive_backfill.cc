@@ -1,3 +1,4 @@
+// File modified by Sam Hughes (2017).
 #include "rdb_protocol/store.hpp"
 
 #include "btree/backfill.hpp"
@@ -23,7 +24,7 @@ void flush_cache(cache_conn_t *cache, UNUSED signal_t *interruptor) {
     scoped_ptr_t<txn_t> txn;
     scoped_ptr_t<real_superblock_t> superblock;
     get_btree_superblock_and_txn_for_writing(cache, nullptr,
-        write_access_t::write, 1, write_durability_t::HARD, &superblock, &txn);
+        write_access_t::write, 1, txn_durability_t::HARD(), &superblock, &txn);
     buf_write_t write(superblock->get());
     /* `txn`'s destructor will block until all of the transactions that acquired the
     superblock before we did and modified the metainfo have been flushed to disk. It's a
@@ -159,7 +160,7 @@ void apply_empty_range(
                 &tokens.info->btree_fifo_sink, tokens.write_token);
             wait_interruptible(&exiter, tokens.keepalive.get_drain_signal());
             get_btree_superblock_and_txn_for_writing(tokens.info->cache_conn, nullptr,
-                write_access_t::write, 1, write_durability_t::SOFT, &superblock, &txn);
+                write_access_t::write, 1, txn_durability_t::SOFT(), &superblock, &txn);
 
             /* Update the metainfo and release the superblock. */
             tokens.update_metainfo_cb(empty_range, superblock.get());
@@ -237,7 +238,7 @@ void apply_single_key_item(
                 1, tokens.keepalive.get_drain_signal());
 
             get_btree_superblock_and_txn_for_writing(tokens.info->cache_conn, nullptr,
-                write_access_t::write, 1, write_durability_t::SOFT, &superblock, &txn);
+                write_access_t::write, 1, txn_durability_t::SOFT(), &superblock, &txn);
 
             /* Acquire the sindex block and update the metainfo now, because we'll
             release the superblock soon */
@@ -309,7 +310,7 @@ void apply_multi_key_item(
             scoped_ptr_t<txn_t> txn;
             scoped_ptr_t<real_superblock_t> superblock;
             get_btree_superblock_and_txn_for_writing(tokens.info->cache_conn, nullptr,
-                write_access_t::write, 1, write_durability_t::SOFT, &superblock, &txn);
+                write_access_t::write, 1, txn_durability_t::SOFT(), &superblock, &txn);
 
             /* If we haven't already done so, then update the min deletion timstamps.
             See `btree/backfill.hpp` for an explanation of what this is. Note that we do

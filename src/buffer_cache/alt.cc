@@ -1,3 +1,4 @@
+// File modified by Sam Hughes (2017).
 #include "buffer_cache/alt.hpp"
 
 #include <stack>
@@ -199,12 +200,12 @@ txn_t::txn_t(cache_conn_t *cache_conn,
 }
 
 txn_t::txn_t(cache_conn_t *cache_conn,
-             write_durability_t durability,
+             txn_durability_t durability,
              int64_t expected_change_count)
     : cache_(cache_conn->cache()),
       cache_account_(cache_->page_cache_.default_reads_account()),
       access_(access_t::write),
-      durability_(durability) {
+      durability_(durability.wd()) {
 
     help_construct(expected_change_count, cache_conn);
 }
@@ -827,4 +828,3 @@ void *buf_write_t::get_data_write(uint32_t block_size) {
 void *buf_write_t::get_data_write() {
     return get_data_write(lock_->cache()->max_block_size().value());
 }
-

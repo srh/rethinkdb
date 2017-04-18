@@ -2086,10 +2086,11 @@ private:
         // dirty page limit and bring down the whole table.
         // Other than that, the hard durability guarantee is not actually
         // needed here.
+        // HSI: Reexamine this question.
         scoped_ptr_t<real_superblock_t> superblock;
         store_->acquire_superblock_for_write(
                 2 + MAX_CHUNK_SIZE,
-                write_durability_t::HARD,
+                txn_durability_t::HARD(),
                 &token,
                 &wtxn_,
                 &superblock,

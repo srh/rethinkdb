@@ -1,4 +1,5 @@
 // Copyright 2010-2015 RethinkDB, all rights reserved.
+// File modified by Sam Hughes (2017).
 #ifndef BTREE_REQL_SPECIFIC_HPP_
 #define BTREE_REQL_SPECIFIC_HPP_
 
@@ -39,7 +40,7 @@ private:
     For writes it locks the write superblock acquisition semaphore until the
     sb_buf_ is released.
     Note that this is used to throttle writes compared to reads, but not required
-    for correctness. */    
+    for correctness. */
     new_semaphore_in_line_t write_semaphore_acq_;
 
     buf_lock_t sb_buf_;
@@ -190,7 +191,7 @@ void get_btree_superblock_and_txn_for_writing(
         new_semaphore_t *superblock_write_semaphore,
         write_access_t superblock_access,
         int expected_change_count,
-        write_durability_t durability,
+        txn_durability_t durability,
         scoped_ptr_t<real_superblock_t> *got_superblock_out,
         scoped_ptr_t<txn_t> *txn_out);
 

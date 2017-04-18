@@ -91,6 +91,8 @@ RDB_DECLARE_EQUALITY_COMPARABLE(table_config_t::shard_t);
 RDB_DECLARE_SERIALIZABLE(table_config_t);
 RDB_DECLARE_EQUALITY_COMPARABLE(table_config_t);
 
+txn_durability_t get_txn_durability(const table_config_t &);
+
 class table_shard_scheme_t {
 public:
     std::vector<store_key_t> split_points;

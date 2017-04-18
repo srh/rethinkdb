@@ -1,3 +1,4 @@
+// File modified by Sam Hughes (2017).
 #include "unittest/mock_store.hpp"
 
 #include "arch/timing.hpp"
@@ -94,7 +95,7 @@ region_map_t<binary_blob_t> mock_store_t::get_metainfo(
 void mock_store_t::set_metainfo(const region_map_t<binary_blob_t> &new_metainfo,
                                 order_token_t order_token,
                                 write_token_t *token,
-                                UNUSED write_durability_t durability,
+                                UNUSED txn_durability_t durability,
                                 signal_t *interruptor) THROWS_ONLY(interrupted_exc_t) {
     assert_thread();
     rassert(region_is_superset(get_region(), new_metainfo.get_domain()));
@@ -179,7 +180,7 @@ void mock_store_t::write(
         const region_map_t<binary_blob_t> &new_metainfo,
         const write_t &write,
         write_response_t *response,
-        UNUSED write_durability_t durability,
+        UNUSED txn_durability_t durability,
         state_timestamp_t timestamp,
         order_token_t order_token,
         write_token_t *token,
@@ -526,7 +527,7 @@ bool mock_store_t::check_ok_to_receive_backfill() THROWS_NOTHING {
 void mock_store_t::reset_data(
         const binary_blob_t &zero_version,
         const region_t &subregion,
-        UNUSED write_durability_t durability,
+        UNUSED txn_durability_t durability,
         signal_t *interruptor) THROWS_ONLY(interrupted_exc_t) {
     assert_thread();
     rassert(region_is_superset(get_region(), subregion));

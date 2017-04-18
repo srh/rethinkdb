@@ -1,4 +1,5 @@
 // Copyright 2010-2014 RethinkDB, all rights reserved.
+// File modified by Sam Hughes (2017).
 #include "clustering/immediate_consistency/backfiller.hpp"
 #include "clustering/immediate_consistency/backfillee.hpp"
 #include "clustering/table_manager/backfill_progress_tracker.hpp"
@@ -45,7 +46,7 @@ TPTEST(ClusteringBackfill, BackfillTest) {
                 binary_blob_t(version_t(dummy_branch_id, timestamp))),
             order_source.check_in(strprintf("set_metainfo(i=%zu)", i)),
             &token,
-            write_durability_t::HARD,
+            txn_durability_t::HARD(),
             &non_interruptor);
     }
 
@@ -76,7 +77,8 @@ TPTEST(ClusteringBackfill, BackfillTest) {
                     binary_blob_t(version_t(dummy_branch_id, timestamp))
                 ),
                 w,
-                &response, write_durability_t::SOFT,
+                &response,
+                txn_durability_t::SOFT(),
                 timestamp,
                 order_source.check_in(strprintf("backfiller_store.write(j=%d)", j)),
                 &token,

@@ -86,7 +86,7 @@ public:
     txn_t(cache_conn_t *cache_conn, read_access_t read_access);
 
     txn_t(cache_conn_t *cache_conn,
-          write_durability_t durability,
+          txn_durability_t durability,
           int64_t expected_change_count);
 
     ~txn_t();

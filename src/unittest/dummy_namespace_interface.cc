@@ -1,3 +1,4 @@
+// File modified by Sam Hughes (2017).
 #include "unittest/dummy_namespace_interface.hpp"
 
 #include "unittest/clustering_utils.hpp"
@@ -55,7 +56,8 @@ void dummy_performer_t::write(const write_t &write,
     store->write(
             DEBUG_ONLY(metainfo_checker, )
             region_map_t<binary_blob_t>(store->get_region(), binary_blob_t(timestamp)),
-            write, response, write_durability_t::SOFT, timestamp, order_token, &token, &non_interruptor);
+            write, response, txn_durability_t::SOFT(), timestamp, order_token,
+            &token, &non_interruptor);
 }
 
 
@@ -183,7 +185,7 @@ dummy_namespace_interface_t(std::vector<region_t> shards,
                     order_source->check_in("dummy_namespace_interface_t::"
                         "dummy_namespace_interface_t (set_metainfo)"),
                     &write_token,
-                    write_durability_t::SOFT,
+                    txn_durability_t::SOFT(),
                     &interruptor);
         }
 

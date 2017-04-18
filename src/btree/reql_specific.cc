@@ -1,4 +1,5 @@
 // Copyright 2010-2015 RethinkDB, all rights reserved.
+// File modified by Sam Hughes (2017).
 #include "btree/reql_specific.hpp"
 
 #include "btree/secondary_operations.hpp"
@@ -377,7 +378,7 @@ void get_btree_superblock_and_txn_for_writing(
         new_semaphore_t *superblock_write_semaphore,
         UNUSED write_access_t superblock_access,
         int expected_change_count,
-        write_durability_t durability,
+        txn_durability_t durability,
         scoped_ptr_t<real_superblock_t> *got_superblock_out,
         scoped_ptr_t<txn_t> *txn_out) {
     txn_t *txn = new txn_t(cache_conn, durability, expected_change_count);

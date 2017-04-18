@@ -1,4 +1,5 @@
 // Copyright 2010-2015 RethinkDB, all rights reserved.
+// File modified by Sam Hughes (2017).
 #include "clustering/administration/persist/table_interface.hpp"
 
 #include <algorithm>
@@ -108,7 +109,7 @@ public:
                         binary_blob_t(version_t::zero())),
                     order_source.check_in("real_multistore_ptr_t"),
                     &write_token,
-                    write_durability_t::HARD,
+                    txn_durability_t::HARD(),
                     &non_interruptor);
             }
         });

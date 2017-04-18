@@ -1,4 +1,5 @@
 // Copyright 2010-2015 RethinkDB, all rights reserved.
+// File modified by Sam Hughes (2017).
 #ifndef CLUSTERING_IMMEDIATE_CONSISTENCY_REMOTE_REPLICATOR_CLIENT_HPP_
 #define CLUSTERING_IMMEDIATE_CONSISTENCY_REMOTE_REPLICATOR_CLIENT_HPP_
 
@@ -94,7 +95,7 @@ private:
             const write_t &write,
             state_timestamp_t timestamp,
             order_token_t order_token,
-            write_durability_t durability,
+            txn_durability_t durability,
             const mailbox_t<void(write_response_t)>::address_t &ack_addr)
         THROWS_ONLY(interrupted_exc_t);
 

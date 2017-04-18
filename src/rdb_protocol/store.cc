@@ -1,4 +1,5 @@
 // Copyright 2010-2014 RethinkDB, all rights reserved.
+// File modified by Sam Hughes (2017).
 #include "rdb_protocol/store.hpp"
 
 #include <list>
@@ -87,7 +88,7 @@ void store_t::help_construct_bring_sindexes_up_to_date() {
     scoped_ptr_t<txn_t> txn;
     scoped_ptr_t<real_superblock_t> superblock;
     acquire_superblock_for_write(1,
-                                 write_durability_t::SOFT,
+                                 txn_durability_t::SOFT(),
                                  &token,
                                  &txn,
                                  &superblock,

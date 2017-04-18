@@ -1,4 +1,5 @@
 // Copyright 2010-2015 RethinkDB, all rights reserved.
+// File modified by Sam Hughes (2017).
 #include "clustering/immediate_consistency/remote_replicator_server.hpp"
 
 remote_replicator_server_t::remote_replicator_server_t(
@@ -49,7 +50,7 @@ void remote_replicator_server_t::proxy_replica_t::do_write_sync(
         const write_t &write,
         state_timestamp_t timestamp,
         order_token_t order_token,
-        write_durability_t durability,
+        txn_durability_t durability,
         signal_t *interruptor,
         write_response_t *response_out) {
     guarantee(is_ready);

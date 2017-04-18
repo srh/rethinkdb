@@ -1,4 +1,5 @@
 // Copyright 2010-2015 RethinkDB, all rights reserved.
+// File modified by Sam Hughes (2017).
 #ifndef CLUSTERING_IMMEDIATE_CONSISTENCY_REMOTE_REPLICATOR_METADATA_HPP_
 #define CLUSTERING_IMMEDIATE_CONSISTENCY_REMOTE_REPLICATOR_METADATA_HPP_
 
@@ -26,7 +27,7 @@ public:
         mailbox_t<void()>::address_t
         )> write_async_mailbox_t;
     typedef mailbox_t<void(
-        write_t, state_timestamp_t, order_token_t, write_durability_t,
+        write_t, state_timestamp_t, order_token_t, txn_durability_t,
         mailbox_t<void(write_response_t)>::address_t
         )> write_sync_mailbox_t;
     typedef mailbox_t<void(

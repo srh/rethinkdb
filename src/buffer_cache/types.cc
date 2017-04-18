@@ -1,6 +1,9 @@
+// File modified by Sam Hughes (2017).
 #include "buffer_cache/types.hpp"
 
 #include "debug.hpp"
+
+RDB_MAKE_SERIALIZABLE_1_FOR_CLUSTER(txn_durability_t, flush_interval_ms);
 
 void debug_print(printf_buffer_t *buf, block_magic_t magic) {
     buf->appendf("block_magic{");

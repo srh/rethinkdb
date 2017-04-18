@@ -1,4 +1,5 @@
 // Copyright 2010-2014 RethinkDB, all rights reserved.
+// File modified by Sam Hughes (2017).
 #ifndef RDB_PROTOCOL_STORE_HPP_
 #define RDB_PROTOCOL_STORE_HPP_
 
@@ -110,7 +111,7 @@ public:
             const region_map_t<binary_blob_t> &new_metainfo,
             order_token_t order_token,
             write_token_t *token,
-            write_durability_t durability,
+            txn_durability_t durability,
             signal_t *interruptor)
         THROWS_ONLY(interrupted_exc_t);
 
@@ -140,7 +141,7 @@ public:
             const region_map_t<binary_blob_t>& new_metainfo,
             const write_t &write,
             write_response_t *response,
-            write_durability_t durability,
+            txn_durability_t durability,
             state_timestamp_t timestamp,
             order_token_t order_token,
             write_token_t *token,
@@ -172,7 +173,7 @@ public:
     void reset_data(
             const binary_blob_t &zero_version,
             const region_t &subregion,
-            write_durability_t durability,
+            txn_durability_t durability,
             signal_t *interruptor)
         THROWS_ONLY(interrupted_exc_t);
 
@@ -319,7 +320,7 @@ public:
 
     void acquire_superblock_for_write(
             int expected_change_count,
-            write_durability_t durability,
+            txn_durability_t durability,
             write_token_t *token,
             scoped_ptr_t<txn_t> *txn_out,
             scoped_ptr_t<real_superblock_t> *sb_out,

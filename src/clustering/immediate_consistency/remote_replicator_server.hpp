@@ -1,4 +1,5 @@
 // Copyright 2010-2015 RethinkDB, all rights reserved.
+// File modified by Sam Hughes (2017).
 #ifndef CLUSTERING_IMMEDIATE_CONSISTENCY_REMOTE_REPLICATOR_SERVER_HPP_
 #define CLUSTERING_IMMEDIATE_CONSISTENCY_REMOTE_REPLICATOR_SERVER_HPP_
 
@@ -49,7 +50,7 @@ private:
             const write_t &write,
             state_timestamp_t timestamp,
             order_token_t order_token,
-            write_durability_t durability,
+            txn_durability_t durability,
             signal_t *interruptor,
             write_response_t *response_out);
 

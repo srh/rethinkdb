@@ -1,4 +1,5 @@
 // Copyright 2010-2014 RethinkDB, all rights reserved.
+// File modified by Sam Hughes (2017).
 #include "rdb_protocol/store.hpp"  // NOLINT(build/include_order)
 
 #include <functional>  // NOLINT(build/include_order)
@@ -111,7 +112,7 @@ store_t::store_t(const region_t &region,
         int res = send_write_message(&key, &wm);
         guarantee(!res);
 
-        txn_t txn(general_cache_conn.get(), write_durability_t::HARD, 1);
+        txn_t txn(general_cache_conn.get(), txn_durability_t::HARD(), 1);
         buf_lock_t sb_lock(&txn, SUPERBLOCK_ID, alt_create_t::create);
         real_superblock_t superblock(std::move(sb_lock));
         btree_slice_t::init_real_superblock(&superblock, key.vector(), binary_blob_t());
@@ -202,7 +203,7 @@ void store_t::write(
         const region_map_t<binary_blob_t>& new_metainfo,
         const write_t &write,
         write_response_t *response,
-        const write_durability_t durability,
+        const txn_durability_t durability,
         state_timestamp_t timestamp,
         UNUSED order_token_t order_token,  // TODO
         write_token_t *token,
@@ -225,7 +226,7 @@ void store_t::write(
 void store_t::reset_data(
         const binary_blob_t &zero_metainfo,
         const region_t &subregion,
-        const write_durability_t durability,
+        const txn_durability_t durability,
         signal_t *interruptor)
         THROWS_ONLY(interrupted_exc_t) {
     guarantee(subregion.beg == get_region().beg && subregion.end == get_region().end);
@@ -347,7 +348,7 @@ void store_t::sindex_create(
     scoped_ptr_t<txn_t> txn;
     get_btree_superblock_and_txn_for_writing(general_cache_conn.get(),
         &write_superblock_acq_semaphore, write_access_t::write, 1,
-        write_durability_t::HARD, &superblock, &txn);
+        txn_durability_t::HARD(), &superblock, &txn);
     buf_lock_t sindex_block(superblock->expose_buf(),
                             superblock->get_sindex_block_id(),
                             access_t::write);
@@ -392,7 +393,7 @@ void store_t::sindex_rename_multi(
     scoped_ptr_t<txn_t> txn;
     get_btree_superblock_and_txn_for_writing(general_cache_conn.get(),
         &write_superblock_acq_semaphore, write_access_t::write, 1,
-        write_durability_t::HARD, &superblock, &txn);
+        txn_durability_t::HARD(), &superblock, &txn);
     buf_lock_t sindex_block(superblock->expose_buf(),
                             superblock->get_sindex_block_id(),
                             access_t::write);
@@ -436,7 +437,7 @@ void store_t::sindex_drop(
     scoped_ptr_t<txn_t> txn;
     get_btree_superblock_and_txn_for_writing(general_cache_conn.get(),
         &write_superblock_acq_semaphore, write_access_t::write, 1,
-        write_durability_t::HARD, &superblock, &txn);
+        txn_durability_t::HARD(), &superblock, &txn);
     buf_lock_t sindex_block(superblock->expose_buf(),
                             superblock->get_sindex_block_id(),
                             access_t::write);
@@ -696,7 +697,7 @@ void store_t::clear_sindex_data(
         acquire_superblock_for_write(
             // Not really the right value, since many keys will share a leaf node:
             clear_sindex_traversal_cb_t::CHUNK_SIZE,
-            write_durability_t::SOFT,
+            txn_durability_t::SOFT(),
             &token,
             &txn,
             &superblock,
@@ -791,7 +792,7 @@ void store_t::drop_sindex(uuid_u sindex_id) THROWS_NOTHING {
     cond_t non_interruptor;
     acquire_superblock_for_write(
         2,
-        write_durability_t::SOFT,
+        txn_durability_t::SOFT(),
         &token,
         &txn,
         &superblock,
@@ -1130,7 +1131,7 @@ region_map_t<binary_blob_t> store_t::get_metainfo(
 void store_t::set_metainfo(const region_map_t<binary_blob_t> &new_metainfo,
                            UNUSED order_token_t order_token,  // TODO
                            write_token_t *token,
-                           write_durability_t durability,
+                           txn_durability_t durability,
                            signal_t *interruptor) THROWS_ONLY(interrupted_exc_t) {
     assert_thread();
 
@@ -1169,7 +1170,7 @@ void store_t::migrate_metainfo(
     scoped_ptr_t<txn_t> txn;
     scoped_ptr_t<real_superblock_t> superblock;
     acquire_superblock_for_write(1,
-                                 write_durability_t::HARD,
+                                 txn_durability_t::HARD(),
                                  token,
                                  &txn,
                                  &superblock,
@@ -1199,7 +1200,7 @@ void store_t::acquire_superblock_for_read(
 
 void store_t::acquire_superblock_for_write(
         int expected_change_count,
-        write_durability_t durability,
+        txn_durability_t durability,
         write_token_t *token,
         scoped_ptr_t<txn_t> *txn_out,
         scoped_ptr_t<real_superblock_t> *sb_out,

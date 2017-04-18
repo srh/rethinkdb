@@ -1,4 +1,5 @@
 // Copyright 2010-2015 RethinkDB, all rights reserved.
+// File modified by Sam Hughes (2017).
 #include "clustering/table_contract/executor/exec_erase.hpp"
 
 #include "concurrency/cross_thread_signal.hpp"
@@ -29,10 +30,11 @@ void erase_execution_t::run(auto_drainer_t::lock_t keepalive) {
             keepalive.get_drain_signal(), store->home_thread());
         on_thread_t thread_switcher(store->home_thread());
         try {
+            // HSI: Does anybody call reset_data() without HARD?
             store->reset_data(
                 binary_blob_t(version_t::zero()),
                 region,
-                write_durability_t::HARD,
+                txn_durability_t::HARD(),
                 &interruptor_store_thread);
         } catch (const interrupted_exc_t &) {
             /* do nothing */

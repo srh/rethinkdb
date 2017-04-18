@@ -1,4 +1,5 @@
 // Copyright 2010-2014 RethinkDB, all rights reserved.
+// File modified by Sam Hughes (2017).
 #ifndef UNITTEST_CLUSTERING_UTILS_HPP_
 #define UNITTEST_CLUSTERING_UTILS_HPP_
 
@@ -32,8 +33,8 @@ class simple_write_callback_t :
 {
 public:
     simple_write_callback_t() : acks(0) { }
-    write_durability_t get_default_write_durability() {
-        return write_durability_t::HARD;
+    txn_durability_t get_default_write_durability() {
+        return txn_durability_t::HARD();
     }
     void on_ack(const server_id_t &, write_response_t &&) {
         ++acks;
@@ -74,7 +75,7 @@ public:
                 store.get_region(),
                 binary_blob_t(version_t::zero()));
         store.set_metainfo(new_metainfo, order_source->check_in("test_store_t"), &token,
-            write_durability_t::SOFT, &non_interruptor);
+                           txn_durability_t::SOFT(), &non_interruptor);
     }
 
     temp_file_t temp_file;
