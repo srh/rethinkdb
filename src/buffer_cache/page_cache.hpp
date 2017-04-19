@@ -304,6 +304,11 @@ public:
         movee.index_changes_semaphore_acq_.reset();
     }
 
+    bool has_txn_throttler() const {
+        // Either semaphore would do.
+        return block_changes_semaphore_acq_.has_semaphore();
+    }
+
     // See below:  this can update how much *_changes_semaphore_acq_ holds.
     void update_dirty_page_count(int64_t new_count);
 
@@ -336,7 +341,8 @@ public:
     // throttler_acq parameter) when done.
     void flush_and_destroy_txn(
             scoped_ptr_t<page_txn_t> txn,
-            std::function<void(throttler_acq_t *)> on_flush_complete);
+            txn_durability_t durability,
+            std::function<void(throttler_acq_t *)> &&on_flush_complete);
 
     current_page_t *page_for_block_id(block_id_t block_id);
     current_page_t *page_for_new_block_id(
@@ -419,7 +425,9 @@ private:
 
     static std::vector<page_txn_t *> maximal_flushable_txn_set(page_txn_t *base);
 
-    void im_waiting_for_flush(page_txn_t *txns);
+    void begin_waiting_for_flush(page_txn_t *txns, txn_durability_t durability);
+
+    void spawn_flush_flushables(std::vector<page_txn_t *> &&flush_set);
 
     friend class current_page_acq_t;
     repli_timestamp_t recency_for_block_id(block_id_t id) {
@@ -435,7 +443,7 @@ private:
     }
 
     void set_recency_for_block_id(block_id_t id, repli_timestamp_t recency) {
-        if(is_aux_block_id(id)) {
+        if (is_aux_block_id(id)) {
             guarantee(recency == repli_timestamp_t::invalid);
             return;
         }
@@ -469,6 +477,9 @@ private:
     segmented_vector_t<repli_timestamp_t> recencies_;
 
     std::unordered_map<block_id_t, current_page_t *> current_pages_;
+
+    // Txns that have began_waiting_for_flush_ true, spawned_flush_ false.
+    intrusive_list_t<page_txn_t> waiting_for_spawn_flush_;
 
     free_list_t free_list_;
 
@@ -555,7 +566,7 @@ public:
 // their copies of the block.
 //
 // LSI: Make situation '(a)' happenable.
-class page_txn_t {
+class page_txn_t : public intrusive_list_node_t<page_txn_t> {
 public:
     // Our transaction has to get committed to disk _after_ or at the same time as
     // preceding transactions on cache_conn, if that parameter is not NULL.  (The
@@ -596,8 +607,6 @@ private:
     friend class current_page_acq_t;
     void add_acquirer(current_page_acq_t *acq);
     void remove_acquirer(current_page_acq_t *acq);
-
-    void announce_waiting_for_flush();
 
     page_cache_t *page_cache_;
     // This can be NULL, if the txn is not part of some cache conn.
@@ -647,9 +656,6 @@ private:
     // and modify it again.
     segmented_vector_t<touched_page_t, 8> touched_pages_;
 
-    // KSI: We could probably turn began_waiting_for_flush_ and spawned_flush_ into a
-    // generalized state enum.
-    //
     // KSI: Should we have the spawned_flush_ variable or should we remove the txn
     // from the graph?
 
