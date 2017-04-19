@@ -244,6 +244,24 @@ page_cache_t::~page_cache_t() {
 
     have_read_ahead_cb_destroyed();
 
+    // HSI: This still the right thing?
+
+    // Flush all pending soft-durability transactions.  All txn's must have had
+    // flush_and_destroy_txn called on them before we entered this destructor, so we
+    // know the entire set of txn's is a valid flush_set.  (All subseqers must have
+    // began_waiting_for_flush_ == true.)
+    {
+        std::vector<page_txn_t *> flush_set;
+        flush_set.reserve(waiting_for_spawn_flush_.size());
+        for (page_txn_t *ptr = waiting_for_spawn_flush_.head();
+             ptr != nullptr;
+             ptr = waiting_for_spawn_flush_.next(ptr)) {
+            flush_set.push_back(ptr);
+        }
+        spawn_flush_flushables(std::move(flush_set));
+    }
+
+
     drainer_.reset();
     size_t i = 0;
     for (auto &&page : current_pages_) {
@@ -270,9 +288,10 @@ page_cache_t::~page_cache_t() {
 // We go a bit old-school, with a self-destroying callback.
 class flush_and_destroy_txn_waiter_t : public signal_t::subscription_t {
 public:
-    flush_and_destroy_txn_waiter_t(auto_drainer_t::lock_t &&lock,
-                                   page_txn_t *txn,
-                                   std::function<void(throttler_acq_t *)> on_flush_complete)
+    flush_and_destroy_txn_waiter_t(
+            auto_drainer_t::lock_t &&lock,
+            page_txn_t *txn,
+            std::function<void(throttler_acq_t *)> &&on_flush_complete)
         : lock_(std::move(lock)),
           txn_(txn),
           on_flush_complete_(std::move(on_flush_complete)) { }
@@ -318,12 +337,16 @@ private:
 
 void page_cache_t::flush_and_destroy_txn(
         scoped_ptr_t<page_txn_t> txn,
-        std::function<void(throttler_acq_t *)> on_flush_complete) {
+        txn_durability_t durability,
+        std::function<void(throttler_acq_t *)> &&on_flush_complete) {
     guarantee(txn->live_acqs_ == 0,
               "A current_page_acq_t lifespan exceeds its page_txn_t's.");
     guarantee(!txn->began_waiting_for_flush_);
 
-    txn->announce_waiting_for_flush();
+    rassert(txn->live_acqs_ == 0);
+    rassert(!txn->spawned_flush_);
+
+    begin_waiting_for_flush(txn.get(), durability);
 
     page_txn_t *page_txn = txn.release();
     flush_and_destroy_txn_waiter_t *sub
@@ -1060,14 +1083,6 @@ void page_txn_t::remove_acquirer(current_page_acq_t *acq) {
     }
 }
 
-void page_txn_t::announce_waiting_for_flush() {
-    rassert(live_acqs_ == 0);
-    rassert(!began_waiting_for_flush_);
-    rassert(!spawned_flush_);
-    began_waiting_for_flush_ = true;
-    page_cache_->im_waiting_for_flush(this);
-}
-
 std::unordered_map<block_id_t, page_cache_t::block_change_t>
 page_cache_t::compute_changes(const std::vector<page_txn_t *> &txns) {
     // We combine changes, using the block_version_t value to see which change
@@ -1392,7 +1407,13 @@ void page_cache_t::do_flush_changes(
                                 txn->snapshotted_dirtied_pages_[i].block_id);
                         }
                         txn->snapshotted_dirtied_pages_.clear();
-                        txn->throttler_acq_.mark_dirty_pages_written();
+                        // Read txn's won't have one.  Most read txn's don't get here,
+                        // because they're disconnected in the graph from other
+                        // page_txn's.  At the time of writing this comment, only in
+                        // ~page_cache_t do we flush them together with other txn's.
+                        if (txn->throttler_acq_.has_txn_throttler()) {
+                            txn->throttler_acq_.mark_dirty_pages_written();
+                        }
                     }
                     blocks_released_cond.pulse();
                 }, page_cache->home_thread());
@@ -1547,18 +1568,12 @@ std::vector<page_txn_t *> page_cache_t::maximal_flushable_txn_set(page_txn_t *ba
     return colored;
 }
 
-void page_cache_t::im_waiting_for_flush(page_txn_t *base) {
-    assert_thread();
-    rassert(base->began_waiting_for_flush_);
-    rassert(!base->spawned_flush_);
-    ASSERT_FINITE_CORO_WAITING;
-
-    std::vector<page_txn_t *> flush_set
-        = page_cache_t::maximal_flushable_txn_set(base);
+void page_cache_t::spawn_flush_flushables(std::vector<page_txn_t *> &&flush_set) {
     if (!flush_set.empty()) {
         for (auto it = flush_set.begin(); it != flush_set.end(); ++it) {
             rassert(!(*it)->spawned_flush_);
             (*it)->spawned_flush_ = true;
+            waiting_for_spawn_flush_.remove(*it);
         }
 
         std::unordered_map<block_id_t, block_change_t> changes
@@ -1568,11 +1583,30 @@ void page_cache_t::im_waiting_for_flush(page_txn_t *base) {
             coro_t::spawn_now_dangerously(std::bind(&page_cache_t::do_flush_txn_set,
                                                     this,
                                                     &changes,
-                                                    flush_set));
+                                                    std::move(flush_set)));
         } else {
             // Flush complete.  do_flush_txn_set does this in the write case.
             page_cache_t::remove_txn_set_from_graph(this, flush_set);
         }
+    }
+}
+
+void page_cache_t::begin_waiting_for_flush(page_txn_t *base, txn_durability_t durability) {
+    assert_thread();
+    ASSERT_FINITE_CORO_WAITING;
+    rassert(!base->began_waiting_for_flush_);
+    rassert(!base->spawned_flush_);
+
+    base->began_waiting_for_flush_ = true;
+    waiting_for_spawn_flush_.push_back(base);
+
+    // HSI: Obviously, we can't just do things this way.
+    if (durability.is_hard()) {
+
+        std::vector<page_txn_t *> flush_set
+            = page_cache_t::maximal_flushable_txn_set(base);
+
+        spawn_flush_flushables(std::move(flush_set));
     }
 }
 

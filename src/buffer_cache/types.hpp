@@ -34,9 +34,9 @@ public:
     int64_t flush_interval_ms;
 
     // HSI: Rename or remove these...
-    bool hard_durability() const { return flush_interval_ms == -1; }
+    bool is_hard() const { return flush_interval_ms == -1; }
     write_durability_t wd() const {
-        return hard_durability() ? write_durability_t::HARD : write_durability_t::SOFT;
+        return is_hard() ? write_durability_t::HARD : write_durability_t::SOFT;
     }
     static txn_durability_t HARD() {
         return txn_durability_t(write_durability_t::HARD);

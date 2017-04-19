@@ -88,10 +88,6 @@ new_semaphore_in_line_t::new_semaphore_in_line_t(new_semaphore_in_line_t &&movee
     movee.cond_.reset();
 }
 
-int64_t new_semaphore_in_line_t::count() const {
-    return count_;
-}
-
 void new_semaphore_in_line_t::change_count(int64_t new_count) {
     guarantee(semaphore_ != nullptr);
     guarantee(new_count >= 0);
