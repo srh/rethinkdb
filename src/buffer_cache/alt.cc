@@ -192,7 +192,9 @@ txn_t::txn_t(cache_conn_t *cache_conn,
     : cache_(cache_conn->cache()),
       cache_account_(cache_->page_cache_.default_reads_account()),
       access_(access_t::read),
-      durability_(write_durability_t::SOFT) {
+      // HSI: This was soft before, but it's really a read-only txn.  Make sure this
+      // gets treated appropriately.
+      durability_(txn_durability_t::SOFT()) {
     // Right now, cache_conn is only used to control flushing of write txns.  When we
     // need to support other cache_conn_t related features, we'll need to do something
     // fancier with read txns on cache conns.
@@ -205,7 +207,7 @@ txn_t::txn_t(cache_conn_t *cache_conn,
     : cache_(cache_conn->cache()),
       cache_account_(cache_->page_cache_.default_reads_account()),
       access_(access_t::write),
-      durability_(durability.wd()) {
+      durability_(durability) {
 
     help_construct(expected_change_count, cache_conn);
 }
@@ -247,17 +249,18 @@ void txn_t::pulse_and_inform_tracker(cache_t *cache,
 txn_t::~txn_t() {
     cache_->assert_thread();
 
-    if (durability_ == write_durability_t::SOFT) {
-        cache_->page_cache_.flush_and_destroy_txn(std::move(page_txn_),
-                                                  std::bind(&txn_t::inform_tracker,
-                                                            cache_,
-                                                            ph::_1));
+    if (!durability_.is_hard()) {
+        cache_->page_cache_.flush_and_destroy_txn(
+            std::move(page_txn_),
+            durability_,
+            std::bind(&txn_t::inform_tracker, cache_, ph::_1));
     } else {
         cond_t cond;
         cache_->page_cache_.flush_and_destroy_txn(
-                std::move(page_txn_),
-                std::bind(&txn_t::pulse_and_inform_tracker,
-                          cache_, ph::_1, &cond));
+            std::move(page_txn_),
+            durability_,
+            std::bind(&txn_t::pulse_and_inform_tracker,
+                      cache_, ph::_1, &cond));
         cond.wait();
     }
 }

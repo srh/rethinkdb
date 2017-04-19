@@ -1,4 +1,5 @@
 // Copyright 2014 RethinkDB, all rights reserved.
+// File modified by Sam Hughes (2017).
 #ifndef CONCURRENCY_NEW_SEMAPHORE_HPP_
 #define CONCURRENCY_NEW_SEMAPHORE_HPP_
 
@@ -54,7 +55,14 @@ public:
     new_semaphore_in_line_t(new_semaphore_in_line_t &&movee);
 
     // Returns "how much" of the semaphore this acq has acquired or would acquire.
-    int64_t count() const;
+    int64_t count() const {
+        return count_;
+    }
+
+    // Is this object not in a default-constructed state?
+    bool has_semaphore() const {
+        return semaphore_ != nullptr;
+    }
 
     // Changes "how much" of the semaphore this acq has acquired or would acquire.
     // If it's already acquired the semaphore, and new_count is bigger than the

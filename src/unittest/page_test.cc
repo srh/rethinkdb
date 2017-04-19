@@ -1,4 +1,5 @@
 // Copyright 2010-2014 RethinkDB, all rights reserved.
+// File modified by Sam Hughes (2017).
 #include "arch/runtime/coroutines.hpp"
 #include "arch/timing.hpp"
 #include "buffer_cache/page_cache.hpp"
@@ -57,7 +58,9 @@ public:
           throttler_(throttler) { }
 
     void flush(scoped_ptr_t<test_txn_t> txn) {
-        flush_and_destroy_txn(std::move(txn), &reset_throttler_acq);
+        // HSI: What should txn durability be?
+        flush_and_destroy_txn(std::move(txn), txn_durability_t::SOFT(),
+                              &reset_throttler_acq);
     }
 
     alt::throttler_acq_t make_throttler_acq() {

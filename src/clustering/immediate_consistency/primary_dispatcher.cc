@@ -164,7 +164,7 @@ void primary_dispatcher_t::spawn_write(
             break;
         case DURABILITY_REQUIREMENT_SOFT: {
             durability = cb->get_default_write_durability();
-            if (durability.hard_durability()) {
+            if (durability.is_hard()) {
                 // HSI: cb should really give a durability config that specifies
                 // which flush interval to fall back to.
                 durability = txn_durability_t::SOFT();

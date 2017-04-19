@@ -1,3 +1,4 @@
+// File modified by Sam Hughes (2017).
 #include "concurrency/new_semaphore.hpp"
 
 new_semaphore_t::new_semaphore_t(int64_t capacity)
@@ -86,10 +87,6 @@ new_semaphore_in_line_t::new_semaphore_in_line_t(new_semaphore_in_line_t &&movee
     movee.semaphore_ = nullptr;
     movee.count_ = 0;
     movee.cond_.reset();
-}
-
-int64_t new_semaphore_in_line_t::count() const {
-    return count_;
 }
 
 void new_semaphore_in_line_t::change_count(int64_t new_count) {
