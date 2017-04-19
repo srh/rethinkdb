@@ -119,7 +119,7 @@ private:
     const access_t access_;
 
     // Only applicable if access_ == write.
-    const write_durability_t durability_;
+    const txn_durability_t durability_;
 
     scoped_ptr_t<alt::page_txn_t> page_txn_;
 
