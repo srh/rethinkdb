@@ -1,3 +1,4 @@
+// This file has been modified by Sam Hughes.
 #ifndef BUFFER_CACHE_EVICTER_HPP_
 #define BUFFER_CACHE_EVICTER_HPP_
 
@@ -30,7 +31,6 @@ public:
     void move_unevictable_to_evictable(page_t *page);
     void change_to_correct_eviction_bag(eviction_bag_t *current_bag, page_t *page);
     eviction_bag_t *correct_eviction_category(page_t *page);
-    eviction_bag_t *unevictable_category() { return &unevictable_; }
     eviction_bag_t *evicted_category() { return &evicted_; }
     void remove_page(page_t *page);
     void reloading_page(page_t *page);

@@ -1,3 +1,4 @@
+// This file has been modified by Sam Hughes.
 #include "buffer_cache/page.hpp"
 
 #include "arch/runtime/coroutines.hpp"
@@ -605,14 +606,6 @@ page_acq_t::~page_acq_t() {
         // page_ptr_t.  It would be risky to call it -- page_acq_t is used in
         // load_from_copyee.
     }
-}
-
-bool page_acq_t::has() const {
-    return page_ != nullptr;
-}
-
-signal_t *page_acq_t::buf_ready_signal() {
-    return &buf_ready_signal_;
 }
 
 block_size_t page_acq_t::get_buf_size() {
