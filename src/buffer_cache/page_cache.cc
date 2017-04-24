@@ -999,9 +999,9 @@ void page_txn_t::connect_preceder(page_txn_t *preceder) {
     rassert(preceder->page_cache_ == page_cache_);
     // We can't add ourselves as a preceder, we have to avoid that.
     rassert(preceder != this);
-    // The flush_complete_cond_ is pulsed at the same time that this txn is removed
-    // entirely from the txn graph, so we can't be adding preceders after that point.
-    rassert(!preceder->flush_complete_cond_.is_pulsed());
+    // spawned_flush_ is set at the same time that this txn is removed entirely from the
+    // txn graph, so we can't be adding preceders after that point.
+    rassert(!preceder->spawned_flush_);
 
     // See "PERFORMANCE(preceders_)".
     if (std::find(preceders_.begin(), preceders_.end(), preceder)
@@ -1086,6 +1086,7 @@ void page_txn_t::remove_acquirer(current_page_acq_t *acq) {
 
 std::unordered_map<block_id_t, page_cache_t::block_change_t>
 page_cache_t::compute_changes(const std::vector<page_txn_t *> &txns) {
+    ASSERT_NO_CORO_WAITING;
     // We combine changes, using the block_version_t value to see which change
     // happened later.  This even works if a single transaction acquired the same
     // block twice.
@@ -1149,13 +1150,13 @@ page_cache_t::compute_changes(const std::vector<page_txn_t *> &txns) {
 
 void page_cache_t::remove_txn_set_from_graph(page_cache_t *page_cache,
                                              const std::vector<page_txn_t *> &txns) {
+    // We want detaching the subseqers and preceders to happen at the same time
+    // spawned_flush_ is set.  That way connect_preceder can use it to check it's not
+    // called on an already disconnected part of the graph.
+    ASSERT_FINITE_CORO_WAITING;
     page_cache->assert_thread();
 
     for (auto it = txns.begin(); it != txns.end(); ++it) {
-        // We want detaching the subsequers and preceders to happen at the same time
-        // that the flush_complete_cond_ is pulsed.  That way connect_preceder can
-        // check if flush_complete_cond_ has been pulsed.
-        ASSERT_FINITE_CORO_WAITING;
         page_txn_t *txn = *it;
         {
             for (auto jt = txn->subseqers_.begin(); jt != txn->subseqers_.end(); ++jt) {
@@ -1173,8 +1174,6 @@ void page_cache_t::remove_txn_set_from_graph(page_cache_t *page_cache,
         }
         txn->preceders_.clear();
 
-        // KSI: Maybe we could remove pages_write_acquired_last_ earlier?  Like when
-        // we begin the index write (but that's on the wrong thread) or earlier?
         while (txn->pages_write_acquired_last_.size() != 0) {
             current_page_t *current_page
                 = txn->pages_write_acquired_last_.access_random(0);
@@ -1202,7 +1201,9 @@ void page_cache_t::remove_txn_set_from_graph(page_cache_t *page_cache,
             txn->cache_conn_ = nullptr;
         }
 
-        txn->flush_complete_cond_.pulse();
+        rassert(!txn->spawned_flush_);
+        txn->spawned_flush_ = true;
+        page_cache->waiting_for_spawn_flush_.remove(txn);
     }
 }
 
@@ -1427,6 +1428,12 @@ void page_cache_t::do_flush_changes(
     blocks_released_cond.wait();
 }
 
+void page_cache_t::pulse_flush_complete(const std::vector<page_txn_t *> &txns) {
+    for (page_txn_t *txn : txns) {
+        txn->flush_complete_cond_.pulse();
+    }
+}
+
 void page_cache_t::do_flush_txn_set(
         page_cache_t *page_cache,
         std::unordered_map<block_id_t, block_change_t> *changes_ptr,
@@ -1449,13 +1456,11 @@ void page_cache_t::do_flush_txn_set(
 
     // Okay, yield, thank you.
     coro_t::yield();
+
     do_flush_changes(page_cache, changes, txns, index_write_token);
 
     // Flush complete.
-
-    // KSI: Can't we remove_txn_set_from_graph before flushing?  It would make some
-    // data structures smaller.
-    page_cache_t::remove_txn_set_from_graph(page_cache, txns);
+    page_cache_t::pulse_flush_complete(txns);
 }
 
 std::vector<page_txn_t *> page_cache_t::maximal_flushable_txn_set(page_txn_t *base) {
@@ -1511,10 +1516,9 @@ std::vector<page_txn_t *> page_cache_t::maximal_flushable_txn_set(page_txn_t *ba
         bool poisoned = false;
         for (auto it = txn->preceders_.begin(); it != txn->preceders_.end(); ++it) {
             page_txn_t *prec = *it;
-            if (prec->spawned_flush_) {
-                rassert(prec->mark_ == page_txn_t::marked_not);
-            } else if (!prec->began_waiting_for_flush_
-                       || prec->mark_ == page_txn_t::marked_red) {
+            rassert(!prec->spawned_flush_);
+            if (!prec->began_waiting_for_flush_
+                || prec->mark_ == page_txn_t::marked_red) {
                 poisoned = true;
             } else if (prec->mark_ == page_txn_t::marked_not) {
                 prec->mark_ = page_txn_t::marked_blue;
@@ -1571,14 +1575,14 @@ std::vector<page_txn_t *> page_cache_t::maximal_flushable_txn_set(page_txn_t *ba
 
 void page_cache_t::spawn_flush_flushables(std::vector<page_txn_t *> &&flush_set) {
     if (!flush_set.empty()) {
-        for (auto it = flush_set.begin(); it != flush_set.end(); ++it) {
-            rassert(!(*it)->spawned_flush_);
-            (*it)->spawned_flush_ = true;
-            waiting_for_spawn_flush_.remove(*it);
-        }
+        // We can remove txn set from graph before or after we call
+        // do_flush_changes.  The page_txn's still exist, they're just disconnected
+        // from the graph.
+        page_cache_t::remove_txn_set_from_graph(this, flush_set);
 
         std::unordered_map<block_id_t, block_change_t> changes
             = page_cache_t::compute_changes(flush_set);
+
 
         if (!changes.empty()) {
             coro_t::spawn_now_dangerously(std::bind(&page_cache_t::do_flush_txn_set,
@@ -1587,7 +1591,7 @@ void page_cache_t::spawn_flush_flushables(std::vector<page_txn_t *> &&flush_set)
                                                     std::move(flush_set)));
         } else {
             // Flush complete.  do_flush_txn_set does this in the write case.
-            page_cache_t::remove_txn_set_from_graph(this, flush_set);
+            page_cache_t::pulse_flush_complete(flush_set);
         }
     }
 }

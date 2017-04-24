@@ -421,6 +421,8 @@ private:
     static void remove_txn_set_from_graph(page_cache_t *page_cache,
                                           const std::vector<page_txn_t *> &txns);
 
+    static void pulse_flush_complete(const std::vector<page_txn_t *> &txns);
+
     static std::unordered_map<block_id_t, block_change_t>
     compute_changes(const std::vector<page_txn_t *> &txns);
 
@@ -657,12 +659,11 @@ private:
     // and modify it again.
     segmented_vector_t<touched_page_t, 8> touched_pages_;
 
-    // KSI: Should we have the spawned_flush_ variable or should we remove the txn
-    // from the graph?
-
     // Tells whether this page_txn_t has announced itself (to the cache) to be
     // waiting for a flush.
     bool began_waiting_for_flush_;
+    // spawned_flush_ gets set true when we have removed the txn from the graph (before
+    // flushing).
     bool spawned_flush_;
 
     enum mark_state_t : uint8_t {
