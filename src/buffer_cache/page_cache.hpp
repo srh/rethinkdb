@@ -611,6 +611,9 @@ private:
     void add_acquirer(current_page_acq_t *acq);
     void remove_acquirer(current_page_acq_t *acq);
 
+    // Sets base->pre_spawn_flush_ to true, and propagates to preceders.
+    static void propagate_pre_spawn_flush(page_txn_t *base);
+
     page_cache_t *page_cache_;
     // This can be NULL, if the txn is not part of some cache conn.
     cache_conn_t *cache_conn_;
@@ -659,11 +662,21 @@ private:
     // and modify it again.
     segmented_vector_t<touched_page_t, 8> touched_pages_;
 
+    // Valid states of (began_waiting_for_flush_, pre_spawn_flush_, spawned_flush_) are:
+    //   (    *,     *, false)
+    //   ( true,  true,  true)
+
     // Tells whether this page_txn_t has announced itself (to the cache) to be
     // waiting for a flush.
     bool began_waiting_for_flush_;
-    // spawned_flush_ gets set true when we have removed the txn from the graph (before
-    // flushing).
+
+    // We "want" to spawn a flush, so you shouldn't gratuitously add any preceders by
+    // stealing dirtied pages.  If this is true, then it must also be true for any
+    // preceders.
+    bool pre_spawn_flush_;
+
+    // spawned_flush_ gets set true when we have removed the txn from the graph (just
+    // before we actually start flushing).
     bool spawned_flush_;
 
     enum mark_state_t : uint8_t {
