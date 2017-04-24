@@ -1630,7 +1630,7 @@ void page_cache_t::begin_waiting_for_flush(page_txn_t *base, txn_durability_t du
     waiting_for_spawn_flush_.push_back(base);
 
     // HSI: Obviously, we can't just do things this way.
-    if (durability.is_hard()) {
+    if (durability.is_hard() || base->pre_spawn_flush_) {
 
         page_txn_t::propagate_pre_spawn_flush(base);
 
