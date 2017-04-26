@@ -24,7 +24,8 @@ public:
     explicit alt_txn_throttler_t(int64_t minimum_unwritten_changes_limit);
     ~alt_txn_throttler_t();
 
-    alt::throttler_acq_t begin_txn_or_throttle(int64_t expected_change_count);
+    alt::throttler_acq_t begin_txn_or_throttle(
+        txn_durability_t durability, int64_t expected_change_count);
     void end_txn(alt::throttler_acq_t acq);
 
     void inform_memory_limit_change(uint64_t memory_limit,
