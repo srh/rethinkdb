@@ -154,11 +154,20 @@ private:
     // Our index into the last_write_acquirer_->pages_write_acquired_last_.
     backindex_bag_index_t last_write_acquirer_index_;
 
-    // The version of the page, that the last write acquirer had.
+    // The version of the page, that the last write acquirer had.  We maintain this
+    // value, incrementing it with each new acquirer.
     block_version_t last_write_acquirer_version_;
 
     page_txn_t *last_dirtier_;
     backindex_bag_index_t last_dirtier_index_;
+
+    // The version and recency of the page, that the last dirtier had.  We merely set
+    // and read these values, the only thing it affects is compute_changes, later.
+    // Maybe we should replace last_dirtier_ with last_toucher_or_dirtier_.  Then we
+    // wouldn't need this recency field.
+    // HSI: Maybe remove_acquirer should just make a touched_page_t, with dirtied_page_t no longer handling recency.
+    block_version_t last_dirtier_version_;
+    repli_timestamp_t last_dirtier_recency_;
 
     // Instead of storing the recency here, we store it page_cache_t::recencies_.
 
@@ -614,6 +623,7 @@ public:
 // Right now, situation '(a)' doesn't happen because transactions do greedily keep
 // their copies of the block.
 //
+// HSI: Check this comment.
 // LSI: Make situation '(a)' happenable.
 class page_txn_t : public intrusive_list_node_t<page_txn_t> {
 public:
@@ -706,6 +716,10 @@ private:
     // KSI: Right now we put multiple dirtied_page_t's if we reacquire the same block
     // and modify it again.
     segmented_vector_t<dirtied_page_t, 8> snapshotted_dirtied_pages_;
+
+    size_t dirtied_page_count() const {
+        return snapshotted_dirtied_pages_.size() + pages_dirtied_last_.size();
+    }
 
     // Touched pages (by block id).
     // KSI: Right now we put multiple touched_page_t's if we reacquire the same block

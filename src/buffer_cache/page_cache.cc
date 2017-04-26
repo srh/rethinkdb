@@ -632,13 +632,37 @@ repli_timestamp_t current_page_acq_t::recency() {
 void current_page_acq_t::dirty_the_page() {
     dirtied_page_ = true;
     page_txn_t *prec = current_page_->last_dirtier_;
-    if (prec != nullptr) {
-        prec->pages_dirtied_last_.remove(current_page_dirtier_t{current_page_});
-    }
-    the_txn_->pages_dirtied_last_.add(current_page_dirtier_t{current_page_});
-    current_page_->last_dirtier_ = the_txn_;
+    if (prec != the_txn_) {
 
-    // HSI: No need to connect subseqer just yet.
+        if (prec != nullptr) {
+            prec->pages_dirtied_last_.remove(current_page_dirtier_t{current_page_});
+            if (prec->throttler_acq_.pre_spawn_flush()) {
+                timestamped_page_ptr_t tpp;
+                tpp.init(
+                    current_page_->last_dirtier_recency_,
+                    current_page_->the_page_for_read_or_deleted(help()));
+                prec->snapshotted_dirtied_pages_.push_back(
+                    dirtied_page_t(current_page_->last_dirtier_version_,
+                                   block_id_,
+                                   std::move(tpp)));
+            } else {
+                // prec is already a preceder of the_txn_, transitively.  Now prec is a
+                // subseqer too, and we have to flush them at the same time.  This is
+                // fitting and proper because prec has no snapshot of its buf to flush.
+                prec->connect_preceder(the_txn_);
+            }
+        }
+        // We increase the_txn_'s dirty_page_count(), so we update its throttler_acq_
+        // first, before we update prec's (which may decrease back down).
+        the_txn_->pages_dirtied_last_.add(current_page_dirtier_t{current_page_});
+        the_txn_->throttler_acq_.update_dirty_page_count(the_txn_->dirtied_page_count());
+        if (prec != nullptr) {
+            prec->throttler_acq_.update_dirty_page_count(prec->dirtied_page_count());
+        }
+    }
+    current_page_->last_dirtier_ = the_txn_;
+    current_page_->last_dirtier_recency_ = page_cache_->recency_for_block_id(block_id_);
+    current_page_->last_dirtier_version_ = block_version_;
 }
 
 page_t *current_page_acq_t::current_page_for_write(cache_account_t *account) {
@@ -659,6 +683,9 @@ void current_page_acq_t::set_recency(repli_timestamp_t recency) {
     rassert(current_page_ != nullptr);
     touched_page_ = true;
     page_cache_->set_recency_for_block_id(block_id_, recency);
+    if (current_page_->last_dirtier_ == the_txn_) {
+        current_page_->last_dirtier_recency_ = recency;
+    }
 }
 
 void current_page_acq_t::mark_deleted() {
@@ -797,6 +824,11 @@ bool current_page_t::should_be_evicted() const {
 
     // A reason: We still have a connection to last_write_acquirer_.  (Important.)
     if (last_write_acquirer_ != nullptr) {
+        return false;
+    }
+
+    // A reason: We have a last dirtier.
+    if (last_dirtier_ != nullptr) {
         return false;
     }
 
@@ -1020,14 +1052,14 @@ void page_txn_t::propagate_pre_spawn_flush(page_txn_t *base) {
     }
     // All elements of stack have pre_spawn_flush_ freshly set.  (Thus, we never push a
     // page_txn_t onto this stack more than once.)
-    base->throttler_acq_.set_pre_spawn_flush(base->snapshotted_dirtied_pages_.size());
+    base->throttler_acq_.set_pre_spawn_flush(base->dirtied_page_count());
     std::vector<page_txn_t *> stack = {base};
     while (!stack.empty()) {
         page_txn_t *txn = stack.back();
         stack.pop_back();
         for (page_txn_t *p : txn->preceders_) {
             if (!p->throttler_acq_.pre_spawn_flush()) {
-                p->throttler_acq_.set_pre_spawn_flush(p->snapshotted_dirtied_pages_.size());
+                p->throttler_acq_.set_pre_spawn_flush(p->dirtied_page_count());
                 stack.push_back(p);
             }
         }
@@ -1101,24 +1133,6 @@ void page_txn_t::remove_acquirer(current_page_acq_t *acq) {
         // We know we hold an exclusive lock.
         rassert(acq->write_cond_.is_pulsed());
 
-        // Declare readonly (so that we may declare acq snapshotted).
-        acq->declare_readonly();
-        acq->declare_snapshotted();
-
-        // Steal the snapshotted page_ptr_t.
-        timestamped_page_ptr_t local = std::move(acq->snapshotted_page_);
-        // It's okay to have two dirtied_page_t's or touched_page_t's for the
-        // same block id -- compute_changes handles this.
-        snapshotted_dirtied_pages_.push_back(dirtied_page_t(block_version,
-                                                            acq->block_id(),
-                                                            std::move(local)));
-        // If you keep writing and reacquiring the same page, though, the count
-        // might be off and you could excessively throttle new operations.
-
-        // LSI: We could reacquire the same block and update the dirty page count
-        // with a _correct_ value indicating that we're holding redundant dirty
-        // pages for the same block id.
-        throttler_acq_.update_dirty_page_count(snapshotted_dirtied_pages_.size());
     } else if (acq->touched_page()) {
         // It's okay to have two dirtied_page_t's or touched_page_t's for the
         // same block id -- compute_changes handles this.
@@ -1243,8 +1257,23 @@ void page_cache_t::remove_txn_set_from_graph(page_cache_t *page_cache,
                 = txn->pages_dirtied_last_.access_random(0);
             rassert(dirtier.current_page->last_dirtier_ == txn);
 
+            // HSI: Dedup this code a bit with the other one.
+            timestamped_page_ptr_t tpp;
+            tpp.init(
+                dirtier.current_page->last_dirtier_recency_,
+                dirtier.current_page->the_page_for_read_or_deleted(
+                    current_page_help_t(dirtier.current_page->block_id_,
+                                        page_cache)));
+            txn->snapshotted_dirtied_pages_.push_back(
+                dirtied_page_t(dirtier.current_page->last_dirtier_version_,
+                               dirtier.current_page->block_id_,
+                               std::move(tpp)));
+
             txn->pages_dirtied_last_.remove(dirtier);
             dirtier.current_page->last_dirtier_ = nullptr;
+
+
+
             page_cache->consider_evicting_current_page(dirtier.current_page->block_id_);
         }
 
