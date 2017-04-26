@@ -70,8 +70,15 @@ alt_txn_throttler_t::alt_txn_throttler_t(int64_t minimum_unwritten_changes_limit
 
 alt_txn_throttler_t::~alt_txn_throttler_t() { }
 
-throttler_acq_t alt_txn_throttler_t::begin_txn_or_throttle(int64_t expected_change_count) {
-    throttler_acq_t acq;
+throttler_acq_t alt_txn_throttler_t::begin_txn_or_throttle(
+        txn_durability_t durability,
+        int64_t expected_change_count) {
+    throttler_acq_t acq(durability, expected_change_count);
+    if (!acq.pre_spawn_flush()) {
+        // Changes don't count until we "want" to flush the txn -- which for hard
+        // durability is right away, but for soft durability is later.
+        expected_change_count = 0;
+    }
     acq.index_changes_semaphore_acq_.init(
         &unwritten_index_changes_semaphore_,
         expected_change_count);
@@ -224,8 +231,8 @@ void txn_t::help_construct(int64_t expected_change_count,
     }
     throttler_acq_t throttler_acq(
         access_ == access_t::write
-        ? cache_->throttler_.begin_txn_or_throttle(expected_change_count)
-        : throttler_acq_t());
+        ? cache_->throttler_.begin_txn_or_throttle(durability_, expected_change_count)
+        : throttler_acq_t(durability_, expected_change_count));
 
     ASSERT_FINITE_CORO_WAITING;
 
