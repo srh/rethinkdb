@@ -41,7 +41,8 @@ public:
 void throttler_acq_t::update_dirty_page_count(int64_t new_count) {
     rassert(
         block_changes_semaphore_acq_.count() == index_changes_semaphore_acq_.count());
-    if (new_count > block_changes_semaphore_acq_.count()) {
+    new_count = std::max<int64_t>(new_count, expected_change_count_);
+    if (pre_spawn_flush_ && new_count > block_changes_semaphore_acq_.count()) {
         block_changes_semaphore_acq_.change_count(new_count);
         index_changes_semaphore_acq_.change_count(new_count);
     }
@@ -980,7 +981,6 @@ page_txn_t::page_txn_t(page_cache_t *page_cache,
       throttler_acq_(std::move(throttler_acq)),
       live_acqs_(0),
       began_waiting_for_flush_(false),
-      pre_spawn_flush_(false),
       spawned_flush_(false),
       mark_(marked_not) {
     if (cache_conn != nullptr) {
@@ -996,19 +996,19 @@ page_txn_t::page_txn_t(page_cache_t *page_cache,
 
 void page_txn_t::propagate_pre_spawn_flush(page_txn_t *base) {
     ASSERT_NO_CORO_WAITING;
-    if (base->pre_spawn_flush_) {
+    if (base->throttler_acq_.pre_spawn_flush()) {
         return;
     }
     // All elements of stack have pre_spawn_flush_ freshly set.  (Thus, we never push a
     // page_txn_t onto this stack more than once.)
-    base->pre_spawn_flush_ = true;
+    base->throttler_acq_.set_pre_spawn_flush(base->snapshotted_dirtied_pages_.size());
     std::vector<page_txn_t *> stack = {base};
     while (!stack.empty()) {
         page_txn_t *txn = stack.back();
         stack.pop_back();
         for (page_txn_t *p : txn->preceders_) {
-            if (!p->pre_spawn_flush_) {
-                p->pre_spawn_flush_ = true;
+            if (!p->throttler_acq_.pre_spawn_flush()) {
+                p->throttler_acq_.set_pre_spawn_flush(p->snapshotted_dirtied_pages_.size());
                 stack.push_back(p);
             }
         }
@@ -1029,7 +1029,7 @@ void page_txn_t::connect_preceder(page_txn_t *preceder) {
         == preceders_.end()) {
         preceders_.push_back(preceder);
         preceder->subseqers_.push_back(this);
-        if (pre_spawn_flush_) {
+        if (throttler_acq_.pre_spawn_flush()) {
             page_txn_t::propagate_pre_spawn_flush(preceder);
         }
     }
@@ -1630,7 +1630,7 @@ void page_cache_t::begin_waiting_for_flush(page_txn_t *base, txn_durability_t du
     waiting_for_spawn_flush_.push_back(base);
 
     // HSI: Obviously, we can't just do things this way.
-    if (durability.is_hard() || base->pre_spawn_flush_) {
+    if (durability.is_hard() || base->throttler_acq_.pre_spawn_flush()) {
 
         page_txn_t::propagate_pre_spawn_flush(base);
 
