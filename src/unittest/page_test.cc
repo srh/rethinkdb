@@ -66,7 +66,7 @@ public:
     alt::throttler_acq_t make_throttler_acq() {
         // KSI: We could make these tests better by varying the expected change
         // count.
-        return throttler_->begin_txn_or_throttle(0);
+        return throttler_->begin_txn_or_throttle(txn_durability_t::SOFT(), 0);
     }
 
 private:
