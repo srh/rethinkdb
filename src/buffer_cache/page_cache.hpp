@@ -295,11 +295,18 @@ private:
 
 class throttler_acq_t {
 public:
-    throttler_acq_t() { }
+    explicit throttler_acq_t(txn_durability_t durability,
+                             int64_t expected_change_count)
+        : expected_change_count_(expected_change_count),
+          pre_spawn_flush_(durability.is_hard()) { }
     ~throttler_acq_t() { }
     throttler_acq_t(throttler_acq_t &&movee)
-        : block_changes_semaphore_acq_(std::move(movee.block_changes_semaphore_acq_)),
+        : expected_change_count_(movee.expected_change_count_),
+          pre_spawn_flush_(movee.pre_spawn_flush_),
+          block_changes_semaphore_acq_(std::move(movee.block_changes_semaphore_acq_)),
           index_changes_semaphore_acq_(std::move(movee.index_changes_semaphore_acq_)) {
+        movee.pre_spawn_flush_ = false;
+        movee.expected_change_count_ = 0;
         movee.block_changes_semaphore_acq_.reset();
         movee.index_changes_semaphore_acq_.reset();
     }
@@ -316,7 +323,30 @@ public:
     // as it is.
     void mark_dirty_pages_written();
 
+    // This is set by other algorithms.
+    bool pre_spawn_flush() const { return pre_spawn_flush_; }
+
+    // sets pre_spawn_flush to true, updates the dirty page count.
+    void set_pre_spawn_flush(int64_t dirty_page_count) {
+        if (!pre_spawn_flush_) {
+            pre_spawn_flush_ = true;
+            if (has_txn_throttler()) {
+                update_dirty_page_count(dirty_page_count);
+            }
+        }
+    }
+
 private:
+    // The original expected_change_count value.  Once pre_spawn_flush_ is true and we
+    // start to block the semaphores, we jump up to this value.
+    int64_t expected_change_count_;
+
+    // True if we want to flush the txn's values ASAP.  (True for hard-durability txn's,
+    // true for soft-durability txn's that we've decided to flush.)
+    // We don't acquire anything on the semaphore until this is true.
+    bool pre_spawn_flush_;
+
+
     friend class ::alt_txn_throttler_t;
     // At first, the number of dirty pages is 0 and *_changes_semaphore_acq_.count() >=
     // dirtied_count_.  Once the number of dirty pages gets bigger than the original
@@ -652,6 +682,7 @@ private:
     size_t live_acqs_;
 
     // Saved pages (by block id).
+    // You have to update throttler_acq_ when you add/remove from this.
     // KSI: Right now we put multiple dirtied_page_t's if we reacquire the same block
     // and modify it again.
     segmented_vector_t<dirtied_page_t, 8> snapshotted_dirtied_pages_;
@@ -672,7 +703,8 @@ private:
     // We "want" to spawn a flush, so you shouldn't gratuitously add any preceders by
     // stealing dirtied pages.  If this is true, then it must also be true for any
     // preceders.
-    bool pre_spawn_flush_;
+    // bool pre_spawn_flush_;
+    // Actually, this field is stored in throttler_acq_.pre_spawn_flush_.
 
     // spawned_flush_ gets set true when we have removed the txn from the graph (just
     // before we actually start flushing).
