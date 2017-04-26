@@ -39,6 +39,7 @@ namespace alt {
 class current_page_acq_t;
 class page_cache_t;
 class page_txn_t;
+struct current_page_dirtier_t;
 
 enum class page_create_t { no, yes };
 
@@ -130,6 +131,7 @@ private:
     friend class page_cache_t;
 
     friend backindex_bag_index_t *access_backindex(current_page_t *current_page);
+    friend backindex_bag_index_t *access_backindex(current_page_dirtier_t dirtier);
 
     bool is_deleted() const { return is_deleted_; }
 
@@ -155,6 +157,9 @@ private:
     // The version of the page, that the last write acquirer had.
     block_version_t last_write_acquirer_version_;
 
+    page_txn_t *last_dirtier_;
+    backindex_bag_index_t last_dirtier_index_;
+
     // Instead of storing the recency here, we store it page_cache_t::recencies_.
 
     // All list elements have current_page_ != NULL, snapshotted_page_ == NULL.
@@ -171,6 +176,15 @@ private:
 inline backindex_bag_index_t *access_backindex(current_page_t *current_page) {
     return &current_page->last_write_acquirer_index_;
 }
+
+// Distinguishes type for access_backindex overloading.
+struct current_page_dirtier_t {
+    current_page_t *current_page;
+};
+inline backindex_bag_index_t *access_backindex(current_page_dirtier_t dirtier) {
+    return &dirtier.current_page->last_dirtier_index_;
+}
+
 
 class current_page_acq_t : public intrusive_list_node_t<current_page_acq_t>,
                            public home_thread_mixin_debug_only_t {
@@ -245,6 +259,8 @@ private:
 
     void pulse_read_available();
     void pulse_write_available();
+
+    void dirty_the_page();
 
     page_cache_t *page_cache_;
     page_txn_t *the_txn_;
@@ -678,6 +694,9 @@ private:
     // segmented_vector_t -- we give it a segment size big enough to not be obnoxious
     // about memory usage.
     backindex_bag_t<current_page_t *, 16> pages_write_acquired_last_;
+
+    // Pages for which this page_txn_t is the last_dirtier_ of that page.
+    backindex_bag_t<current_page_dirtier_t, 16> pages_dirtied_last_;
 
     // How many current_page_acq_t's for this transaction that are currently alive.
     size_t live_acqs_;

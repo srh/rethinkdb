@@ -629,13 +629,25 @@ repli_timestamp_t current_page_acq_t::recency() {
     return page_cache_->recency_for_block_id(block_id_);
 }
 
+void current_page_acq_t::dirty_the_page() {
+    dirtied_page_ = true;
+    page_txn_t *prec = current_page_->last_dirtier_;
+    if (prec != nullptr) {
+        prec->pages_dirtied_last_.remove(current_page_dirtier_t{current_page_});
+    }
+    the_txn_->pages_dirtied_last_.add(current_page_dirtier_t{current_page_});
+    current_page_->last_dirtier_ = the_txn_;
+
+    // HSI: No need to connect subseqer just yet.
+}
+
 page_t *current_page_acq_t::current_page_for_write(cache_account_t *account) {
     assert_thread();
     rassert(access_ == access_t::write);
     rassert(current_page_ != nullptr);
     write_cond_.wait();
     rassert(current_page_ != nullptr);
-    dirtied_page_ = true;
+    dirty_the_page();
     return current_page_->the_page_for_write(help(), account);
 }
 
@@ -655,7 +667,7 @@ void current_page_acq_t::mark_deleted() {
     rassert(current_page_ != nullptr);
     write_cond_.wait();
     rassert(current_page_ != nullptr);
-    dirtied_page_ = true;
+    dirty_the_page();
     current_page_->mark_deleted(help());
     // No need to call consider_evicting_current_page here -- there's a
     // current_page_acq_t for it: ourselves.
@@ -701,6 +713,7 @@ current_page_t::current_page_t(block_id_t block_id)
     : block_id_(block_id),
       is_deleted_(false),
       last_write_acquirer_(nullptr),
+      last_dirtier_(nullptr),
       num_keepalives_(0) {
     // Increment the block version so that we can distinguish between unassigned
     // current_page_acq_t::block_version_ values (which are 0) and assigned ones.
@@ -715,6 +728,7 @@ current_page_t::current_page_t(block_id_t block_id,
       page_(new page_t(block_id, std::move(buf), page_cache)),
       is_deleted_(false),
       last_write_acquirer_(nullptr),
+      last_dirtier_(nullptr),
       num_keepalives_(0) {
     // Increment the block version so that we can distinguish between unassigned
     // current_page_acq_t::block_version_ values (which are 0) and assigned ones.
@@ -730,6 +744,7 @@ current_page_t::current_page_t(block_id_t block_id,
       page_(new page_t(block_id, std::move(buf), token, page_cache)),
       is_deleted_(false),
       last_write_acquirer_(nullptr),
+      last_dirtier_(nullptr),
       num_keepalives_(0) {
     // Increment the block version so that we can distinguish between unassigned
     // current_page_acq_t::block_version_ values (which are 0) and assigned ones.
@@ -755,6 +770,9 @@ void current_page_t::reset(page_cache_t *page_cache) {
     // newer in compute_changes.  current_page_t::should_be_evicted tests for this being
     // null.
     rassert(last_write_acquirer_ == nullptr);
+
+    // HSI: Should this be null, or might it need to snapshot the dirtied page?
+    rassert(last_dirtier_ == nullptr);
 
     page_.reset_page_ptr(page_cache);
     // No need to call consider_evicting_current_page here -- we're already getting
@@ -1218,6 +1236,16 @@ void page_cache_t::remove_txn_set_from_graph(page_cache_t *page_cache,
             txn->pages_write_acquired_last_.remove(current_page);
             current_page->last_write_acquirer_ = nullptr;
             page_cache->consider_evicting_current_page(current_page->block_id_);
+        }
+
+        while (txn->pages_dirtied_last_.size() != 0) {
+            current_page_dirtier_t dirtier
+                = txn->pages_dirtied_last_.access_random(0);
+            rassert(dirtier.current_page->last_dirtier_ == txn);
+
+            txn->pages_dirtied_last_.remove(dirtier);
+            dirtier.current_page->last_dirtier_ = nullptr;
+            page_cache->consider_evicting_current_page(dirtier.current_page->block_id_);
         }
 
         if (txn->cache_conn_ != nullptr) {
