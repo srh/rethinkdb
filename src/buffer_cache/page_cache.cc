@@ -287,52 +287,32 @@ page_cache_t::~page_cache_t() {
     }
 }
 
-// We go a bit old-school, with a self-destroying callback.
-class flush_and_destroy_txn_waiter_t : public signal_t::subscription_t {
+// We go a bit old-school, with a self-destroying callback.  The important thing it does
+// is hold the drainer lock.
+class flush_and_destroy_txn_waiter_t {
 public:
     flush_and_destroy_txn_waiter_t(
             auto_drainer_t::lock_t &&lock,
             page_txn_t *txn,
-            std::function<void()> &&on_flush_complete)
+            cond_t *on_complete_or_null)
         : lock_(std::move(lock)),
           txn_(txn),
-          on_flush_complete_(std::move(on_flush_complete)) { }
+          on_complete_or_null_(on_complete_or_null) { }
 
-private:
     void run() {
         // Tell everybody without delay that the flush is complete.
-        on_flush_complete_();
+        if (on_complete_or_null_ != nullptr) {
+            on_complete_or_null_->pulse();
+        }
 
-        // We have to do the rest _later_ because of signal_t::subscription_t not
-        // allowing reentrant signal_t::subscription_t::reset() calls, and the like,
-        // even though it would be valid.
-        // We are using `call_later_on_this_thread` instead of spawning a coroutine
-        // to reduce memory overhead.
-        class kill_later_t : public linux_thread_message_t {
-        public:
-            explicit kill_later_t(flush_and_destroy_txn_waiter_t *self) :
-                self_(self) { }
-            void on_thread_switch() {
-                self_->kill_ourselves();
-                delete this;
-            }
-        private:
-            flush_and_destroy_txn_waiter_t *self_;
-        };
-        call_later_on_this_thread(new kill_later_t(this));
-    }
-
-    void kill_ourselves() {
-        // We can't destroy txn_->flush_complete_cond_ until we've reset our
-        // subscription, because computers.
-        reset();
         delete txn_;
         delete this;
     }
 
+private:
     auto_drainer_t::lock_t lock_;
     page_txn_t *txn_;
-    std::function<void()> on_flush_complete_;
+    cond_t *on_complete_or_null_;
 
     DISABLE_COPYING(flush_and_destroy_txn_waiter_t);
 };
@@ -340,7 +320,7 @@ private:
 void page_cache_t::flush_and_destroy_txn(
         scoped_ptr_t<page_txn_t> txn,
         txn_durability_t durability,
-        std::function<void()> &&on_flush_complete) {
+        cond_t *on_complete_or_null) {
     guarantee(txn->live_acqs_ == 0,
               "A current_page_acq_t lifespan exceeds its page_txn_t's.");
     guarantee(!txn->began_waiting_for_flush_);
@@ -348,14 +328,12 @@ void page_cache_t::flush_and_destroy_txn(
     rassert(txn->live_acqs_ == 0);
     rassert(!txn->spawned_flush_);
 
-    begin_waiting_for_flush(txn.get(), durability);
-
     page_txn_t *page_txn = txn.release();
     flush_and_destroy_txn_waiter_t *sub
         = new flush_and_destroy_txn_waiter_t(drainer_->lock(), page_txn,
-                                             std::move(on_flush_complete));
-
-    sub->reset(&page_txn->flush_complete_cond_);
+                                             on_complete_or_null);
+    page_txn->flush_complete_waiter_ = sub;
+    begin_waiting_for_flush(page_txn, durability);
 }
 
 
@@ -1033,7 +1011,8 @@ page_txn_t::page_txn_t(page_cache_t *page_cache,
       live_acqs_(0),
       began_waiting_for_flush_(false),
       spawned_flush_(false),
-      mark_(marked_not) {
+      mark_(marked_not),
+      flush_complete_waiter_(nullptr) {
     if (cache_conn != nullptr) {
         page_txn_t *old_newest_txn = cache_conn->newest_txn_;
         cache_conn->newest_txn_ = this;
@@ -1101,7 +1080,8 @@ void page_txn_t::remove_subseqer(page_txn_t *subseqer) {
 }
 
 page_txn_t::~page_txn_t() {
-    guarantee(flush_complete_cond_.is_pulsed());
+    // HSI: What to replace this with?
+    // guarantee(flush_complete_cond_.is_pulsed());
 
     guarantee(preceders_.empty());
     guarantee(subseqers_.empty());
@@ -1512,7 +1492,7 @@ void page_cache_t::do_flush_changes(
 
 void page_cache_t::pulse_flush_complete(const std::vector<page_txn_t *> &txns) {
     for (page_txn_t *txn : txns) {
-        txn->flush_complete_cond_.pulse();
+        txn->flush_complete_waiter_->run();
     }
 }
 

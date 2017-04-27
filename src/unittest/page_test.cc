@@ -56,7 +56,7 @@ public:
     void flush(scoped_ptr_t<test_txn_t> txn) {
         // HSI: What should txn durability be?
         flush_and_destroy_txn(std::move(txn), txn_durability_t::SOFT(),
-                              []() { });
+                              nullptr);
     }
 
     alt::throttler_acq_t make_throttler_acq() {

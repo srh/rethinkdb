@@ -36,6 +36,7 @@ class cache_t;
 class file_account_t;
 
 namespace alt {
+class flush_and_destroy_txn_waiter_t;
 class current_page_acq_t;
 class page_cache_t;
 class page_txn_t;
@@ -392,12 +393,11 @@ public:
                  alt_txn_throttler_t *throttler);
     ~page_cache_t();
 
-    // Takes a txn to be flushed.  Calls on_flush_complete() (which resets the
-    // throttler_acq parameter) when done.
+    // Takes a txn to be flushed.  Pulses on_complete_or_null when done.
     void flush_and_destroy_txn(
             scoped_ptr_t<page_txn_t> txn,
             txn_durability_t durability,
-            std::function<void()> &&on_flush_complete);
+            cond_t *on_complete_or_null);
 
     current_page_t *page_for_block_id(block_id_t block_id);
     current_page_t *page_for_new_block_id(
@@ -753,9 +753,8 @@ private:
     // algorithms.
     mark_state_t mark_;
 
-    // This gets pulsed when the flush is complete or when the txn has no reason to
-    // exist any more.
-    cond_t flush_complete_cond_;
+    // This is null until we set it in flush_and_destroy_txn.
+    flush_and_destroy_txn_waiter_t *flush_complete_waiter_;
 
     DISABLE_COPYING(page_txn_t);
 };
