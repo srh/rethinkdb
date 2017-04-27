@@ -35,7 +35,6 @@ class cache_t;
 class file_account_t;
 
 namespace alt {
-class flush_and_destroy_txn_waiter_t;
 class current_page_acq_t;
 class page_cache_t;
 class page_txn_t;
@@ -400,7 +399,7 @@ public:
 
     // Takes a txn to be flushed.  Pulses on_complete_or_null when done.
     void flush_and_destroy_txn(
-            scoped_ptr_t<page_txn_t> txn,
+            scoped_ptr_t<page_txn_t> &&txn,
             txn_durability_t durability,
             page_txn_complete_cb_t *on_complete_or_null);
 
@@ -487,7 +486,7 @@ private:
 
     static std::vector<page_txn_t *> maximal_flushable_txn_set(page_txn_t *base);
 
-    void begin_waiting_for_flush(page_txn_t *txns, txn_durability_t durability);
+    void begin_waiting_for_flush(scoped_ptr_t<page_txn_t> &&txn, txn_durability_t durability);
 
     void spawn_flush_flushables(std::vector<page_txn_t *> &&flush_set);
 
@@ -628,7 +627,6 @@ public:
 // their copies of the block.
 //
 // HSI: Check this comment.
-// LSI: Make situation '(a)' happenable.
 class page_txn_t : public intrusive_list_node_t<page_txn_t> {
 public:
     // Our transaction has to get committed to disk _after_ or at the same time as
@@ -647,9 +645,6 @@ public:
 private:
     // To set cache_conn_ to NULL.
     friend class ::cache_conn_t;
-
-    // To access throttler_acq_.
-    friend class flush_and_destroy_txn_waiter_t;
 
     // page cache has access to all of this type's innards, including fields.
     friend class page_cache_t;
@@ -673,6 +668,8 @@ private:
 
     // Sets base->pre_spawn_flush_ to true, and propagates to preceders.
     static void propagate_pre_spawn_flush(page_txn_t *base);
+
+    auto_drainer_t::lock_t drainer_lock_;
 
     page_cache_t *page_cache_;
     // This can be NULL, if the txn is not part of some cache conn.
@@ -758,8 +755,7 @@ private:
     // algorithms.
     mark_state_t mark_;
 
-    // This is null until we set it in flush_and_destroy_txn.
-    flush_and_destroy_txn_waiter_t *flush_complete_waiter_;
+    intrusive_list_t<page_txn_complete_cb_t> flush_complete_waiters_;
 
     DISABLE_COPYING(page_txn_t);
 };
