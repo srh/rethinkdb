@@ -23,7 +23,7 @@ cache_conn_t::~cache_conn_t() {
     // need to tell the page_txn_t that we don't exist -- we do so by nullating its
     // cache_conn_ pointer (which it's capable of handling).
     if (newest_txn_ != nullptr) {
-        newest_txn_->cache_conn_ = nullptr;
+        newest_txn_->cache_conns_.remove(this);
         newest_txn_ = nullptr;
     }
 }
@@ -976,7 +976,6 @@ page_txn_t::page_txn_t(page_cache_t *page_cache,
                        cache_conn_t *cache_conn)
     : drainer_lock_(page_cache->drainer_lock()),
       page_cache_(page_cache),
-      cache_conn_(cache_conn),
       throttler_acq_(std::move(throttler_acq)),
       live_acqs_(0),
       began_waiting_for_flush_(false),
@@ -987,8 +986,10 @@ page_txn_t::page_txn_t(page_cache_t *page_cache,
         page_txn_t *old_newest_txn = cache_conn->newest_txn_;
         cache_conn->newest_txn_ = this;
         if (old_newest_txn != nullptr) {
-            rassert(old_newest_txn->cache_conn_ == cache_conn);
-            old_newest_txn->cache_conn_ = nullptr;
+            old_newest_txn->cache_conns_.remove(cache_conn);
+        }
+        cache_conns_.push_front(cache_conn);
+        if (old_newest_txn != nullptr) {
             connect_preceder(old_newest_txn);
         }
     }
@@ -1227,10 +1228,11 @@ void page_cache_t::remove_txn_set_from_graph(page_cache_t *page_cache,
             page_cache->consider_evicting_current_page(dirtier.current_page->block_id_);
         }
 
-        if (txn->cache_conn_ != nullptr) {
-            rassert(txn->cache_conn_->newest_txn_ == txn);
-            txn->cache_conn_->newest_txn_ = nullptr;
-            txn->cache_conn_ = nullptr;
+        while (!txn->cache_conns_.empty()) {
+            cache_conn_t *conn = txn->cache_conns_.head();
+            rassert(conn->newest_txn_ == txn);
+            txn->cache_conns_.remove(conn);
+            conn->newest_txn_ = nullptr;
         }
 
         rassert(!txn->spawned_flush_);
