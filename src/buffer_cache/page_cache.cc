@@ -246,27 +246,10 @@ page_cache_t::~page_cache_t() {
 
     have_read_ahead_cb_destroyed();
 
-    // HSI: This still the right thing?
-
     // Flush all pending soft-durability transactions.  All txn's must have had
     // flush_and_destroy_txn called on them before we entered this destructor, so we
-    // know the entire set of txn's is a valid flush_set.  (All subseqers must have
-    // began_waiting_for_flush_ == true.)
-    {
-        std::vector<page_txn_t *> flush_set;
-        flush_set.reserve(waiting_for_spawn_flush_.size() + want_to_spawn_flush_.size());
-        while (page_txn_t *ptr = waiting_for_spawn_flush_.head()) {
-            page_txn_t::propagate_pre_spawn_flush(this, ptr);
-        }
-        for (page_txn_t *ptr = want_to_spawn_flush_.head();
-             ptr != nullptr;
-             ptr = want_to_spawn_flush_.next(ptr)) {
-            flush_set.push_back(ptr);
-        }
-        page_cache_t::remove_txn_set_from_graph(this, flush_set);
-        spawn_flush_flushables(std::move(flush_set));
-    }
-
+    // know the entire set of txn's will be flushed.
+    begin_flush_pending_txns();
 
     drainer_.reset();
     size_t i = 0;
@@ -289,6 +272,18 @@ page_cache_t::~page_cache_t() {
         default_reads_account_.reset();
         index_write_sink_.reset();
     }
+}
+
+void page_cache_t::begin_flush_pending_txns() {
+    std::vector<page_txn_t *> full_flush_set;
+    while (page_txn_t *ptr = waiting_for_spawn_flush_.head()) {
+        page_txn_t::propagate_pre_spawn_flush(this, ptr);
+        std::vector<page_txn_t *> flush_set
+            = page_cache_t::maximal_flushable_txn_set(ptr);
+        page_cache_t::remove_txn_set_from_graph(this, flush_set);
+        full_flush_set.insert(full_flush_set.end(), flush_set.begin(), flush_set.end());
+    }
+    spawn_flush_flushables(std::move(full_flush_set));
 }
 
 void page_cache_t::flush_and_destroy_txn(
@@ -1249,9 +1244,16 @@ void page_cache_t::remove_txn_set_from_graph(page_cache_t *page_cache,
             conn->newest_txn_ = nullptr;
         }
 
+        // We only do this propagation to keep down the number of possible states a
+        // txn's variables can be in.  This way spawned_flush_ is true only if both
+        // began_waiting_for_flush_ and pre_spawn_flush_ are true.  It doesn't actually
+        // propagate anywhere, either, because we just disconnected the txn from the
+        // graph.
+        if (!txn->throttler_acq_.pre_spawn_flush()) {
+            page_txn_t::propagate_pre_spawn_flush(page_cache, txn);
+        }
         rassert(!txn->spawned_flush_);
         txn->spawned_flush_ = true;
-        rassert(txn->throttler_acq_.pre_spawn_flush());
         page_cache->want_to_spawn_flush_.remove(txn);
     }
 }

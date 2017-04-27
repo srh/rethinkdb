@@ -397,6 +397,9 @@ public:
                  alt_txn_throttler_t *throttler);
     ~page_cache_t();
 
+    // Begins to flush pending txn's.
+    void begin_flush_pending_txns();
+
     // Takes a txn to be flushed.  Pulses on_complete_or_null when done.
     void flush_and_destroy_txn(
             scoped_ptr_t<page_txn_t> &&txn,
