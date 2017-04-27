@@ -48,7 +48,8 @@ enum class alt_create_t { create };
 
 enum class block_type_t { normal, aux };
 
-class page_txn_complete_cb_t : public intrusive_list_node_t<page_txn_complete_cb_t> {
+class page_txn_complete_cb_t
+        : public half_intrusive_list_node_t<page_txn_complete_cb_t> {
 public:
     cond_t cond;
 };
@@ -755,7 +756,7 @@ private:
     // algorithms.
     mark_state_t mark_;
 
-    intrusive_list_t<page_txn_complete_cb_t> flush_complete_waiters_;
+    half_intrusive_list_t<page_txn_complete_cb_t> flush_complete_waiters_;
 
     DISABLE_COPYING(page_txn_t);
 };
