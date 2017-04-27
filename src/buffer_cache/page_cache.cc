@@ -274,6 +274,7 @@ page_cache_t::~page_cache_t() {
 }
 
 void page_cache_t::begin_flush_pending_txns() {
+    ASSERT_FINITE_CORO_WAITING;
     std::vector<page_txn_t *> full_flush_set;
     while (page_txn_t *ptr = waiting_for_spawn_flush_.head()) {
         page_txn_t::propagate_pre_spawn_flush(this, ptr);

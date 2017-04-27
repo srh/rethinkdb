@@ -6,6 +6,7 @@
 #include <vector>
 #include <utility>
 
+#include "arch/timing.hpp"
 #include "buffer_cache/page_cache.hpp"
 #include "buffer_cache/types.hpp"
 #include "containers/two_level_array.hpp"
@@ -75,6 +76,8 @@ private:
 
     std::map<block_id_t, intrusive_list_t<alt_snapshot_node_t> >
         snapshot_nodes_by_block_id_;
+
+    repeating_timer_t soft_durability_flusher_;
 
     DISABLE_COPYING(cache_t);
 };
