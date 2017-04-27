@@ -539,8 +539,16 @@ private:
 
     std::unordered_map<block_id_t, current_page_t *> current_pages_;
 
-    // Txns that have began_waiting_for_flush_ true, spawned_flush_ false.
+    // The difference between these two lists is that waiting_for_spawn_flush_ txn's
+    // might be capable of flushing.  want_to_spawn_flush_ txn's can't disconnect from
+    // the graph and flush just yet.
+
+    // Txns that have began_waiting_for_flush_ true, spawned_flush_ false,
+    // pre_spawn_flush_ false.
     intrusive_list_t<page_txn_t> waiting_for_spawn_flush_;
+    // Txns that have began_waiting_for_flush_ true, spawned_flush_ false,
+    // pre_spawn_flush_ true.
+    intrusive_list_t<page_txn_t> want_to_spawn_flush_;
 
     free_list_t free_list_;
 
@@ -667,7 +675,7 @@ private:
     void remove_acquirer(current_page_acq_t *acq);
 
     // Sets base->pre_spawn_flush_ to true, and propagates to preceders.
-    static void propagate_pre_spawn_flush(page_txn_t *base);
+    static void propagate_pre_spawn_flush(page_cache_t *page_cache, page_txn_t *base);
 
     auto_drainer_t::lock_t drainer_lock_;
 

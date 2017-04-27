@@ -254,10 +254,13 @@ page_cache_t::~page_cache_t() {
     // began_waiting_for_flush_ == true.)
     {
         std::vector<page_txn_t *> flush_set;
-        flush_set.reserve(waiting_for_spawn_flush_.size());
-        for (page_txn_t *ptr = waiting_for_spawn_flush_.head();
+        flush_set.reserve(waiting_for_spawn_flush_.size() + want_to_spawn_flush_.size());
+        while (page_txn_t *ptr = waiting_for_spawn_flush_.head()) {
+            page_txn_t::propagate_pre_spawn_flush(this, ptr);
+        }
+        for (page_txn_t *ptr = want_to_spawn_flush_.head();
              ptr != nullptr;
-             ptr = waiting_for_spawn_flush_.next(ptr)) {
+             ptr = want_to_spawn_flush_.next(ptr)) {
             flush_set.push_back(ptr);
         }
         page_cache_t::remove_txn_set_from_graph(this, flush_set);
@@ -996,21 +999,31 @@ page_txn_t::page_txn_t(page_cache_t *page_cache,
     }
 }
 
-void page_txn_t::propagate_pre_spawn_flush(page_txn_t *base) {
+void page_txn_t::propagate_pre_spawn_flush(page_cache_t *page_cache, page_txn_t *base) {
     ASSERT_NO_CORO_WAITING;
     if (base->throttler_acq_.pre_spawn_flush()) {
         return;
     }
     // All elements of stack have pre_spawn_flush_ freshly set.  (Thus, we never push a
     // page_txn_t onto this stack more than once.)
+    // HSI: Dedup this set_pre_spawn_flush stuff.
     base->throttler_acq_.set_pre_spawn_flush(base->dirtied_page_count());
+    if (base->in_a_list()) {
+        page_cache->waiting_for_spawn_flush_.remove(base);
+        page_cache->want_to_spawn_flush_.push_back(base);
+    }
     std::vector<page_txn_t *> stack = {base};
     while (!stack.empty()) {
         page_txn_t *txn = stack.back();
         stack.pop_back();
         for (page_txn_t *p : txn->preceders_) {
             if (!p->throttler_acq_.pre_spawn_flush()) {
+                // HSI: Dedup this set_pre_spawn_flush stuff.
                 p->throttler_acq_.set_pre_spawn_flush(p->dirtied_page_count());
+                if (p->in_a_list()) {
+                    page_cache->waiting_for_spawn_flush_.remove(p);
+                    page_cache->want_to_spawn_flush_.push_back(p);
+                }
                 stack.push_back(p);
             }
         }
@@ -1032,7 +1045,7 @@ void page_txn_t::connect_preceder(page_txn_t *preceder) {
         preceders_.push_back(preceder);
         preceder->subseqers_.push_back(this);
         if (throttler_acq_.pre_spawn_flush()) {
-            page_txn_t::propagate_pre_spawn_flush(preceder);
+            page_txn_t::propagate_pre_spawn_flush(page_cache_, preceder);
         }
     }
 }
@@ -1238,7 +1251,8 @@ void page_cache_t::remove_txn_set_from_graph(page_cache_t *page_cache,
 
         rassert(!txn->spawned_flush_);
         txn->spawned_flush_ = true;
-        page_cache->waiting_for_spawn_flush_.remove(txn);
+        rassert(txn->throttler_acq_.pre_spawn_flush());
+        page_cache->want_to_spawn_flush_.remove(txn);
     }
 }
 
@@ -1643,12 +1657,16 @@ void page_cache_t::begin_waiting_for_flush(
 
     base_scoped->began_waiting_for_flush_ = true;
     page_txn_t *base = base_scoped.release();
-    waiting_for_spawn_flush_.push_back(base);
+    if (base->throttler_acq_.pre_spawn_flush()) {
+        want_to_spawn_flush_.push_back(base);
+    } else {
+        waiting_for_spawn_flush_.push_back(base);
+    }
 
     // HSI: Obviously, we can't just do things this way.
     if (durability.is_hard() || base->throttler_acq_.pre_spawn_flush()) {
 
-        page_txn_t::propagate_pre_spawn_flush(base);
+        page_txn_t::propagate_pre_spawn_flush(this, base);
 
         std::vector<page_txn_t *> flush_set
             = page_cache_t::maximal_flushable_txn_set(base);
