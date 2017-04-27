@@ -298,7 +298,7 @@ void page_cache_t::flush_and_destroy_txn(
     rassert(!txn->spawned_flush_);
 
     if (on_complete_or_null != nullptr) {
-        txn->flush_complete_waiters_.push_back(on_complete_or_null);
+        txn->flush_complete_waiters_.push_front(on_complete_or_null);
     }
 
     begin_waiting_for_flush(std::move(txn), durability);
