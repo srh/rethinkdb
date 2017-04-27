@@ -55,7 +55,7 @@ public:
 };
 
 
-class cache_conn_t {
+class cache_conn_t : public half_intrusive_list_node_t<cache_conn_t> {
 public:
     explicit cache_conn_t(cache_t *cache)
         : cache_(cache),
@@ -71,9 +71,7 @@ private:
     cache_t *cache_;
 
     // The most recent unflushed txn, or NULL.  This gets set back to NULL when
-    // newest_txn_ pulses its flush_complete_cond_.  It's a bidirectional pointer
-    // pair with the newest txn's cache_conn_ pointer -- either both point at each
-    // other or neither do.
+    // newest_txn_ finishes.  We're an element of its cache_conns_ list.
     alt::page_txn_t *newest_txn_;
 
     DISABLE_COPYING(cache_conn_t);
@@ -673,8 +671,8 @@ private:
     auto_drainer_t::lock_t drainer_lock_;
 
     page_cache_t *page_cache_;
-    // This can be NULL, if the txn is not part of some cache conn.
-    cache_conn_t *cache_conn_;
+    // Contains cache_conn_t's for which we are the newest txn.
+    half_intrusive_list_t<cache_conn_t> cache_conns_;
 
     // An acquisition object for the memory tracker.
     throttler_acq_t throttler_acq_;
