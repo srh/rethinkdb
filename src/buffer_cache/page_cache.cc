@@ -287,47 +287,10 @@ page_cache_t::~page_cache_t() {
     }
 }
 
-// We go a bit old-school, with a self-destroying callback.  The important thing it does
-// is hold the drainer lock.
-class flush_and_destroy_txn_waiter_t {
-public:
-    flush_and_destroy_txn_waiter_t(
-            auto_drainer_t::lock_t &&lock,
-            page_txn_t *txn,
-            page_txn_complete_cb_t *on_complete_or_null)
-        : lock_(std::move(lock)),
-          txn_(txn) {
-        if (on_complete_or_null != nullptr) {
-            on_complete_.push_back(on_complete_or_null);
-        }
-    }
-
-    void run() {
-        // Tell everybody that the flush is complete.
-        for (page_txn_complete_cb_t *p = on_complete_.head();
-             p != nullptr; ) {
-            page_txn_complete_cb_t *tmp = p;
-            p = on_complete_.next(p);
-            on_complete_.remove(tmp);
-            tmp->cond.pulse();
-        }
-
-        delete txn_;
-        delete this;
-    }
-
-private:
-    auto_drainer_t::lock_t lock_;
-    page_txn_t *txn_;
-    intrusive_list_t<page_txn_complete_cb_t> on_complete_;
-
-    DISABLE_COPYING(flush_and_destroy_txn_waiter_t);
-};
-
 void page_cache_t::flush_and_destroy_txn(
-        scoped_ptr_t<page_txn_t> txn,
+        scoped_ptr_t<page_txn_t> &&txn,
         txn_durability_t durability,
-        cond_t *on_complete_or_null) {
+        page_txn_complete_cb_t *on_complete_or_null) {
     guarantee(txn->live_acqs_ == 0,
               "A current_page_acq_t lifespan exceeds its page_txn_t's.");
     guarantee(!txn->began_waiting_for_flush_);
@@ -335,12 +298,11 @@ void page_cache_t::flush_and_destroy_txn(
     rassert(txn->live_acqs_ == 0);
     rassert(!txn->spawned_flush_);
 
-    page_txn_t *page_txn = txn.release();
-    flush_and_destroy_txn_waiter_t *sub
-        = new flush_and_destroy_txn_waiter_t(drainer_->lock(), page_txn,
-                                             on_complete_or_null);
-    page_txn->flush_complete_waiter_ = sub;
-    begin_waiting_for_flush(page_txn, durability);
+    if (on_complete_or_null != nullptr) {
+        txn->flush_complete_waiters_.push_back(on_complete_or_null);
+    }
+
+    begin_waiting_for_flush(std::move(txn), durability);
 }
 
 
@@ -1012,14 +974,15 @@ page_t *current_page_t::the_page_for_write(current_page_help_t help,
 page_txn_t::page_txn_t(page_cache_t *page_cache,
                        throttler_acq_t throttler_acq,
                        cache_conn_t *cache_conn)
-    : page_cache_(page_cache),
+    : drainer_lock_(page_cache->drainer_lock()),
+      page_cache_(page_cache),
       cache_conn_(cache_conn),
       throttler_acq_(std::move(throttler_acq)),
       live_acqs_(0),
       began_waiting_for_flush_(false),
       spawned_flush_(false),
       mark_(marked_not),
-      flush_complete_waiter_(nullptr) {
+      flush_complete_waiters_() {
     if (cache_conn != nullptr) {
         page_txn_t *old_newest_txn = cache_conn->newest_txn_;
         cache_conn->newest_txn_ = this;
@@ -1499,7 +1462,14 @@ void page_cache_t::do_flush_changes(
 
 void page_cache_t::pulse_flush_complete(const std::vector<page_txn_t *> &txns) {
     for (page_txn_t *txn : txns) {
-        txn->flush_complete_waiter_->run();
+        for (page_txn_complete_cb_t *p = txn->flush_complete_waiters_.head();
+             p != nullptr; ) {
+            page_txn_complete_cb_t *tmp = p;
+            p = txn->flush_complete_waiters_.next(p);
+            txn->flush_complete_waiters_.remove(tmp);
+            tmp->cond.pulse();
+        }
+        delete txn;
     }
 }
 
@@ -1665,13 +1635,15 @@ void page_cache_t::spawn_flush_flushables(std::vector<page_txn_t *> &&flush_set)
     }
 }
 
-void page_cache_t::begin_waiting_for_flush(page_txn_t *base, txn_durability_t durability) {
+void page_cache_t::begin_waiting_for_flush(
+        scoped_ptr_t<page_txn_t> &&base_scoped, txn_durability_t durability) {
     assert_thread();
     ASSERT_FINITE_CORO_WAITING;
-    rassert(!base->began_waiting_for_flush_);
-    rassert(!base->spawned_flush_);
+    rassert(!base_scoped->began_waiting_for_flush_);
+    rassert(!base_scoped->spawned_flush_);
 
-    base->began_waiting_for_flush_ = true;
+    base_scoped->began_waiting_for_flush_ = true;
+    page_txn_t *base = base_scoped.release();
     waiting_for_spawn_flush_.push_back(base);
 
     // HSI: Obviously, we can't just do things this way.
