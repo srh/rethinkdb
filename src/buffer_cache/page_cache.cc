@@ -292,7 +292,7 @@ public:
     flush_and_destroy_txn_waiter_t(
             auto_drainer_t::lock_t &&lock,
             page_txn_t *txn,
-            std::function<void(throttler_acq_t *)> &&on_flush_complete)
+            std::function<void()> &&on_flush_complete)
         : lock_(std::move(lock)),
           txn_(txn),
           on_flush_complete_(std::move(on_flush_complete)) { }
@@ -300,7 +300,7 @@ public:
 private:
     void run() {
         // Tell everybody without delay that the flush is complete.
-        on_flush_complete_(&txn_->throttler_acq_);
+        on_flush_complete_();
 
         // We have to do the rest _later_ because of signal_t::subscription_t not
         // allowing reentrant signal_t::subscription_t::reset() calls, and the like,
@@ -331,7 +331,7 @@ private:
 
     auto_drainer_t::lock_t lock_;
     page_txn_t *txn_;
-    std::function<void(throttler_acq_t *)> on_flush_complete_;
+    std::function<void()> on_flush_complete_;
 
     DISABLE_COPYING(flush_and_destroy_txn_waiter_t);
 };
@@ -339,7 +339,7 @@ private:
 void page_cache_t::flush_and_destroy_txn(
         scoped_ptr_t<page_txn_t> txn,
         txn_durability_t durability,
-        std::function<void(throttler_acq_t *)> &&on_flush_complete) {
+        std::function<void()> &&on_flush_complete) {
     guarantee(txn->live_acqs_ == 0,
               "A current_page_acq_t lifespan exceeds its page_txn_t's.");
     guarantee(!txn->began_waiting_for_flush_);
