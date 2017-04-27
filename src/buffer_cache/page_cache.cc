@@ -260,6 +260,7 @@ page_cache_t::~page_cache_t() {
              ptr = waiting_for_spawn_flush_.next(ptr)) {
             flush_set.push_back(ptr);
         }
+        page_cache_t::remove_txn_set_from_graph(this, flush_set);
         spawn_flush_flushables(std::move(flush_set));
     }
 
@@ -1615,12 +1616,8 @@ std::vector<page_txn_t *> page_cache_t::maximal_flushable_txn_set(page_txn_t *ba
 }
 
 void page_cache_t::spawn_flush_flushables(std::vector<page_txn_t *> &&flush_set) {
+    // The flush set's txn's are already disconnected from the graph.
     if (!flush_set.empty()) {
-        // We can remove txn set from graph before or after we call
-        // do_flush_changes.  The page_txn's still exist, they're just disconnected
-        // from the graph.
-        page_cache_t::remove_txn_set_from_graph(this, flush_set);
-
         std::unordered_map<block_id_t, block_change_t> changes
             = page_cache_t::compute_changes(flush_set);
 
@@ -1656,6 +1653,7 @@ void page_cache_t::begin_waiting_for_flush(
         std::vector<page_txn_t *> flush_set
             = page_cache_t::maximal_flushable_txn_set(base);
 
+        page_cache_t::remove_txn_set_from_graph(this, flush_set);
         spawn_flush_flushables(std::move(flush_set));
     }
 }
