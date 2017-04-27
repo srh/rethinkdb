@@ -371,7 +371,6 @@ private:
     // We don't acquire anything on the semaphore until this is true.
     bool pre_spawn_flush_;
 
-
     friend class ::alt_txn_throttler_t;
     // At first, the number of dirty pages is 0 and *_changes_semaphore_acq_.count() >=
     // dirtied_count_.  Once the number of dirty pages gets bigger than the original
@@ -397,7 +396,7 @@ public:
     void flush_and_destroy_txn(
             scoped_ptr_t<page_txn_t> txn,
             txn_durability_t durability,
-            std::function<void(throttler_acq_t *)> &&on_flush_complete);
+            std::function<void()> &&on_flush_complete);
 
     current_page_t *page_for_block_id(block_id_t block_id);
     current_page_t *page_for_new_block_id(
