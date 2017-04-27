@@ -49,6 +49,12 @@ enum class alt_create_t { create };
 
 enum class block_type_t { normal, aux };
 
+class page_txn_complete_cb_t : public intrusive_list_node_t<page_txn_complete_cb_t> {
+public:
+    cond_t cond;
+};
+
+
 class cache_conn_t {
 public:
     explicit cache_conn_t(cache_t *cache)
@@ -396,7 +402,7 @@ public:
     void flush_and_destroy_txn(
             scoped_ptr_t<page_txn_t> txn,
             txn_durability_t durability,
-            cond_t *on_complete_or_null);
+            page_txn_complete_cb_t *on_complete_or_null);
 
     current_page_t *page_for_block_id(block_id_t block_id);
     current_page_t *page_for_new_block_id(
