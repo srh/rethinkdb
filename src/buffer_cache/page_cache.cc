@@ -294,15 +294,22 @@ public:
     flush_and_destroy_txn_waiter_t(
             auto_drainer_t::lock_t &&lock,
             page_txn_t *txn,
-            cond_t *on_complete_or_null)
+            page_txn_complete_cb_t *on_complete_or_null)
         : lock_(std::move(lock)),
-          txn_(txn),
-          on_complete_or_null_(on_complete_or_null) { }
+          txn_(txn) {
+        if (on_complete_or_null != nullptr) {
+            on_complete_.push_back(on_complete_or_null);
+        }
+    }
 
     void run() {
-        // Tell everybody without delay that the flush is complete.
-        if (on_complete_or_null_ != nullptr) {
-            on_complete_or_null_->pulse();
+        // Tell everybody that the flush is complete.
+        for (page_txn_complete_cb_t *p = on_complete_.head();
+             p != nullptr; ) {
+            page_txn_complete_cb_t *tmp = p;
+            p = on_complete_.next(p);
+            on_complete_.remove(tmp);
+            tmp->cond.pulse();
         }
 
         delete txn_;
@@ -312,7 +319,7 @@ public:
 private:
     auto_drainer_t::lock_t lock_;
     page_txn_t *txn_;
-    cond_t *on_complete_or_null_;
+    intrusive_list_t<page_txn_complete_cb_t> on_complete_;
 
     DISABLE_COPYING(flush_and_destroy_txn_waiter_t);
 };

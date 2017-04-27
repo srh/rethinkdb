@@ -247,12 +247,12 @@ txn_t::~txn_t() {
             durability_,
             nullptr);
     } else {
-        cond_t cond;
+        page_txn_complete_cb_t cb;
         cache_->page_cache_.flush_and_destroy_txn(
             std::move(page_txn_),
             durability_,
-            &cond);
-        cond.wait();
+            &cb);
+        cb.cond.wait_lazily_unordered();
     }
 }
 
