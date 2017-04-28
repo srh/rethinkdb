@@ -643,6 +643,10 @@ void current_page_acq_t::mark_deleted() {
     rassert(current_page_ != nullptr);
     dirty_the_page();
     current_page_->mark_deleted(help());
+    // HSI: This is gross and fragile that we need this knowledge here.
+    if (current_page_->last_dirtier_ == the_txn_) {
+        current_page_->last_dirtier_recency_ = repli_timestamp_t::invalid;
+    }
     // No need to call consider_evicting_current_page here -- there's a
     // current_page_acq_t for it: ourselves.
 }
