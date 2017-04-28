@@ -122,6 +122,14 @@ void page_cache_t::consider_evicting_current_page(block_id_t block_id) {
     }
 }
 
+block_version_t page_cache_t::gen_block_version() {
+    block_version_t ret = next_block_version_;
+    next_block_version_ = next_block_version_.subsequent();
+    return ret;
+}
+
+
+
 void page_cache_t::add_read_ahead_buf(block_id_t block_id,
                                       scoped_device_block_aligned_ptr_t<ser_buffer_t> ptr,
                                       const counted_t<standard_block_token_t> &token) {
@@ -208,6 +216,8 @@ page_cache_t::page_cache_t(serializer_t *serializer,
                            alt_txn_throttler_t *throttler)
     : max_block_size_(serializer->max_block_size()),
       serializer_(serializer),
+      // Start the counter at 1 so we can distinguish empty values.
+      next_block_version_(block_version_t().subsequent()),
       free_list_(serializer),
       evicter_(),
       read_ahead_cb_(nullptr),
@@ -317,7 +327,7 @@ current_page_t *page_cache_t::page_for_block_id(block_id_t block_id) {
                 "(should you have used alt_create_t::create?).",
                 block_id);
         page_it = current_pages_.insert(
-            page_it, std::make_pair(block_id, new current_page_t(block_id)));
+            page_it, std::make_pair(block_id, new current_page_t(block_id, this)));
     } else {
         rassert(!page_it->second->is_deleted());
     }
@@ -687,17 +697,13 @@ void current_page_acq_t::pulse_write_available() {
     write_cond_.pulse_if_not_already_pulsed();
 }
 
-current_page_t::current_page_t(block_id_t block_id)
+current_page_t::current_page_t(block_id_t block_id, page_cache_t *page_cache)
     : block_id_(block_id),
       is_deleted_(false),
       last_write_acquirer_(nullptr),
+      last_write_acquirer_version_(page_cache->gen_block_version()),
       last_dirtier_(nullptr),
-      num_keepalives_(0) {
-    // Increment the block version so that we can distinguish between unassigned
-    // current_page_acq_t::block_version_ values (which are 0) and assigned ones.
-    rassert(last_write_acquirer_version_.debug_value() == 0);
-    last_write_acquirer_version_ = last_write_acquirer_version_.subsequent();
-}
+      num_keepalives_(0) { }
 
 current_page_t::current_page_t(block_id_t block_id,
                                buf_ptr_t buf,
@@ -706,13 +712,9 @@ current_page_t::current_page_t(block_id_t block_id,
       page_(new page_t(block_id, std::move(buf), page_cache)),
       is_deleted_(false),
       last_write_acquirer_(nullptr),
+      last_write_acquirer_version_(page_cache->gen_block_version()),
       last_dirtier_(nullptr),
-      num_keepalives_(0) {
-    // Increment the block version so that we can distinguish between unassigned
-    // current_page_acq_t::block_version_ values (which are 0) and assigned ones.
-    rassert(last_write_acquirer_version_.debug_value() == 0);
-    last_write_acquirer_version_ = last_write_acquirer_version_.subsequent();
-}
+      num_keepalives_(0) { }
 
 current_page_t::current_page_t(block_id_t block_id,
                                buf_ptr_t buf,
@@ -722,13 +724,9 @@ current_page_t::current_page_t(block_id_t block_id,
       page_(new page_t(block_id, std::move(buf), token, page_cache)),
       is_deleted_(false),
       last_write_acquirer_(nullptr),
+      last_write_acquirer_version_(page_cache->gen_block_version()),
       last_dirtier_(nullptr),
-      num_keepalives_(0) {
-    // Increment the block version so that we can distinguish between unassigned
-    // current_page_acq_t::block_version_ values (which are 0) and assigned ones.
-    rassert(last_write_acquirer_version_.debug_value() == 0);
-    last_write_acquirer_version_ = last_write_acquirer_version_.subsequent();
-}
+      num_keepalives_(0) { }
 
 current_page_t::~current_page_t() {
     // Check that reset() has been called.
@@ -808,7 +806,7 @@ void current_page_t::add_acquirer(current_page_acq_t *acq) {
     const block_version_t prev_version = last_write_acquirer_version_;
 
     if (acq->access_ == access_t::write) {
-        block_version_t v = prev_version.subsequent();
+        block_version_t v = acq->page_cache_->gen_block_version();
         acq->block_version_ = v;
 
         rassert(acq->the_txn_ != nullptr);

@@ -93,7 +93,7 @@ public:
                    const counted_t<standard_block_token_t> &token,
                    page_cache_t *page_cache);
     // Constructs a page to be loaded from the serializer.
-    explicit current_page_t(block_id_t block_id);
+    current_page_t(block_id_t block_id, page_cache_t *page_cache);
 
     // You MUST call reset() before destructing a current_page_t!
     ~current_page_t();
@@ -523,6 +523,9 @@ private:
     static void consider_evicting_all_current_pages(page_cache_t *page_cache,
                                                     auto_drainer_t::lock_t lock);
 
+    // Returns next_block_version_ and increments it.
+    block_version_t gen_block_version();
+
     const max_block_size_t max_block_size_;
 
     // We use a separate I/O account for reads in each page cache.
@@ -541,6 +544,13 @@ private:
     segmented_vector_t<repli_timestamp_t> recencies_;
 
     std::unordered_map<block_id_t, current_page_t *> current_pages_;
+
+    // An incrementing 64-bit counter used to generate block versions, with values 1, 2,
+    // 3, ...  This makes sure that block writes never get overwritten by previous block
+    // writes.  alt_snapshot_node_t's will still hold a current_page_acq_t though --
+    // this stops them from destroying and recreating a snapshot node, and getting
+    // multiple copies of the same page.
+    block_version_t next_block_version_;
 
     // The difference between these two lists is that waiting_for_spawn_flush_ txn's
     // might be capable of flushing.  want_to_spawn_flush_ txn's can't disconnect from
