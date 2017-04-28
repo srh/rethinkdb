@@ -671,17 +671,6 @@ bool current_page_acq_t::touched_page() const {
     return touched_page_;
 }
 
-block_version_t current_page_acq_t::block_version() const {
-    assert_thread();
-    return block_version_;
-}
-
-
-page_cache_t *current_page_acq_t::page_cache() const {
-    assert_thread();
-    return page_cache_;
-}
-
 current_page_help_t current_page_acq_t::help() const {
     assert_thread();
     return current_page_help_t(block_id(), page_cache_);

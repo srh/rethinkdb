@@ -233,18 +233,20 @@ public:
     page_t *current_page_for_write(cache_account_t *account);
     void set_recency(repli_timestamp_t recency);
 
-    // Returns current_page_for_read, except it guarantees that the page acq has
-    // already snapshotted the page and is not waiting for the page_t *.
-    page_t *snapshotted_page_ptr();
-
     block_id_t block_id() const { return block_id_; }
     access_t access() const { return access_; }
 
     void mark_deleted();
 
-    block_version_t block_version() const;
+    block_version_t block_version() const {
+        assert_thread();
+        return block_version_;
+    }
 
-    page_cache_t *page_cache() const;
+    page_cache_t *page_cache() const {
+        assert_thread();
+        return page_cache_;
+    }
 
 private:
     void init(page_txn_t *txn,
