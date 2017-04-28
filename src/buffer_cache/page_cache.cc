@@ -782,7 +782,7 @@ bool current_page_t::should_be_evicted() const {
         return false;
     }
 
-    // A reason: The current_page_t is kept alive for another reason.  (Important.)
+    // A reason: The current_page_t has snapshotted ex-acquirers.  (Important.)
     if (num_keepalives_ > 0) {
         return false;
     }
@@ -1157,8 +1157,6 @@ page_cache_t::compute_changes(const std::vector<page_txn_t *> &txns) {
                 // The versions can't be the same for different write operations.
                 rassert(jt->second.version != t.block_version);
                 if (jt->second.version < t.block_version) {
-                    rassert(t.tstamp ==
-                            superceding_recency(jt->second.tstamp, t.tstamp));
                     jt->second.tstamp = t.tstamp;
                     jt->second.version = t.block_version;
                 }
