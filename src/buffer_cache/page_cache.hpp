@@ -692,6 +692,10 @@ private:
     // Sets base->pre_spawn_flush_ to true, and propagates to preceders.
     static void propagate_pre_spawn_flush(page_cache_t *page_cache, page_txn_t *base);
 
+    size_t dirtied_page_count() const {
+        return snapshotted_dirtied_pages_.size() + pages_dirtied_last_.size();
+    }
+
     auto_drainer_t::lock_t drainer_lock_;
 
     page_cache_t *page_cache_;
@@ -740,10 +744,6 @@ private:
     // KSI: Right now we put multiple dirtied_page_t's if we reacquire the same block
     // and modify it again.
     segmented_vector_t<dirtied_page_t, 8> snapshotted_dirtied_pages_;
-
-    size_t dirtied_page_count() const {
-        return snapshotted_dirtied_pages_.size() + pages_dirtied_last_.size();
-    }
 
     // Touched pages (by block id).
     // KSI: Right now we put multiple touched_page_t's if we reacquire the same block
