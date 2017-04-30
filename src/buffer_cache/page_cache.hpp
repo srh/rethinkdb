@@ -690,11 +690,16 @@ private:
     void remove_acquirer(current_page_acq_t *acq);
 
     // Sets base->pre_spawn_flush_ to true, and propagates to preceders.
-    static void propagate_pre_spawn_flush(page_cache_t *page_cache, page_txn_t *base);
+    static void propagate_pre_spawn_flush(page_txn_t *base);
 
     size_t dirtied_page_count() const {
         return snapshotted_dirtied_pages_.size() + pages_dirtied_last_.size();
     }
+
+    // Sets pre_spawn_flush to be true, if not already set.  handles presence in
+    // waiting_for_spawn_flush_/want_to_spawn_flush_.  Returns false if pre_spawn_flush
+    // was already set, in which case there was no side effect.
+    bool set_pre_spawn_flush();
 
     auto_drainer_t::lock_t drainer_lock_;
 
