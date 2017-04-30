@@ -1637,28 +1637,30 @@ void page_cache_t::spawn_flush_flushables(std::vector<page_txn_t *> &&flush_set)
     }
 }
 
+void page_cache_t::merge_into_waiting_for_spawn_flush(scoped_ptr_t<page_txn_t> &&base) {
+    waiting_for_spawn_flush_.push_back(base.release());
+}
+
 void page_cache_t::begin_waiting_for_flush(
-        scoped_ptr_t<page_txn_t> &&base_scoped, txn_durability_t durability) {
+        scoped_ptr_t<page_txn_t> &&base, txn_durability_t durability) {
     assert_thread();
     ASSERT_FINITE_CORO_WAITING;
-    rassert(!base_scoped->began_waiting_for_flush_);
-    rassert(!base_scoped->spawned_flush_);
+    rassert(!base->began_waiting_for_flush_);
+    rassert(!base->spawned_flush_);
 
-    base_scoped->began_waiting_for_flush_ = true;
-    page_txn_t *base = base_scoped.release();
-    if (base->throttler_acq_.pre_spawn_flush()) {
-        want_to_spawn_flush_.push_back(base);
-    } else {
-        waiting_for_spawn_flush_.push_back(base);
+    if (durability.is_hard()) {
+        page_txn_t::propagate_pre_spawn_flush(base.get());
     }
 
-    // HSI: Obviously, we can't just do things this way.
-    if (durability.is_hard() || base->throttler_acq_.pre_spawn_flush()) {
-
-        page_txn_t::propagate_pre_spawn_flush(base);
+    base->began_waiting_for_flush_ = true;
+    if (!base->throttler_acq_.pre_spawn_flush()) {
+        merge_into_waiting_for_spawn_flush(std::move(base));
+    } else {
+        page_txn_t *base_unscoped = base.release();
+        want_to_spawn_flush_.push_back(base_unscoped);
 
         std::vector<page_txn_t *> flush_set
-            = page_cache_t::maximal_flushable_txn_set(base);
+            = page_cache_t::maximal_flushable_txn_set(base_unscoped);
 
         page_cache_t::remove_txn_set_from_graph(this, flush_set);
         spawn_flush_flushables(std::move(flush_set));
