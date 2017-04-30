@@ -586,6 +586,18 @@ repli_timestamp_t current_page_acq_t::recency() {
     return page_cache_->recency_for_block_id(block_id_);
 }
 
+// Doesn't do everything -- caller will need to disconnect dirtier->pages_dirtied_last_.
+void page_cache_t::help_take_snapshotted_dirtied_page(
+        current_page_t *cp, block_id_t block_id, page_txn_t *dirtier) {
+    rassert(cp->last_dirtier_ == dirtier);
+    timestamped_page_ptr_t tpp;
+    tpp.init(
+        cp->last_dirtier_recency_,
+        cp->the_page_for_read_or_deleted(current_page_help_t(block_id, this)));
+    dirtier->snapshotted_dirtied_pages_.push_back(
+        dirtied_page_t(cp->last_dirtier_version_, block_id, std::move(tpp)));
+}
+
 void current_page_acq_t::dirty_the_page() {
     dirtied_page_ = true;
     page_txn_t *prec = current_page_->last_dirtier_;
@@ -594,14 +606,8 @@ void current_page_acq_t::dirty_the_page() {
         if (prec != nullptr) {
             prec->pages_dirtied_last_.remove(current_page_dirtier_t{current_page_});
             if (prec->throttler_acq_.pre_spawn_flush()) {
-                timestamped_page_ptr_t tpp;
-                tpp.init(
-                    current_page_->last_dirtier_recency_,
-                    current_page_->the_page_for_read_or_deleted(help()));
-                prec->snapshotted_dirtied_pages_.push_back(
-                    dirtied_page_t(current_page_->last_dirtier_version_,
-                                   block_id_,
-                                   std::move(tpp)));
+                page_cache_->help_take_snapshotted_dirtied_page(
+                    current_page_, block_id_, prec);
             } else {
                 // prec is already a preceder of the_txn_, transitively.  Now prec is a
                 // subseqer too, and we have to flush them at the same time.  This is
@@ -1209,24 +1215,12 @@ void page_cache_t::remove_txn_set_from_graph(page_cache_t *page_cache,
         while (txn->pages_dirtied_last_.size() != 0) {
             current_page_dirtier_t dirtier
                 = txn->pages_dirtied_last_.access_random(0);
-            rassert(dirtier.current_page->last_dirtier_ == txn);
 
-            // HSI: Dedup this code a bit with the other one.
-            timestamped_page_ptr_t tpp;
-            tpp.init(
-                dirtier.current_page->last_dirtier_recency_,
-                dirtier.current_page->the_page_for_read_or_deleted(
-                    current_page_help_t(dirtier.current_page->block_id_,
-                                        page_cache)));
-            txn->snapshotted_dirtied_pages_.push_back(
-                dirtied_page_t(dirtier.current_page->last_dirtier_version_,
-                               dirtier.current_page->block_id_,
-                               std::move(tpp)));
+            page_cache->help_take_snapshotted_dirtied_page(
+                dirtier.current_page, dirtier.current_page->block_id_, txn);
 
             txn->pages_dirtied_last_.remove(dirtier);
             dirtier.current_page->last_dirtier_ = nullptr;
-
-
 
             page_cache->consider_evicting_current_page(dirtier.current_page->block_id_);
         }

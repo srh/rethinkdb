@@ -443,6 +443,9 @@ public:
     serializer_t *serializer() { return serializer_; }
 
 private:
+    void help_take_snapshotted_dirtied_page(
+        current_page_t *cp, block_id_t block_id, page_txn_t *dirtier);
+
     friend class page_read_ahead_cb_t;
     void add_read_ahead_buf(block_id_t block_id,
                             scoped_device_block_aligned_ptr_t<ser_buffer_t> ptr,
