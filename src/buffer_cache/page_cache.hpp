@@ -530,6 +530,8 @@ private:
     // Returns next_block_version_ and increments it.
     block_version_t gen_block_version();
 
+    void merge_into_waiting_for_spawn_flush(scoped_ptr_t<page_txn_t> &&base);
+
     const max_block_size_t max_block_size_;
 
     // We use a separate I/O account for reads in each page cache.
