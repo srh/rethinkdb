@@ -393,6 +393,24 @@ private:
 
 class page_cache_index_write_sink_t;
 
+// KSI: Maybe just have txn_t hold a single list of block_change_t objects.
+struct block_change_t {
+    block_change_t(block_version_t _version, bool _modified,
+                   page_t *_page, repli_timestamp_t _tstamp)
+        : version(_version), modified(_modified), page(_page), tstamp(_tstamp) { }
+    block_version_t version;
+
+    // True if the value of the block was modified (or the block was deleted), false
+    // if the block was only touched.
+    bool modified;
+    // If modified == true, the new value for the block, or NULL if the block was
+    // deleted.  (The page_t's lifetime is kept by some page_txn_t's
+    // snapshotted_dirtied_pages_ field.)
+    page_t *page;
+    repli_timestamp_t tstamp;
+};
+
+
 class page_cache_t : public home_thread_mixin_t {
 public:
     page_cache_t(serializer_t *serializer,
@@ -456,23 +474,6 @@ private:
 
 
     current_page_t *internal_page_for_new_chosen(block_id_t block_id);
-
-    // KSI: Maybe just have txn_t hold a single list of block_change_t objects.
-    struct block_change_t {
-        block_change_t(block_version_t _version, bool _modified,
-                       page_t *_page, repli_timestamp_t _tstamp)
-            : version(_version), modified(_modified), page(_page), tstamp(_tstamp) { }
-        block_version_t version;
-
-        // True if the value of the block was modified (or the block was deleted), false
-        // if the block was only touched.
-        bool modified;
-        // If modified == true, the new value for the block, or NULL if the block was
-        // deleted.  (The page_t's lifetime is kept by some page_txn_t's
-        // snapshotted_dirtied_pages_ field.)
-        page_t *page;
-        repli_timestamp_t tstamp;
-    };
 
     friend class page_txn_t;
     static void do_flush_changes(
