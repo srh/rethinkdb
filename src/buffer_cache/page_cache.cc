@@ -53,6 +53,20 @@ void throttler_acq_t::mark_dirty_pages_written() {
     block_changes_semaphore_acq_.change_count(0);
 }
 
+void throttler_acq_t::merge(throttler_acq_t &&other) {
+    expected_change_count_ += other.expected_change_count_;
+    other.expected_change_count_ = 0;
+    // Right now we only merge page_txn's with began_waiting_for_flush_ true,
+    // pre_spawn_flush_ false.  If we did support pre_spawn_flush_ true, we might have
+    // to propagate_pre_spawn_flush() to preceders of one of these txn's.
+    rassert(!pre_spawn_flush_ && !other.pre_spawn_flush_);
+
+    block_changes_semaphore_acq_.transfer_in(
+        std::move(other.block_changes_semaphore_acq_));
+    index_changes_semaphore_acq_.transfer_in(
+        std::move(other.index_changes_semaphore_acq_));
+}
+
 page_read_ahead_cb_t::page_read_ahead_cb_t(serializer_t *serializer,
                                            page_cache_t *page_cache)
     : serializer_(serializer), page_cache_(page_cache) {

@@ -356,6 +356,8 @@ public:
     // as it is.
     void mark_dirty_pages_written();
 
+    void merge(throttler_acq_t &&other);
+
     // This is set by other algorithms.
     bool pre_spawn_flush() const { return pre_spawn_flush_; }
 
