@@ -50,7 +50,7 @@ enum class alt_create_t { create };
 enum class block_type_t { normal, aux };
 
 class page_txn_complete_cb_t
-        : public half_intrusive_list_node_t<page_txn_complete_cb_t> {
+        : public intrusive_list_node_t<page_txn_complete_cb_t> {
 public:
     cond_t cond;
 };
@@ -137,6 +137,10 @@ private:
 
     friend backindex_bag_index_t *access_backindex(current_page_t *current_page);
     friend backindex_bag_index_t *access_backindex(current_page_dirtier_t dirtier);
+    friend void update_backindex_back_pointer(current_page_t *cp, page_txn_t *txn);
+    friend void update_backindex_back_pointer(
+        current_page_dirtier_t cp, page_txn_t *txn);
+
 
     bool is_deleted() const { return is_deleted_; }
 
@@ -159,8 +163,7 @@ private:
     // Our index into the last_write_acquirer_->pages_write_acquired_last_.
     backindex_bag_index_t last_write_acquirer_index_;
 
-    // The version of the page, that the last write acquirer had.  We maintain this
-    // value, incrementing it with each new acquirer.
+    // The version of the page, that the last write acquirer had.
     block_version_t last_write_acquirer_version_;
 
     page_txn_t *last_dirtier_;
@@ -404,7 +407,7 @@ struct block_change_t {
 
     // This function has a specific obligation to leave other in an arbitrary
     // safe-to-destruct state.  (other's page must be reset.)  Returns the net
-    // difference in the number of dirty pages.  (Either -1, 0, or 1.)
+    // difference in the number of dirty pages.  (Either 0 or -1.)
     MUST_USE int merge(page_cache_t *page_cache, block_change_t &&other);
 
     block_version_t version;
@@ -483,25 +486,35 @@ private:
 
     current_page_t *internal_page_for_new_chosen(block_id_t block_id);
 
+    struct collapsed_txns_t {
+        auto_drainer_t::lock_t drainer_lock;
+        throttler_acq_t acq;
+        std::unordered_map<block_id_t, block_change_t> changes;
+        intrusive_list_t<page_txn_complete_cb_t> flush_complete_waiters;
+    };
+
     friend class page_txn_t;
     static void do_flush_changes(
         page_cache_t *page_cache,
-        std::unordered_map<block_id_t, block_change_t> &&changes,
-        const std::vector<page_txn_t *> &txns,
+        collapsed_txns_t *coltx,
         fifo_enforcer_write_token_t index_write_token);
     static void do_flush_txn_set(
         page_cache_t *page_cache,
-        std::unordered_map<block_id_t, block_change_t> *changes_ptr,
-        const std::vector<page_txn_t *> &txns);
+        collapsed_txns_t *coltx_ptr);
 
     static void remove_txn_set_from_graph(page_cache_t *page_cache,
                                           const std::vector<page_txn_t *> &txns);
 
-    static void pulse_flush_complete(const std::vector<page_txn_t *> &txns);
+    static void pulse_flush_complete(collapsed_txns_t &&txns);
 
     // We only pass the cache to reset the page ptr.
-    static std::unordered_map<block_id_t, block_change_t>
-    compute_changes(page_cache_t *page_cache, const std::vector<page_txn_t *> &txns);
+    static collapsed_txns_t
+    compute_changes(page_cache_t *page_cache, std::vector<page_txn_t *> &&txns);
+
+    static MUST_USE int64_t merge_changes(
+        page_cache_t *page_cache,
+        std::unordered_map<block_id_t, block_change_t> *onto,
+        std::unordered_map<block_id_t, block_change_t> &&from);
 
     static std::vector<page_txn_t *> maximal_flushable_txn_set(page_txn_t *base);
 
@@ -575,7 +588,8 @@ private:
     // the graph and flush just yet.
 
     // Txns that have began_waiting_for_flush_ true, spawned_flush_ false,
-    // pre_spawn_flush_ false.
+    // pre_spawn_flush_ false.  Right now this has 0 or 1 elements because we merge
+    // _all_ the page_txn's together.
     intrusive_list_t<page_txn_t> waiting_for_spawn_flush_;
     // Txns that have began_waiting_for_flush_ true, spawned_flush_ false,
     // pre_spawn_flush_ true.
@@ -680,6 +694,9 @@ private:
     void add_touched_page(
         block_id_t block_id, block_version_t version, repli_timestamp_t tstamp);
 
+    // Destroys other, merges it into this page txn.
+    void merge(scoped_ptr_t<page_txn_t> &&other);
+
     auto_drainer_t::lock_t drainer_lock_;
 
     page_cache_t *page_cache_;
@@ -756,7 +773,7 @@ private:
     // algorithms.
     mark_state_t mark_;
 
-    half_intrusive_list_t<page_txn_complete_cb_t> flush_complete_waiters_;
+    intrusive_list_t<page_txn_complete_cb_t> flush_complete_waiters_;
 
     DISABLE_COPYING(page_txn_t);
 };

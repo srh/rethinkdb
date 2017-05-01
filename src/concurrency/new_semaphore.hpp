@@ -53,6 +53,7 @@ public:
     new_semaphore_in_line_t();
     new_semaphore_in_line_t(new_semaphore_t *semaphore, int64_t count);
     new_semaphore_in_line_t(new_semaphore_in_line_t &&movee);
+    new_semaphore_in_line_t &operator=(new_semaphore_in_line_t &&movee);
 
     // Returns "how much" of the semaphore this acq has acquired or would acquire.
     int64_t count() const {

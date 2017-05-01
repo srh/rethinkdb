@@ -56,15 +56,20 @@ void throttler_acq_t::mark_dirty_pages_written() {
 void throttler_acq_t::merge(throttler_acq_t &&other) {
     expected_change_count_ += other.expected_change_count_;
     other.expected_change_count_ = 0;
-    // Right now we only merge page_txn's with began_waiting_for_flush_ true,
-    // pre_spawn_flush_ false.  If we did support pre_spawn_flush_ true, we might have
-    // to propagate_pre_spawn_flush() to preceders of one of these txn's.
-    rassert(!pre_spawn_flush_ && !other.pre_spawn_flush_);
+    // No need to worry about propagating pre_spawn_flush_.  (The two places we call
+    // this are for txn's that could belong in waiting_for_spawn_flush_, and txn's in
+    // compute_changes.)
+    rassert(pre_spawn_flush_ == other.pre_spawn_flush_);
 
-    block_changes_semaphore_acq_.transfer_in(
-        std::move(other.block_changes_semaphore_acq_));
-    index_changes_semaphore_acq_.transfer_in(
-        std::move(other.index_changes_semaphore_acq_));
+    if (!has_txn_throttler()) {
+        block_changes_semaphore_acq_ = std::move(other.block_changes_semaphore_acq_);
+        index_changes_semaphore_acq_ = std::move(other.index_changes_semaphore_acq_);
+    } else if (other.has_txn_throttler()) {
+        block_changes_semaphore_acq_.transfer_in(
+            std::move(other.block_changes_semaphore_acq_));
+        index_changes_semaphore_acq_.transfer_in(
+            std::move(other.index_changes_semaphore_acq_));
+    }
 }
 
 page_read_ahead_cb_t::page_read_ahead_cb_t(serializer_t *serializer,
@@ -1113,13 +1118,128 @@ void page_txn_t::remove_acquirer(current_page_acq_t *acq) {
     }
 }
 
+template <class T>
+void remove_unique(std::vector<T> *vec, T removee) {
+    auto it = std::find(vec->begin(), vec->end(), removee);
+    rassert(it != vec->end());
+    *it = std::move(vec->back());
+    vec->pop_back();
+}
+
+// This removes replacee from *vec.  It adds replacement to *vec, unless replacement is
+// already present.  Returns true if replacement was not already present.  This can
+// reorder *vec however it wants to.
+template <class T>
+bool merge_replace(std::vector<T> *vec, T replacee, T replacement) {
+    // HSI: We could do this in one traversal.
+    auto it = std::find(vec->begin(), vec->end(), replacee);
+    rassert(it != vec->end());
+    auto jt = std::find(vec->begin(), vec->end(), replacement);
+    if (jt == vec->end()) {
+        *it = replacement;
+        return true;
+    } else {
+        *it = std::move(vec->back());
+        vec->pop_back();
+        return false;
+    }
+}
+
+void update_backindex_back_pointer(current_page_t *cp, page_txn_t *txn) {
+    cp->last_write_acquirer_ = txn;
+}
+
+void update_backindex_back_pointer(current_page_dirtier_t cp, page_txn_t *txn) {
+    cp.current_page->last_dirtier_ = txn;
+}
+
+template <class T, size_t N>
+void move_elements(page_txn_t *ptr,
+                   backindex_bag_t<T, N> *dest, backindex_bag_t<T, N> *src) {
+    rassert(dest != src);
+    while (!src->empty()) {
+        T elem = src->access_random(0);
+        src->remove(elem);
+        dest->add(elem);
+        update_backindex_back_pointer(elem, ptr);
+    }
+}
+
+void page_txn_t::merge(scoped_ptr_t<page_txn_t> &&scoped_other) {
+    page_txn_t *other = scoped_other.get();
+
+    // Skip drainer lock -- nothing to merge there.
+
+    // Merge page cache?  No need.
+    rassert(page_cache_ == other->page_cache_);
+
+    // Merge cache conns.
+    while (cache_conn_t *conn = other->cache_conns_.head()) {
+        other->cache_conns_.pop_front();
+        rassert(conn->newest_txn_ == other);
+        conn->newest_txn_ = this;
+        cache_conns_.push_front(conn);
+    }
+
+    // Merge throttler acqs.
+    throttler_acq_.merge(std::move(other->throttler_acq_));
+
+    // HSI: Add back/forward indices to preceders_/subseqers_ instead.
+    for (page_txn_t *o_prec : other->preceders_) {
+        if (o_prec == this) {
+            remove_unique(&subseqers_, other);
+        } else {
+            if (merge_replace(&o_prec->subseqers_, other, this)) {
+                preceders_.push_back(o_prec);
+            }
+        }
+    }
+    other->preceders_.clear();
+
+    for (page_txn_t *o_subseq : other->subseqers_) {
+        if (o_subseq == this) {
+            remove_unique(&preceders_, other);
+        } else {
+            if (merge_replace(&o_subseq->preceders_, other, this)) {
+                subseqers_.push_back(o_subseq);
+            }
+        }
+    }
+    other->subseqers_.clear();
+
+    move_elements(this, &pages_write_acquired_last_,
+                  &other->pages_write_acquired_last_);
+    move_elements(this, &pages_dirtied_last_, &other->pages_dirtied_last_);
+
+    rassert(live_acqs_ == 0 && other->live_acqs_ == 0);
+    live_acqs_ += other->live_acqs_;
+    other->live_acqs_ = 0;
+
+    // net_dirty is 0 or -1.
+    int net_dirty = page_cache_t::merge_changes(
+        page_cache_, &changes_, std::move(other->changes_));
+
+    dirty_changes_pages_ += other->dirty_changes_pages_ + net_dirty;
+    other->dirty_changes_pages_ = 0;
+
+    // No need to worry about propagating began_waiting_for_flush_, spawned_flush_, or
+    // mark_.
+    rassert(began_waiting_for_flush_ && other->began_waiting_for_flush_);
+    rassert(!spawned_flush_ && !other->spawned_flush_);
+    rassert(mark_ == marked_not && other->mark_ == marked_not);
+
+    // Now the waiters wait on us...
+    flush_complete_waiters_.append_and_clear(&other->flush_complete_waiters_);
+
+    scoped_other.reset();
+
+    throttler_acq_.update_dirty_page_count(dirtied_page_count());
+}
+
 block_change_t make_block_change(block_version_t version,
                                  repli_timestamp_t tstamp,
                                  page_ptr_t &&ptr) {
-    return block_change_t(version,
-                          true,
-                          std::move(ptr),
-                          tstamp);
+    return block_change_t(version, true, std::move(ptr), tstamp);
 }
 
 void page_txn_t::add_snapshotted_dirtied_page(
@@ -1176,32 +1296,63 @@ int block_change_t::merge(page_cache_t *page_cache, block_change_t &&other) {
     return page.has() - old_pages_count;
 }
 
-std::unordered_map<block_id_t, block_change_t>
+int64_t page_cache_t::merge_changes(
+        page_cache_t *page_cache,
+        std::unordered_map<block_id_t, block_change_t> *onto,
+        std::unordered_map<block_id_t, block_change_t> &&from) {
+    int64_t total_net_dirty = 0;
+    for (auto &p : from) {
+        auto res = onto->emplace(p.first, block_change_t());
+        auto const jt = res.first;
+        if (res.second) {
+            jt->second = std::move(p.second);
+        } else {
+            total_net_dirty += jt->second.merge(page_cache, std::move(p.second));
+        }
+    }
+    from.clear();
+    return total_net_dirty;
+}
+
+// HSI: Make this a vector<scoped_ptr_t<page_txn_t>>.
+page_cache_t::collapsed_txns_t
 page_cache_t::compute_changes(page_cache_t *page_cache,
-                              const std::vector<page_txn_t *> &txns) {
+                              std::vector<page_txn_t *> &&txns) {
     ASSERT_NO_CORO_WAITING;
     // We combine changes, using the block_version_t value to see which change
     // happened later.  This even works if a single transaction acquired the same
     // block twice.
 
-    // The map of changes we make.
-    std::unordered_map<block_id_t, block_change_t> changes;
+    rassert(!txns.empty());
 
-    for (page_txn_t *txn : txns) {
-        for (auto &p : txn->changes_) {
-            auto res = changes.emplace(p.first, block_change_t());
-            auto const jt = res.first;
-            if (res.second) {
-                jt->second = std::move(p.second);
-            } else {
-                // HSI: Should we really ignore this, or could we note the cache usage
-                // reduction right away?
-                UNUSED int net_dirty = jt->second.merge(page_cache, std::move(p.second));
-            }
-        }
+    page_txn_t *first = txns[0];
+
+    collapsed_txns_t ret {
+        std::move(first->drainer_lock_),
+        std::move(first->throttler_acq_),
+        std::move(first->changes_),
+        std::move(first->flush_complete_waiters_)
+    };
+
+    // We merge out the throttler_acq's of the txn's.
+    int64_t dirty_changes_pages = first->dirty_changes_pages_;
+
+    delete first;
+
+    for (auto it = txns.begin() + 1; it != txns.end(); ++it) {
+        page_txn_t *txn = *it;
+        ret.acq.merge(std::move(txn->throttler_acq_));
+
+        int64_t net_dirty = page_cache_t::merge_changes(
+            page_cache, &ret.changes, std::move(txn->changes_));
+        dirty_changes_pages += net_dirty;
+        ret.acq.update_dirty_page_count(dirty_changes_pages);
+        ret.flush_complete_waiters.append_and_clear(&txn->flush_complete_waiters_);
+
+        delete txn;
     }
 
-    return changes;
+    return ret;
 }
 
 void page_cache_t::remove_txn_set_from_graph(page_cache_t *page_cache,
@@ -1311,9 +1462,9 @@ struct ancillary_info_t {
 
 void page_cache_t::do_flush_changes(
         page_cache_t *page_cache,
-        std::unordered_map<block_id_t, block_change_t> &&changes,
-        const std::vector<page_txn_t *> &txns,
+        collapsed_txns_t *coltx,
         fifo_enforcer_write_token_t index_write_token) {
+    std::unordered_map<block_id_t, block_change_t> &changes = coltx->changes;
     rassert(!changes.empty());
     std::vector<block_token_tstamp_t> blocks_by_tokens;
     blocks_by_tokens.reserve(changes.size());
@@ -1484,30 +1635,8 @@ void page_cache_t::do_flush_changes(
                         page_cache->consider_evicting_current_page(change_pair.first);
                     }
                     changes.clear();
+                    coltx->acq.mark_dirty_pages_written();
 
-                    for (auto &txn : txns) {
-                        for (auto &change_pair : txn->changes_) {
-                            // HSI: This should be unnecessary, already reset, right?
-                            // It's changes (the function param here) that needs to be
-                            // reset.
-                            change_pair.second.page.reset_page_ptr(page_cache);
-                            page_cache->consider_evicting_current_page(
-                                change_pair.first);
-                        }
-                        txn->changes_.clear();
-                        txn->dirty_changes_pages_ = 0;
-
-                        // HSI: By the time we get here the txn's should be destroyed
-                        // and their throttler_acq's extracted and merged together.
-
-                        // Read txn's won't have one.  Most read txn's don't get here,
-                        // because they're disconnected in the graph from other
-                        // page_txn's.  At the time of writing this comment, only in
-                        // ~page_cache_t do we flush them together with other txn's.
-                        if (txn->throttler_acq_.has_txn_throttler()) {
-                            txn->throttler_acq_.mark_dirty_pages_written();
-                        }
-                    }
                     blocks_released_cond.pulse();
                 }, page_cache->home_thread());
             }, write_ops);
@@ -1519,23 +1648,19 @@ void page_cache_t::do_flush_changes(
     blocks_released_cond.wait();
 }
 
-void page_cache_t::pulse_flush_complete(const std::vector<page_txn_t *> &txns) {
-    for (page_txn_t *txn : txns) {
-        for (page_txn_complete_cb_t *p = txn->flush_complete_waiters_.head();
-             p != nullptr; ) {
-            page_txn_complete_cb_t *tmp = p;
-            p = txn->flush_complete_waiters_.next(p);
-            txn->flush_complete_waiters_.remove(tmp);
-            tmp->cond.pulse();
-        }
-        delete txn;
+void page_cache_t::pulse_flush_complete(collapsed_txns_t &&coltx) {
+    for (page_txn_complete_cb_t *p = coltx.flush_complete_waiters.head();
+         p != nullptr; ) {
+        page_txn_complete_cb_t *tmp = p;
+            p = coltx.flush_complete_waiters.next(p);
+        coltx.flush_complete_waiters.remove(tmp);
+        tmp->cond.pulse();
     }
 }
 
 void page_cache_t::do_flush_txn_set(
         page_cache_t *page_cache,
-        std::unordered_map<block_id_t, block_change_t> *changes_ptr,
-        const std::vector<page_txn_t *> &txns) {
+        collapsed_txns_t *coltx_ptr) {
     // This is called with spawn_now_dangerously!  The reason is partly so that we
     // don't put a zillion coroutines on the message loop when doing a bunch of
     // reads.  The other reason is that passing changes through a std::bind without
@@ -1546,8 +1671,9 @@ void page_cache_t::do_flush_txn_set(
     // set of changes we're actually doing is, since any transaction may have touched
     // the same blocks.
 
-    std::unordered_map<block_id_t, block_change_t> changes = std::move(*changes_ptr);
-    rassert(!changes.empty());
+    collapsed_txns_t coltx = std::move(*coltx_ptr);
+
+    rassert(!coltx.changes.empty());
 
     fifo_enforcer_write_token_t index_write_token
         = page_cache->index_write_source_.enter_write();
@@ -1555,10 +1681,10 @@ void page_cache_t::do_flush_txn_set(
     // Okay, yield, thank you.
     coro_t::yield();
 
-    do_flush_changes(page_cache, std::move(changes), txns, index_write_token);
+    do_flush_changes(page_cache, &coltx, index_write_token);
 
     // Flush complete.
-    page_cache_t::pulse_flush_complete(txns);
+    page_cache_t::pulse_flush_complete(std::move(coltx));
 }
 
 std::vector<page_txn_t *> page_cache_t::maximal_flushable_txn_set(page_txn_t *base) {
@@ -1674,24 +1800,27 @@ std::vector<page_txn_t *> page_cache_t::maximal_flushable_txn_set(page_txn_t *ba
 void page_cache_t::spawn_flush_flushables(std::vector<page_txn_t *> &&flush_set) {
     // The flush set's txn's are already disconnected from the graph.
     if (!flush_set.empty()) {
-        std::unordered_map<block_id_t, block_change_t> changes
-            = page_cache_t::compute_changes(this, flush_set);
+        collapsed_txns_t coltx = page_cache_t::compute_changes(this, std::move(flush_set));
 
-
-        if (!changes.empty()) {
+        if (!coltx.changes.empty()) {
             coro_t::spawn_now_dangerously(std::bind(&page_cache_t::do_flush_txn_set,
                                                     this,
-                                                    &changes,
-                                                    std::move(flush_set)));
+                                                    &coltx));
         } else {
             // Flush complete.  do_flush_txn_set does this in the write case.
-            page_cache_t::pulse_flush_complete(flush_set);
+            page_cache_t::pulse_flush_complete(std::move(coltx));
         }
     }
 }
 
 void page_cache_t::merge_into_waiting_for_spawn_flush(scoped_ptr_t<page_txn_t> &&base) {
-    waiting_for_spawn_flush_.push_back(base.release());
+    if (waiting_for_spawn_flush_.empty()) {
+        waiting_for_spawn_flush_.push_back(base.release());
+        return;
+    }
+
+    page_txn_t *last = waiting_for_spawn_flush_.tail();
+    last->merge(std::move(base));
 }
 
 void page_cache_t::begin_waiting_for_flush(
