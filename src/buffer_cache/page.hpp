@@ -194,7 +194,11 @@ public:
 
     void init(page_t *page);
 
-    page_t *get_page_for_read() const;
+    page_t *get_page_for_read() const {
+        rassert(page_ != nullptr);
+        return page_;
+    }
+
     // Constructs a new page if there might be snapshot references.
     page_t *get_page_for_write(page_cache_t *page_cache,
                                cache_account_t *account);

@@ -1116,8 +1116,17 @@ void page_txn_t::remove_acquirer(current_page_acq_t *acq) {
     }
 }
 
+block_change_t make_block_change(const dirtied_page_t &d) {
+    return block_change_t(d.block_version,
+                          true,
+                          page_ptr_t(d.ptr.has() ? d.ptr.get_page_for_read() : nullptr),
+                          d.ptr.has() ? d.ptr.timestamp() : repli_timestamp_t::invalid);
+
+}
+
 std::unordered_map<block_id_t, block_change_t>
-page_cache_t::compute_changes(const std::vector<page_txn_t *> &txns) {
+page_cache_t::compute_changes(page_cache_t *page_cache,
+                              const std::vector<page_txn_t *> &txns) {
     ASSERT_NO_CORO_WAITING;
     // We combine changes, using the block_version_t value to see which change
     // happened later.  This even works if a single transaction acquired the same
@@ -1131,22 +1140,22 @@ page_cache_t::compute_changes(const std::vector<page_txn_t *> &txns) {
         for (size_t i = 0, e = txn->snapshotted_dirtied_pages_.size(); i < e; ++i) {
             const dirtied_page_t &d = txn->snapshotted_dirtied_pages_[i];
 
-            block_change_t change(d.block_version, true,
-                                  d.ptr.has() ? d.ptr.get_page_for_read() : nullptr,
-                                  d.ptr.has() ? d.ptr.timestamp() : repli_timestamp_t::invalid);
+            auto res = changes.emplace(d.block_id, block_change_t());
 
-            auto res = changes.insert(std::make_pair(d.block_id, change));
-
-            if (!res.second) {
-                // The insertion failed -- we need to use the newer version.
-                auto const jt = res.first;
+            auto const jt = res.first;
+            if (res.second) {
+                // HSI: Move the page, leaving snapshotted_dirtied_pages_ in an invalid
+                // state?  In other branch too.
+                jt->second = make_block_change(d);
+            } else {
                 // The versions can't be the same for different write operations.
-                rassert(jt->second.version != change.version,
+                rassert(jt->second.version != d.block_version,
                         "equal versions on block %" PRIi64 ": %" PRIu64,
                         d.block_id,
-                        change.version.debug_value());
-                if (jt->second.version < change.version) {
-                    jt->second = change;
+                        d.block_version.debug_value());
+                if (jt->second.version < d.block_version) {
+                    jt->second.page.reset_page_ptr(page_cache);
+                    jt->second = make_block_change(d);
                 }
             }
         }
@@ -1157,15 +1166,16 @@ page_cache_t::compute_changes(const std::vector<page_txn_t *> &txns) {
         for (size_t i = 0, e = txn->touched_pages_.size(); i < e; ++i) {
             const touched_page_t &t = txn->touched_pages_[i];
 
-            auto res = changes.insert(std::make_pair(t.block_id,
-                                                     block_change_t(t.block_version,
-                                                                    false,
-                                                                    nullptr,
-                                                                    t.tstamp)));
-            if (!res.second) {
-                // The insertion failed.  We need to combine the versions.
-                auto const jt = res.first;
-                // The versions can't be the same for different write operations.
+            auto res = changes.emplace(t.block_id, block_change_t());
+
+            auto const jt = res.first;
+            if (res.second) {
+                jt->second = block_change_t(
+                    t.block_version,
+                    false,
+                    page_ptr_t(),
+                    t.tstamp);
+            } else {
                 rassert(jt->second.version != t.block_version);
                 if (jt->second.version < t.block_version) {
                     jt->second.tstamp = t.tstamp;
@@ -1305,7 +1315,7 @@ void page_cache_t::do_flush_changes(
 
         for (auto it = changes.begin(); it != changes.end(); ++it) {
             if (it->second.modified) {
-                if (it->second.page == nullptr) {
+                if (!it->second.page.has()) {
                     // The block is deleted.
                     blocks_by_tokens.push_back(block_token_tstamp_t(
                         it->first,
@@ -1314,7 +1324,7 @@ void page_cache_t::do_flush_changes(
                         repli_timestamp_t::invalid,
                         nullptr));
                 } else {
-                    page_t *page = it->second.page;
+                    page_t *page = it->second.page.get_page_for_read();
                     if (page->block_token().has()) {
                         // It's already on disk, we're not going to flush it.
                         blocks_by_tokens.push_back(block_token_tstamp_t(
@@ -1517,6 +1527,9 @@ void page_cache_t::do_flush_txn_set(
     coro_t::yield();
 
     do_flush_changes(page_cache, changes, txns, index_write_token);
+    for (auto &pair : changes) {
+        pair.second.page.reset_page_ptr(page_cache);
+    }
 
     // Flush complete.
     page_cache_t::pulse_flush_complete(txns);
@@ -1636,7 +1649,7 @@ void page_cache_t::spawn_flush_flushables(std::vector<page_txn_t *> &&flush_set)
     // The flush set's txn's are already disconnected from the graph.
     if (!flush_set.empty()) {
         std::unordered_map<block_id_t, block_change_t> changes
-            = page_cache_t::compute_changes(flush_set);
+            = page_cache_t::compute_changes(this, flush_set);
 
 
         if (!changes.empty()) {
