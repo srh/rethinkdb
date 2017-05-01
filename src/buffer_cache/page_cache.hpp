@@ -169,7 +169,6 @@ private:
     // and read these values, the only thing it affects is compute_changes, later.
     // Maybe we should replace last_dirtier_ with last_toucher_or_dirtier_.  Then we
     // wouldn't need this recency field.
-    // HSI: Maybe remove_acquirer should just make a touched_page_t, with dirtied_page_t no longer handling recency.
     block_version_t last_dirtier_version_;
     repli_timestamp_t last_dirtier_recency_;
 
@@ -393,9 +392,10 @@ private:
 
 class page_cache_index_write_sink_t;
 
-// KSI: Maybe just have txn_t hold a single list of block_change_t objects.
 struct block_change_t {
     block_change_t() = default;
+    block_change_t(block_version_t _version, repli_timestamp_t _tstamp)
+        : version(_version), modified(false), page(), tstamp(_tstamp) { }
     block_change_t(block_version_t _version, bool _modified,
                    page_ptr_t &&_page, repli_timestamp_t _tstamp)
         : version(_version), modified(_modified), page(std::move(_page)),
@@ -597,23 +597,6 @@ private:
     DISABLE_COPYING(page_cache_t);
 };
 
-class touched_page_t {
-public:
-    touched_page_t()
-        : block_id(NULL_BLOCK_ID),
-          tstamp(repli_timestamp_t::invalid) { }
-    touched_page_t(block_version_t _block_version,
-                   block_id_t _block_id,
-                   repli_timestamp_t _tstamp)
-        : block_version(_block_version),
-          block_id(_block_id),
-          tstamp(_tstamp) { }
-
-    block_version_t block_version;
-    block_id_t block_id;
-    repli_timestamp_t tstamp;
-};
-
 // page_txn_t's exist for the purpose of writing to disk.  The rules are as follows:
 //
 //  - When a page_txn_t gets "committed" (written to disk), all blocks modified with
@@ -742,11 +725,6 @@ private:
     std::unordered_map<block_id_t, block_change_t> changes_;
     // How many pages are held by changes_.  (Always non-negative.)
     int64_t dirty_changes_pages_;
-
-    // Touched pages (by block id).
-    // KSI: Right now we put multiple touched_page_t's if we reacquire the same block
-    // and modify it again.
-    segmented_vector_t<touched_page_t, 8> touched_pages_;
 
     // Valid states of (began_waiting_for_flush_, pre_spawn_flush_, spawned_flush_) are:
     //   (    *,     *, false)
