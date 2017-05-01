@@ -166,8 +166,9 @@ inline backindex_bag_index_t *access_backindex(page_t *page) {
 // A page_ptr_t holds a pointer to a page_t.
 class page_ptr_t {
 public:
-    explicit page_ptr_t(page_t *page)
-        : page_(nullptr) { init(page); }
+    explicit page_ptr_t(page_t *page) : page_(nullptr) {
+        init(page);
+    }
     page_ptr_t() : page_(nullptr) { }
 
     // The page_ptr_t MUST be reset before the destructor is called.
