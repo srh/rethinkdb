@@ -401,6 +401,11 @@ struct block_change_t {
         : version(_version), modified(_modified), page(std::move(_page)),
           tstamp(_tstamp) { }
 
+    // This function has a specific obligation to leave other in an arbitrary
+    // safe-to-destruct state.  (other's page must be reset.)  Returns the net
+    // difference in the number of dirty pages.  (Either -1, 0, or 1.)
+    MUST_USE int merge(page_cache_t *page_cache, block_change_t &&other);
+
     block_version_t version;
 
     // True if the value of the block was modified (or the block was deleted), false
@@ -480,7 +485,7 @@ private:
     friend class page_txn_t;
     static void do_flush_changes(
         page_cache_t *page_cache,
-        const std::unordered_map<block_id_t, block_change_t> &changes,
+        std::unordered_map<block_id_t, block_change_t> &&changes,
         const std::vector<page_txn_t *> &txns,
         fifo_enforcer_write_token_t index_write_token);
     static void do_flush_txn_set(
@@ -592,33 +597,6 @@ private:
     DISABLE_COPYING(page_cache_t);
 };
 
-class dirtied_page_t {
-public:
-    dirtied_page_t()
-        : block_id(NULL_BLOCK_ID) { }
-    dirtied_page_t(block_version_t _block_version,
-                   block_id_t _block_id, timestamped_page_ptr_t &&_ptr)
-        : block_version(_block_version),
-          block_id(_block_id),
-          ptr(std::move(_ptr)) { }
-    dirtied_page_t(dirtied_page_t &&movee)
-        : block_version(movee.block_version),
-          block_id(movee.block_id),
-          ptr(std::move(movee.ptr)) { }
-    dirtied_page_t &operator=(dirtied_page_t &&movee) {
-        block_version = movee.block_version;
-        block_id = movee.block_id;
-        ptr = std::move(movee.ptr);
-        return *this;
-    }
-    // Our block version of the dirty page.
-    block_version_t block_version;
-    // The block id of the dirty page.
-    block_id_t block_id;
-    // The snapshotted dirty page value.  (If empty, the page was deleted.)
-    timestamped_page_ptr_t ptr;
-};
-
 class touched_page_t {
 public:
     touched_page_t()
@@ -703,13 +681,19 @@ private:
     static void propagate_pre_spawn_flush(page_txn_t *base);
 
     size_t dirtied_page_count() const {
-        return snapshotted_dirtied_pages_.size() + pages_dirtied_last_.size();
+        return pages_dirtied_last_.size() + dirty_changes_pages_;
     }
 
     // Sets pre_spawn_flush to be true, if not already set.  handles presence in
     // waiting_for_spawn_flush_/want_to_spawn_flush_.  Returns false if pre_spawn_flush
     // was already set, in which case there was no side effect.
     bool set_pre_spawn_flush();
+
+    // If ptr is empty, that means the block was deleted.
+    void add_snapshotted_dirtied_page(
+        block_id_t block_id, block_version_t version, timestamped_page_ptr_t &&ptr);
+    void add_touched_page(
+        block_id_t block_id, block_version_t version, repli_timestamp_t tstamp);
 
     auto_drainer_t::lock_t drainer_lock_;
 
@@ -754,11 +738,10 @@ private:
     // How many current_page_acq_t's for this transaction that are currently alive.
     size_t live_acqs_;
 
-    // Saved pages (by block id).
     // You have to update throttler_acq_ when you add/remove from this.
-    // KSI: Right now we put multiple dirtied_page_t's if we reacquire the same block
-    // and modify it again.
-    segmented_vector_t<dirtied_page_t, 8> snapshotted_dirtied_pages_;
+    std::unordered_map<block_id_t, block_change_t> changes_;
+    // How many pages are held by changes_.  (Always non-negative.)
+    int64_t dirty_changes_pages_;
 
     // Touched pages (by block id).
     // KSI: Right now we put multiple touched_page_t's if we reacquire the same block
