@@ -1111,8 +1111,6 @@ void page_txn_t::remove_acquirer(current_page_acq_t *acq) {
         rassert(acq->write_cond_.is_pulsed());
 
     } else if (acq->touched_page()) {
-        // It's okay to have two touched_page_t's for the same block id --
-        // compute_changes handles this.
         add_touched_page(acq->block_id(), block_version, acq->recency());
     }
 }
@@ -1139,7 +1137,15 @@ void page_txn_t::add_snapshotted_dirtied_page(
 
 void page_txn_t::add_touched_page(
         block_id_t block_id, block_version_t version, repli_timestamp_t tstamp) {
-    touched_pages_.push_back(touched_page_t(version, block_id, tstamp));
+    auto res = changes_.emplace(block_id, block_change_t(version, tstamp));
+    if (!res.second) {
+        auto jt = res.first;
+        rassert(jt->second.version != version);
+        if (jt->second.version < version) {
+            jt->second.version = version;
+            jt->second.tstamp = tstamp;
+        }
+    }
 }
 
 int block_change_t::merge(page_cache_t *page_cache, block_change_t &&other) {
@@ -1187,30 +1193,6 @@ page_cache_t::compute_changes(page_cache_t *page_cache,
                 // HSI: Should we really ignore this, or could we note the cache usage
                 // reduction right away?
                 UNUSED int net_dirty = jt->second.merge(page_cache, std::move(p.second));
-            }
-        }
-    }
-
-    for (auto it = txns.begin(); it != txns.end(); ++it) {
-        page_txn_t *txn = *it;
-        for (size_t i = 0, e = txn->touched_pages_.size(); i < e; ++i) {
-            const touched_page_t &t = txn->touched_pages_[i];
-
-            auto res = changes.emplace(t.block_id, block_change_t());
-
-            auto const jt = res.first;
-            if (res.second) {
-                jt->second = block_change_t(
-                    t.block_version,
-                    false,
-                    page_ptr_t(),
-                    t.tstamp);
-            } else {
-                rassert(jt->second.version != t.block_version);
-                if (jt->second.version < t.block_version) {
-                    jt->second.tstamp = t.tstamp;
-                    jt->second.version = t.block_version;
-                }
             }
         }
     }
