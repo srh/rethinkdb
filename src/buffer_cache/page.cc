@@ -641,11 +641,6 @@ void page_ptr_t::reset_page_ptr(page_cache_t *page_cache) {
     }
 }
 
-page_t *page_ptr_t::get_page_for_read() const {
-    rassert(page_ != nullptr);
-    return page_;
-}
-
 page_t *page_ptr_t::get_page_for_write(page_cache_t *page_cache,
                                        cache_account_t *account) {
     rassert(page_ != nullptr);
