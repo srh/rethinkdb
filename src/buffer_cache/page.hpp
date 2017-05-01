@@ -232,6 +232,8 @@ public:
 
     void reset_page_ptr(page_cache_t *page_cache);
 
+    page_ptr_t &&remove_ptr() && { return std::move(page_ptr_); }
+
 private:
     repli_timestamp_t timestamp_;
     page_ptr_t page_ptr_;
