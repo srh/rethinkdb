@@ -603,12 +603,10 @@ repli_timestamp_t current_page_acq_t::recency() {
 void page_cache_t::help_take_snapshotted_dirtied_page(
         current_page_t *cp, block_id_t block_id, page_txn_t *dirtier) {
     rassert(cp->last_dirtier_ == dirtier);
-    timestamped_page_ptr_t tpp;
-    tpp.init(
-        cp->last_dirtier_recency_,
-        cp->the_page_for_read_or_deleted(current_page_help_t(block_id, this)));
     dirtier->add_snapshotted_dirtied_page(
-        block_id, cp->last_dirtier_version_, std::move(tpp));
+        block_id, cp->last_dirtier_version_,
+        cp->last_dirtier_recency_,
+        page_ptr_t(cp->the_page_for_read_or_deleted(current_page_help_t(block_id, this))));
 }
 
 void current_page_acq_t::dirty_the_page() {
@@ -1114,23 +1112,29 @@ void page_txn_t::remove_acquirer(current_page_acq_t *acq) {
     }
 }
 
-block_change_t make_block_change(block_version_t version, timestamped_page_ptr_t &&ptr) {
-    repli_timestamp_t tstamp = ptr.has() ? ptr.timestamp() : repli_timestamp_t::invalid;
+block_change_t make_block_change(block_version_t version,
+                                 repli_timestamp_t tstamp,
+                                 page_ptr_t &&ptr) {
     return block_change_t(version,
                           true,
-                          ptr.has() ? std::move(ptr).remove_ptr() : page_ptr_t(),
+                          std::move(ptr),
                           tstamp);
 }
 
 void page_txn_t::add_snapshotted_dirtied_page(
-        block_id_t block_id, block_version_t version, timestamped_page_ptr_t &&ptr) {
+        block_id_t block_id, block_version_t version,
+        repli_timestamp_t tstamp, page_ptr_t &&ptr) {
+    rassert(!ptr.has() || tstamp != repli_timestamp_t::invalid
+        || is_aux_block_id(block_id));
+
     auto res = changes_.emplace(block_id, block_change_t());
     auto const jt = res.first;
     if (res.second) {
         dirty_changes_pages_ += ptr.has();
-        jt->second = make_block_change(version, std::move(ptr));
+        jt->second = make_block_change(version, tstamp, std::move(ptr));
     } else {
-        dirty_changes_pages_ += jt->second.merge(page_cache_, make_block_change(version, std::move(ptr)));
+        dirty_changes_pages_ += jt->second.merge(page_cache_,
+            make_block_change(version, tstamp, std::move(ptr)));
     }
 }
 

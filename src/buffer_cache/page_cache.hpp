@@ -674,7 +674,8 @@ private:
 
     // If ptr is empty, that means the block was deleted.
     void add_snapshotted_dirtied_page(
-        block_id_t block_id, block_version_t version, timestamped_page_ptr_t &&ptr);
+        block_id_t block_id, block_version_t version, repli_timestamp_t tstamp,
+        page_ptr_t &&ptr);
     void add_touched_page(
         block_id_t block_id, block_version_t version, repli_timestamp_t tstamp);
 
