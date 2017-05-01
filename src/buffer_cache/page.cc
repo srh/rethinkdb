@@ -624,29 +624,6 @@ const void *page_acq_t::get_buf_read() {
     return page_->get_page_buf(page_cache_);
 }
 
-page_ptr_t::page_ptr_t() : page_(nullptr) {
-}
-
-page_ptr_t::~page_ptr_t() {
-    rassert(page_ == nullptr);
-}
-
-page_ptr_t::page_ptr_t(page_ptr_t &&movee)
-    : page_(movee.page_) {
-    movee.page_ = nullptr;
-}
-
-page_ptr_t &page_ptr_t::operator=(page_ptr_t &&movee) {
-    // We can't do true assignment, destructing an old page-having value, because
-    // reset() has to manually be called.  (This assertion is redundant with the one
-    // that'll enforce this fact in tmp's destructor.)
-    rassert(page_ == nullptr);
-
-    page_ptr_t tmp(std::move(movee));
-    swap_with(&tmp);
-    return *this;
-}
-
 void page_ptr_t::init(page_t *page) {
     rassert(page_ == nullptr);
     page_ = page;
