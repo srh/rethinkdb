@@ -1117,7 +1117,7 @@ void page_txn_t::remove_acquirer(current_page_acq_t *acq) {
     }
 }
 
-std::unordered_map<block_id_t, page_cache_t::block_change_t>
+std::unordered_map<block_id_t, block_change_t>
 page_cache_t::compute_changes(const std::vector<page_txn_t *> &txns) {
     ASSERT_NO_CORO_WAITING;
     // We combine changes, using the block_version_t value to see which change
