@@ -608,8 +608,8 @@ void page_cache_t::help_take_snapshotted_dirtied_page(
     tpp.init(
         cp->last_dirtier_recency_,
         cp->the_page_for_read_or_deleted(current_page_help_t(block_id, this)));
-    dirtier->snapshotted_dirtied_pages_.push_back(
-        dirtied_page_t(cp->last_dirtier_version_, block_id, std::move(tpp)));
+    dirtier->add_snapshotted_dirtied_page(
+        block_id, cp->last_dirtier_version_, std::move(tpp));
 }
 
 void current_page_acq_t::dirty_the_page() {
@@ -989,6 +989,7 @@ page_txn_t::page_txn_t(page_cache_t *page_cache,
       page_cache_(page_cache),
       throttler_acq_(std::move(throttler_acq)),
       live_acqs_(0),
+      dirty_changes_pages_(0),
       began_waiting_for_flush_(false),
       spawned_flush_(false),
       mark_(marked_not),
@@ -1082,7 +1083,7 @@ page_txn_t::~page_txn_t() {
     guarantee(preceders_.empty());
     guarantee(subseqers_.empty());
 
-    guarantee(snapshotted_dirtied_pages_.empty());
+    guarantee(changes_.empty());
 }
 
 void page_txn_t::add_acquirer(DEBUG_VAR current_page_acq_t *acq) {
@@ -1110,19 +1111,59 @@ void page_txn_t::remove_acquirer(current_page_acq_t *acq) {
         rassert(acq->write_cond_.is_pulsed());
 
     } else if (acq->touched_page()) {
-        // It's okay to have two dirtied_page_t's or touched_page_t's for the
-        // same block id -- compute_changes handles this.
-        touched_pages_.push_back(touched_page_t(block_version, acq->block_id(),
-                                                acq->recency()));
+        // It's okay to have two touched_page_t's for the same block id --
+        // compute_changes handles this.
+        add_touched_page(acq->block_id(), block_version, acq->recency());
     }
 }
 
-block_change_t make_block_change(const dirtied_page_t &d) {
-    return block_change_t(d.block_version,
+block_change_t make_block_change(block_version_t version, timestamped_page_ptr_t &&ptr) {
+    repli_timestamp_t tstamp = ptr.has() ? ptr.timestamp() : repli_timestamp_t::invalid;
+    return block_change_t(version,
                           true,
-                          page_ptr_t(d.ptr.has() ? d.ptr.get_page_for_read() : nullptr),
-                          d.ptr.has() ? d.ptr.timestamp() : repli_timestamp_t::invalid);
+                          ptr.has() ? std::move(ptr).remove_ptr() : page_ptr_t(),
+                          tstamp);
+}
 
+void page_txn_t::add_snapshotted_dirtied_page(
+        block_id_t block_id, block_version_t version, timestamped_page_ptr_t &&ptr) {
+    auto res = changes_.emplace(block_id, block_change_t());
+    auto const jt = res.first;
+    if (res.second) {
+        dirty_changes_pages_ += ptr.has();
+        jt->second = make_block_change(version, std::move(ptr));
+    } else {
+        dirty_changes_pages_ += jt->second.merge(page_cache_, make_block_change(version, std::move(ptr)));
+    }
+}
+
+void page_txn_t::add_touched_page(
+        block_id_t block_id, block_version_t version, repli_timestamp_t tstamp) {
+    touched_pages_.push_back(touched_page_t(version, block_id, tstamp));
+}
+
+int block_change_t::merge(page_cache_t *page_cache, block_change_t &&other) {
+    rassert(version != other.version);
+    int old_pages_count = page.has() + other.page.has();
+    // This function is commutative -- changes from the later version supercede those of
+    // the earlier version.  (Both branches here do the same thing.)
+    if (version < other.version) {
+        if (other.modified) {
+            modified = true;
+            page.reset_page_ptr(page_cache);
+            page = std::move(other.page);
+        }
+        tstamp = other.tstamp;
+    } else {
+        // Move in other's page unless we supercede.
+        if (!modified) {
+            modified = other.modified;
+            page = std::move(other.page);
+        } else {
+            other.page.reset_page_ptr(page_cache);
+        }
+    }
+    return page.has() - old_pages_count;
 }
 
 std::unordered_map<block_id_t, block_change_t>
@@ -1136,28 +1177,16 @@ page_cache_t::compute_changes(page_cache_t *page_cache,
     // The map of changes we make.
     std::unordered_map<block_id_t, block_change_t> changes;
 
-    for (auto it = txns.begin(); it != txns.end(); ++it) {
-        page_txn_t *txn = *it;
-        for (size_t i = 0, e = txn->snapshotted_dirtied_pages_.size(); i < e; ++i) {
-            const dirtied_page_t &d = txn->snapshotted_dirtied_pages_[i];
-
-            auto res = changes.emplace(d.block_id, block_change_t());
-
+    for (page_txn_t *txn : txns) {
+        for (auto &p : txn->changes_) {
+            auto res = changes.emplace(p.first, block_change_t());
             auto const jt = res.first;
             if (res.second) {
-                // HSI: Move the page, leaving snapshotted_dirtied_pages_ in an invalid
-                // state?  In other branch too.
-                jt->second = make_block_change(d);
+                jt->second = std::move(p.second);
             } else {
-                // The versions can't be the same for different write operations.
-                rassert(jt->second.version != d.block_version,
-                        "equal versions on block %" PRIi64 ": %" PRIu64,
-                        d.block_id,
-                        d.block_version.debug_value());
-                if (jt->second.version < d.block_version) {
-                    jt->second.page.reset_page_ptr(page_cache);
-                    jt->second = make_block_change(d);
-                }
+                // HSI: Should we really ignore this, or could we note the cache usage
+                // reduction right away?
+                UNUSED int net_dirty = jt->second.merge(page_cache, std::move(p.second));
             }
         }
     }
@@ -1296,7 +1325,7 @@ struct ancillary_info_t {
 
 void page_cache_t::do_flush_changes(
         page_cache_t *page_cache,
-        const std::unordered_map<block_id_t, block_change_t> &changes,
+        std::unordered_map<block_id_t, block_change_t> &&changes,
         const std::vector<page_txn_t *> &txns,
         fifo_enforcer_write_token_t index_write_token) {
     rassert(!changes.empty());
@@ -1441,7 +1470,7 @@ void page_cache_t::do_flush_changes(
                     for (auto &block : blocks_by_tokens) {
                         if (block.block_token.has() && block.page != nullptr) {
                             // We know page is still a valid pointer because of the
-                            // page_ptr_t in snapshotted_dirtied_pages_.
+                            // page_ptr_t in changes.
 
                             // HSI: This assertion would fail if we try to force-evict
                             // the page simultaneously as this write.
@@ -1462,16 +1491,29 @@ void page_cache_t::do_flush_changes(
                     // below.
                     ancillary_infos.clear();
 
+                    // Really this is what clears the changes -- the txn->changes_
+                    // should already be reset.
+                    for (auto &change_pair : changes) {
+                        change_pair.second.page.reset_page_ptr(page_cache);
+                        page_cache->consider_evicting_current_page(change_pair.first);
+                    }
+                    changes.clear();
+
                     for (auto &txn : txns) {
-                        for (size_t i = 0, e = txn->snapshotted_dirtied_pages_.size();
-                             i < e;
-                             ++i) {
-                            txn->snapshotted_dirtied_pages_[i].ptr.reset_page_ptr(
-                                page_cache);
+                        for (auto &change_pair : txn->changes_) {
+                            // HSI: This should be unnecessary, already reset, right?
+                            // It's changes (the function param here) that needs to be
+                            // reset.
+                            change_pair.second.page.reset_page_ptr(page_cache);
                             page_cache->consider_evicting_current_page(
-                                txn->snapshotted_dirtied_pages_[i].block_id);
+                                change_pair.first);
                         }
-                        txn->snapshotted_dirtied_pages_.clear();
+                        txn->changes_.clear();
+                        txn->dirty_changes_pages_ = 0;
+
+                        // HSI: By the time we get here the txn's should be destroyed
+                        // and their throttler_acq's extracted and merged together.
+
                         // Read txn's won't have one.  Most read txn's don't get here,
                         // because they're disconnected in the graph from other
                         // page_txn's.  At the time of writing this comment, only in
@@ -1527,10 +1569,7 @@ void page_cache_t::do_flush_txn_set(
     // Okay, yield, thank you.
     coro_t::yield();
 
-    do_flush_changes(page_cache, changes, txns, index_write_token);
-    for (auto &pair : changes) {
-        pair.second.page.reset_page_ptr(page_cache);
-    }
+    do_flush_changes(page_cache, std::move(changes), txns, index_write_token);
 
     // Flush complete.
     page_cache_t::pulse_flush_complete(txns);
