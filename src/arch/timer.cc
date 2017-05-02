@@ -56,7 +56,7 @@ void timer_handler_t::on_oneshot() {
             token_queue.push(token);
         }
 
-        token->callback->on_timer();
+        token->callback->on_timer(real_ticks);
 
         // Delete nonrepeating timer tokens.
         if (token->interval_nanos == 0) {
