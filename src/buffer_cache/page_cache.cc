@@ -305,13 +305,14 @@ page_cache_t::~page_cache_t() {
 
 void page_cache_t::begin_flush_pending_txns() {
     ASSERT_FINITE_CORO_WAITING;
-    std::vector<page_txn_t *> full_flush_set;
+    std::vector<scoped_ptr_t<page_txn_t>> full_flush_set;
     while (page_txn_t *ptr = waiting_for_spawn_flush_.head()) {
         page_txn_t::propagate_pre_spawn_flush(ptr);
-        std::vector<page_txn_t *> flush_set
+        std::vector<scoped_ptr_t<page_txn_t>> flush_set
             = page_cache_t::maximal_flushable_txn_set(ptr);
         page_cache_t::remove_txn_set_from_graph(this, flush_set);
-        full_flush_set.insert(full_flush_set.end(), flush_set.begin(), flush_set.end());
+        std::move(flush_set.begin(), flush_set.end(),
+                  std::back_inserter(full_flush_set));
     }
     spawn_flush_flushables(std::move(full_flush_set));
 }
@@ -1314,10 +1315,9 @@ int64_t page_cache_t::merge_changes(
     return total_net_dirty;
 }
 
-// HSI: Make this a vector<scoped_ptr_t<page_txn_t>>.
 page_cache_t::collapsed_txns_t
 page_cache_t::compute_changes(page_cache_t *page_cache,
-                              std::vector<page_txn_t *> &&txns) {
+                              std::vector<scoped_ptr_t<page_txn_t>> &&txns) {
     ASSERT_NO_CORO_WAITING;
     // We combine changes, using the block_version_t value to see which change
     // happened later.  This even works if a single transaction acquired the same
@@ -1325,7 +1325,7 @@ page_cache_t::compute_changes(page_cache_t *page_cache,
 
     rassert(!txns.empty());
 
-    page_txn_t *first = txns[0];
+    page_txn_t *first = txns.front().get();
 
     collapsed_txns_t ret {
         std::move(first->drainer_lock_),
@@ -1337,10 +1337,8 @@ page_cache_t::compute_changes(page_cache_t *page_cache,
     // We merge out the throttler_acq's of the txn's.
     int64_t dirty_changes_pages = first->dirty_changes_pages_;
 
-    delete first;
-
     for (auto it = txns.begin() + 1; it != txns.end(); ++it) {
-        page_txn_t *txn = *it;
+        page_txn_t *txn = it->get();
         ret.acq.merge(std::move(txn->throttler_acq_));
 
         int64_t net_dirty = page_cache_t::merge_changes(
@@ -1348,15 +1346,16 @@ page_cache_t::compute_changes(page_cache_t *page_cache,
         dirty_changes_pages += net_dirty;
         ret.acq.update_dirty_page_count(dirty_changes_pages);
         ret.flush_complete_waiters.append_and_clear(&txn->flush_complete_waiters_);
-
-        delete txn;
     }
+
+    txns.clear();
 
     return ret;
 }
 
-void page_cache_t::remove_txn_set_from_graph(page_cache_t *page_cache,
-                                             const std::vector<page_txn_t *> &txns) {
+void page_cache_t::remove_txn_set_from_graph(
+        page_cache_t *page_cache,
+        const std::vector<scoped_ptr_t<page_txn_t>> &txns) {
     // We want detaching the subseqers and preceders to happen at the same time
     // spawned_flush_ is set.  That way connect_preceder can use it to check it's not
     // called on an already disconnected part of the graph.
@@ -1364,7 +1363,7 @@ void page_cache_t::remove_txn_set_from_graph(page_cache_t *page_cache,
     page_cache->assert_thread();
 
     for (auto it = txns.begin(); it != txns.end(); ++it) {
-        page_txn_t *txn = *it;
+        page_txn_t *txn = it->get();
         {
             for (auto jt = txn->subseqers_.begin(); jt != txn->subseqers_.end(); ++jt) {
                 (*jt)->remove_preceder(txn);
@@ -1687,7 +1686,8 @@ void page_cache_t::do_flush_txn_set(
     page_cache_t::pulse_flush_complete(std::move(coltx));
 }
 
-std::vector<page_txn_t *> page_cache_t::maximal_flushable_txn_set(page_txn_t *base) {
+std::vector<scoped_ptr_t<page_txn_t>>
+page_cache_t::maximal_flushable_txn_set(page_txn_t *base) {
     // Returns all transactions that can presently be flushed, given the newest
     // transaction that has had began_waiting_for_flush_ set.  (We assume all
     // previous such sets of transactions had flushing begin on them.)
@@ -1719,15 +1719,17 @@ std::vector<page_txn_t *> page_cache_t::maximal_flushable_txn_set(page_txn_t *ba
     // An element is marked blue iff it's in `blue`.
     std::vector<page_txn_t *> blue;
     // All elements marked red, green, or blue are in `colored` -- we unmark them and
-    // construct the return vector at the end of the function.
-    std::vector<page_txn_t *> colored;
+    // construct the return vector at the end of the function.  Those which aren't
+    // included in the return value are only "temporarily" owned by the scoped_ptr_t --
+    // they'll get .release()d.
+    std::vector<scoped_ptr_t<page_txn_t>> colored;
 
     rassert(!base->spawned_flush_);
     rassert(base->began_waiting_for_flush_);
     rassert(base->mark_ == page_txn_t::marked_not);
     base->mark_ = page_txn_t::marked_blue;
     blue.push_back(base);
-    colored.push_back(base);
+    colored.emplace_back(base);
 
     while (!blue.empty()) {
         page_txn_t *txn = blue.back();
@@ -1747,7 +1749,7 @@ std::vector<page_txn_t *> page_cache_t::maximal_flushable_txn_set(page_txn_t *ba
             } else if (prec->mark_ == page_txn_t::marked_not) {
                 prec->mark_ = page_txn_t::marked_blue;
                 blue.push_back(prec);
-                colored.push_back(prec);
+                colored.emplace_back(prec);
             } else {
                 rassert(prec->mark_ == page_txn_t::marked_green
                         || prec->mark_ == page_txn_t::marked_blue);
@@ -1765,7 +1767,7 @@ std::vector<page_txn_t *> page_cache_t::maximal_flushable_txn_set(page_txn_t *ba
                 if (!poisoned) {
                     subs->mark_ = page_txn_t::marked_blue;
                     blue.push_back(subs);
-                    colored.push_back(subs);
+                    colored.emplace_back(subs);
                 }
             } else if (subs->mark_ == page_txn_t::marked_green) {
                 if (poisoned) {
@@ -1786,9 +1788,11 @@ std::vector<page_txn_t *> page_cache_t::maximal_flushable_txn_set(page_txn_t *ba
         page_txn_t::mark_state_t mark = (*jt)->mark_;
         (*jt)->mark_ = page_txn_t::marked_not;
         if (mark == page_txn_t::marked_green) {
-            *it++ = *jt++;
+            *it++ = std::move(*jt++);
         } else {
             rassert(mark == page_txn_t::marked_red);
+            // Release page_txn_t that we don't really own yet.
+            UNUSED page_txn_t *ignore = jt->release();
             ++jt;
         }
     }
@@ -1797,7 +1801,8 @@ std::vector<page_txn_t *> page_cache_t::maximal_flushable_txn_set(page_txn_t *ba
     return colored;
 }
 
-void page_cache_t::spawn_flush_flushables(std::vector<page_txn_t *> &&flush_set) {
+void page_cache_t::spawn_flush_flushables(
+        std::vector<scoped_ptr_t<page_txn_t>> &&flush_set) {
     // The flush set's txn's are already disconnected from the graph.
     if (!flush_set.empty()) {
         collapsed_txns_t coltx = page_cache_t::compute_changes(this, std::move(flush_set));
@@ -1841,7 +1846,7 @@ void page_cache_t::begin_waiting_for_flush(
         page_txn_t *base_unscoped = base.release();
         want_to_spawn_flush_.push_back(base_unscoped);
 
-        std::vector<page_txn_t *> flush_set
+        std::vector<scoped_ptr_t<page_txn_t>> flush_set
             = page_cache_t::maximal_flushable_txn_set(base_unscoped);
 
         page_cache_t::remove_txn_set_from_graph(this, flush_set);
