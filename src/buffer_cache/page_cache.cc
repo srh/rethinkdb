@@ -1080,8 +1080,7 @@ void page_txn_t::remove_subseqer(page_txn_t *subseqer) {
 }
 
 page_txn_t::~page_txn_t() {
-    // HSI: What to replace this with?
-    // guarantee(flush_complete_cond_.is_pulsed());
+    guarantee(flush_complete_waiters_.empty());
 
     guarantee(preceders_.empty());
     guarantee(subseqers_.empty());
