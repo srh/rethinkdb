@@ -40,7 +40,7 @@ public:
     bool is_running() const;
 
 private:
-    void on_timer();
+    void on_timer(ticks_t ticks);
     timer_token_t *timer;
 };
 
@@ -63,7 +63,7 @@ public:
     ~repeating_timer_t();
 
 private:
-    void on_timer();
+    void on_timer(ticks_t ticks);
     timer_token_t *timer;
     std::function<void()> ringee;
 
