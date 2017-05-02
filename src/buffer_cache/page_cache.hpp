@@ -501,25 +501,28 @@ private:
         page_cache_t *page_cache,
         collapsed_txns_t *coltx_ptr);
 
-    static void remove_txn_set_from_graph(page_cache_t *page_cache,
-                                          const std::vector<page_txn_t *> &txns);
+    static void remove_txn_set_from_graph(
+        page_cache_t *page_cache,
+        const std::vector<scoped_ptr_t<page_txn_t>> &txns);
 
     static void pulse_flush_complete(collapsed_txns_t &&txns);
 
     // We only pass the cache to reset the page ptr.
     static collapsed_txns_t
-    compute_changes(page_cache_t *page_cache, std::vector<page_txn_t *> &&txns);
+    compute_changes(page_cache_t *page_cache,
+                    std::vector<scoped_ptr_t<page_txn_t>> &&txns);
 
     static MUST_USE int64_t merge_changes(
         page_cache_t *page_cache,
         std::unordered_map<block_id_t, block_change_t> *onto,
         std::unordered_map<block_id_t, block_change_t> &&from);
 
-    static std::vector<page_txn_t *> maximal_flushable_txn_set(page_txn_t *base);
+    static std::vector<scoped_ptr_t<page_txn_t>>
+    maximal_flushable_txn_set(page_txn_t *base);
 
     void begin_waiting_for_flush(scoped_ptr_t<page_txn_t> &&txn, txn_durability_t durability);
 
-    void spawn_flush_flushables(std::vector<page_txn_t *> &&flush_set);
+    void spawn_flush_flushables(std::vector<scoped_ptr_t<page_txn_t>> &&flush_set);
 
     friend class current_page_acq_t;
     repli_timestamp_t recency_for_block_id(block_id_t id) {
