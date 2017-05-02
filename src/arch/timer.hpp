@@ -2,13 +2,16 @@
 #ifndef ARCH_TIMER_HPP_
 #define ARCH_TIMER_HPP_
 
-#include "containers/intrusive_priority_queue.hpp"
 #include "arch/io/timer_provider.hpp"
+#include "containers/intrusive_priority_queue.hpp"
+#include "time.hpp"
 
 class timer_token_t;
 
 struct timer_callback_t {
-    virtual void on_timer() = 0;
+    // The same "ticks" value gets passed to multiple on_timer() callbacks, so it could
+    // become "old" if a callback is slow.
+    virtual void on_timer(ticks_t ticks) = 0;
     virtual ~timer_callback_t() { }
 };
 
