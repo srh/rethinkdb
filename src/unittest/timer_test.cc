@@ -52,5 +52,16 @@ TPTEST(TimerTest, TestApproximateWaitTimes) {
         << "Average timer error too high";
 }
 
+TPTEST(TimerTest, TestRepeatingTimer) {
+    int64_t first_ticks = get_ticks();
+    int count = 0;
+    repeating_timer_t timer(30, [&]() {
+        ++count;
+        int64_t ticks = get_ticks();
+        int64_t diff = ticks - first_ticks;
+        EXPECT_LT(std::abs(diff - 30 * MILLION * count), max_error_ms * MILLION);
+    });
+    nap(100);
+}
 
 }  // namespace unittest
