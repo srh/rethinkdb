@@ -1,4 +1,5 @@
 // Copyright 2010-2014 RethinkDB, all rights reserved.
+// File modified by Sam Hughes (2017).
 #include "arch/timing.hpp"
 
 #include <functional>
@@ -60,7 +61,7 @@ bool signal_timer_t::is_running() const {
     return is_pulsed() || timer != nullptr;
 }
 
-void signal_timer_t::on_timer() {
+void signal_timer_t::on_timer(ticks_t) {
     timer = nullptr;
     pulse();
 }
@@ -93,7 +94,7 @@ void call_ringer(std::function<void()> ringee) {
     ringee();
 }
 
-void repeating_timer_t::on_timer() {
+void repeating_timer_t::on_timer(ticks_t) {
     // Spawn _now_, otherwise the repeating_timer_t lifetime might end
     // before ring gets used.
     coro_t::spawn_now_dangerously(std::bind(call_ringer, ringee));

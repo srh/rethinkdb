@@ -1,4 +1,5 @@
 // Copyright 2010-2014 RethinkDB, all rights reserved.
+// File modified by Sam Hughes (2017).
 #ifndef ARCH_TIMING_HPP_
 #define ARCH_TIMING_HPP_
 
@@ -40,7 +41,7 @@ public:
     bool is_running() const;
 
 private:
-    void on_timer();
+    void on_timer(ticks_t ticks);
     timer_token_t *timer;
 };
 
@@ -63,7 +64,7 @@ public:
     ~repeating_timer_t();
 
 private:
-    void on_timer();
+    void on_timer(ticks_t ticks);
     timer_token_t *timer;
     std::function<void()> ringee;
 
