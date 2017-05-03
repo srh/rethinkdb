@@ -109,7 +109,6 @@ cache_t::cache_t(serializer_t *serializer,
     : throttler_(MINIMUM_SOFT_UNWRITTEN_CHANGES_LIMIT),
       page_cache_(serializer, balancer, &throttler_),
       stats_(make_scoped<alt_cache_stats_t>(&page_cache_, perfmon_collection)),
-      // HSI: This needs to be user-configurable.
       soft_durability_flusher_(5000 /* ms */, [this]() {
           page_cache_.begin_flush_pending_txns();
       }) {
@@ -117,6 +116,11 @@ cache_t::cache_t(serializer_t *serializer,
 
 cache_t::~cache_t() {
     guarantee(snapshot_nodes_by_block_id_.empty());
+}
+
+void cache_t::configure_flush_interval(flush_interval_t interval) {
+    rassert(interval.millis > 0);
+    soft_durability_flusher_.change_interval(interval.millis);
 }
 
 cache_account_t cache_t::create_cache_account(int priority) {
