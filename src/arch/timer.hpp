@@ -25,7 +25,9 @@ public:
     explicit timer_handler_t(linux_event_queue_t *queue);
     ~timer_handler_t();
 
-    timer_token_t *add_timer_internal(int64_t ms, timer_callback_t *callback, bool once);
+    // If interval_ms is zero that means a non-repeating callback.
+    timer_token_t *add_timer_internal(int64_t next_time_in_nanos, int64_t interval_ms,
+                                      timer_callback_t *callback);
     void cancel_timer(timer_token_t *timer);
 
 private:
@@ -49,6 +51,11 @@ private:
  * executed on the same thread that they were created on. Thus, non-thread-safe
  * (but coroutine-safe) concurrency primitives can be used where appropriate.
  */
+
+// Adds a repeating timer where the first ring starts at next_time_in_nanos (or
+// immediately, if that time was in the past).
+timer_token_t *add_timer2(int64_t next_time_in_nanos, int64_t interval_ms,
+                          timer_callback_t *callback);
 timer_token_t *add_timer(int64_t ms, timer_callback_t *callback);
 timer_token_t *fire_timer_once(int64_t ms, timer_callback_t *callback);
 void cancel_timer(timer_token_t *timer);
