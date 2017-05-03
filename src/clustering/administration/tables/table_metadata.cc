@@ -87,7 +87,38 @@ txn_durability_t get_txn_durability(const table_config_t &config) {
     return txn_durability_t::HSI(config.durability);
 }
 
-flush_interval_t get_flush_interval(const table_config_t &) {
-    // HSI: Use user_value.
-    return flush_interval_t { DEFAULT_FLUSH_INTERVAL };
+flush_interval_t get_flush_interval(const table_config_t &config) {
+    ql::datum_t field = config.user_value.datum.get_field("srh/flush_interval",
+                                                          ql::NOTHROW);
+
+    if (!field.has()) {
+        return flush_interval_t{DEFAULT_FLUSH_INTERVAL};
+    }
+
+    if (field.get_type() == ql::datum_t::R_NUM) {
+        double value_ms = 1000.0 * field.as_num();
+
+        if (value_ms <= 0) {
+            return flush_interval_t{DEFAULT_FLUSH_INTERVAL};
+        }
+
+        // Divide by 2 to avoid thinking about rounding up to 2**63.
+        if (value_ms >= static_cast<double>(INT64_MAX / 2)) {
+            return flush_interval_t{NEVER_FLUSH_INTERVAL};
+        }
+
+        int64_t value_int = ceil(value_ms);
+        return flush_interval_t{value_int};
+    }
+
+    if (field.get_type() == ql::datum_t::R_STR) {
+        const datum_string_t &str = field.as_str();
+        if (str == "never") {
+            return flush_interval_t{NEVER_FLUSH_INTERVAL};
+        } else {
+            return flush_interval_t{DEFAULT_FLUSH_INTERVAL};
+        }
+    }
+
+    return flush_interval_t{DEFAULT_FLUSH_INTERVAL};
 }
