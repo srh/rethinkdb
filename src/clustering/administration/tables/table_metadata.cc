@@ -86,3 +86,8 @@ txn_durability_t get_txn_durability(const table_config_t &config) {
     // HSI: Use user_value.
     return txn_durability_t::HSI(config.durability);
 }
+
+flush_interval_t get_flush_interval(const table_config_t &) {
+    // HSI: Use user_value.
+    return flush_interval_t { DEFAULT_FLUSH_INTERVAL };
+}
