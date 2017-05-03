@@ -82,11 +82,6 @@ RDB_IMPL_SERIALIZABLE_1_SINCE_v1_13(databases_semilattice_metadata_t, databases)
 RDB_IMPL_SEMILATTICE_JOINABLE_1(databases_semilattice_metadata_t, databases);
 RDB_IMPL_EQUALITY_COMPARABLE_1(databases_semilattice_metadata_t, databases);
 
-txn_durability_t get_txn_durability(const table_config_t &config) {
-    // HSI: Use user_value.
-    return txn_durability_t::HSI(config.durability);
-}
-
 flush_interval_t get_flush_interval(const table_config_t &config) {
     ql::datum_t field = config.user_value.datum.get_field("srh/flush_interval",
                                                           ql::NOTHROW);

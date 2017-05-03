@@ -26,7 +26,7 @@ public:
     ~alt_txn_throttler_t();
 
     alt::throttler_acq_t begin_txn_or_throttle(
-        txn_durability_t durability, int64_t expected_change_count);
+        write_durability_t durability, int64_t expected_change_count);
 
     void inform_memory_limit_change(uint64_t memory_limit,
                                     block_size_t max_block_size);
@@ -90,7 +90,7 @@ public:
     txn_t(cache_conn_t *cache_conn, read_access_t read_access);
 
     txn_t(cache_conn_t *cache_conn,
-          txn_durability_t durability,
+          write_durability_t durability,
           int64_t expected_change_count);
 
     ~txn_t();
@@ -114,7 +114,7 @@ private:
     const access_t access_;
 
     // Only applicable if access_ == write.
-    const txn_durability_t durability_;
+    const write_durability_t durability_;
 
     scoped_ptr_t<alt::page_txn_t> page_txn_;
 

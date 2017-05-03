@@ -87,7 +87,7 @@ void store_t::help_construct_bring_sindexes_up_to_date() {
     scoped_ptr_t<txn_t> txn;
     scoped_ptr_t<real_superblock_t> superblock;
     acquire_superblock_for_write(1,
-                                 txn_durability_t::SOFT(),
+                                 write_durability_t::SOFT,
                                  &token,
                                  &txn,
                                  &superblock,
