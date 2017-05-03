@@ -1482,22 +1482,22 @@ void page_cache_t::do_flush_changes(
             if (it->second.modified) {
                 if (!it->second.page.has()) {
                     // The block is deleted.
-                    blocks_by_tokens.push_back(block_token_tstamp_t(
+                    blocks_by_tokens.emplace_back(
                         it->first,
                         true,
                         counted_t<standard_block_token_t>(),
                         repli_timestamp_t::invalid,
-                        nullptr));
+                        nullptr);
                 } else {
                     page_t *page = it->second.page.get_page_for_read();
                     if (page->block_token().has()) {
                         // It's already on disk, we're not going to flush it.
-                        blocks_by_tokens.push_back(block_token_tstamp_t(
+                        blocks_by_tokens.emplace_back(
                             it->first,
                             false,
                             page->block_token(),
                             it->second.tstamp,
-                            page));
+                            page);
                     } else {
                         // We can't be in the process of loading a block we're going
                         // to write for which we don't have a block token.  That's
@@ -1508,11 +1508,11 @@ void page_cache_t::do_flush_changes(
 
                         rassert(page->is_loaded());
 
-                        write_infos.push_back(buf_write_info_t(
+                        write_infos.emplace_back(
                             page->get_loaded_ser_buffer(),
                             page->get_page_buf_size(),
-                            it->first));
-                        ancillary_infos.push_back(ancillary_info_t(it->second.tstamp));
+                            it->first);
+                        ancillary_infos.emplace_back(it->second.tstamp);
                         // The account doesn't matter because the page is already
                         // loaded.
                         ancillary_infos.back().page_acq.init(
@@ -1521,12 +1521,12 @@ void page_cache_t::do_flush_changes(
                 }
             } else {
                 // We only touched the page.
-                blocks_by_tokens.push_back(block_token_tstamp_t(
+                blocks_by_tokens.emplace_back(
                     it->first,
                     false,
                     counted_t<standard_block_token_t>(),
                     it->second.tstamp,
-                    nullptr));
+                    nullptr);
             }
         }
     }
@@ -1551,12 +1551,12 @@ void page_cache_t::do_flush_changes(
         rassert(tokens.size() == write_infos.size());
         rassert(write_infos.size() == ancillary_infos.size());
         for (size_t i = 0; i < write_infos.size(); ++i) {
-            blocks_by_tokens.push_back(block_token_tstamp_t(
+            blocks_by_tokens.emplace_back(
                 write_infos[i].block_id,
                 false,
                 std::move(tokens[i]),
                 ancillary_infos[i].tstamp,
-                ancillary_infos[i].page_acq.page()));
+                ancillary_infos[i].page_acq.page());
         }
 
         // KSI: Unnecessary copying between blocks_by_tokens and write_ops, inelegant
@@ -1567,17 +1567,17 @@ void page_cache_t::do_flush_changes(
         for (auto it = blocks_by_tokens.begin(); it != blocks_by_tokens.end();
              ++it) {
             if (it->is_deleted) {
-                write_ops.push_back(index_write_op_t(it->block_id,
-                                                     counted_t<standard_block_token_t>(),
-                                                     repli_timestamp_t::invalid));
+                write_ops.emplace_back(it->block_id,
+                                       counted_t<standard_block_token_t>(),
+                                       repli_timestamp_t::invalid);
             } else if (it->block_token.has()) {
-                write_ops.push_back(index_write_op_t(it->block_id,
-                                                     it->block_token,
-                                                     it->tstamp));
+                write_ops.emplace_back(it->block_id,
+                                       it->block_token,
+                                       it->tstamp);
             } else {
-                write_ops.push_back(index_write_op_t(it->block_id,
-                                                     boost::none,
-                                                     it->tstamp));
+                write_ops.emplace_back(it->block_id,
+                                       boost::none,
+                                       it->tstamp);
             }
         }
 
