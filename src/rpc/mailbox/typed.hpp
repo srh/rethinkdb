@@ -477,7 +477,7 @@ class mailbox_t< void(arg0_t, arg1_t, arg2_t, arg3_t, arg4_t) > {
         }
 #ifdef ENABLE_MESSAGE_PROFILER
         const char *message_profiler_tag() const {
-            static const std::string tag =
+            static const std::string tag = 
                 strprintf("mailbox<%s, %s, %s, %s, %s>", typeid(arg0_t).name(), typeid(arg1_t).name(), typeid(arg2_t).name(), typeid(arg3_t).name(), typeid(arg4_t).name());
             return tag.c_str();
         }

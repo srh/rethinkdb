@@ -63,7 +63,7 @@ private:
     public:
         contract_info_t(const contract_id_t &_contract_id,
                         const contract_t &_contract,
-                        txn_durability_t _default_write_durability,
+                        write_durability_t _default_write_durability,
                         write_ack_config_t _write_ack_config) :
                 contract_id(_contract_id),
                 contract(_contract),
@@ -79,7 +79,7 @@ private:
         }
         contract_id_t contract_id;
         contract_t contract;
-        txn_durability_t default_write_durability;
+        write_durability_t default_write_durability;
         write_ack_config_t write_ack_config;
         cond_t obsolete;
     };

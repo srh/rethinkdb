@@ -318,7 +318,7 @@ void page_cache_t::begin_flush_pending_txns() {
 
 void page_cache_t::flush_and_destroy_txn(
         scoped_ptr_t<page_txn_t> &&txn,
-        txn_durability_t durability,
+        write_durability_t durability,
         page_txn_complete_cb_t *on_complete_or_null) {
     guarantee(txn->live_acqs_ == 0,
               "A current_page_acq_t lifespan exceeds its page_txn_t's.");
@@ -1827,13 +1827,15 @@ void page_cache_t::merge_into_waiting_for_spawn_flush(scoped_ptr_t<page_txn_t> &
 }
 
 void page_cache_t::begin_waiting_for_flush(
-        scoped_ptr_t<page_txn_t> &&base, txn_durability_t durability) {
+        scoped_ptr_t<page_txn_t> &&base, write_durability_t durability) {
     assert_thread();
     ASSERT_FINITE_CORO_WAITING;
     rassert(!base->began_waiting_for_flush_);
     rassert(!base->spawned_flush_);
 
-    if (durability.is_hard()) {
+    // This is redundant because we pass the durability in the throttler_acq_
+    // constructor anyway.
+    if (durability == write_durability_t::HARD) {
         page_txn_t::propagate_pre_spawn_flush(base.get());
     }
 

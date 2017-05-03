@@ -71,7 +71,7 @@ alt_txn_throttler_t::alt_txn_throttler_t(int64_t minimum_unwritten_changes_limit
 alt_txn_throttler_t::~alt_txn_throttler_t() { }
 
 throttler_acq_t alt_txn_throttler_t::begin_txn_or_throttle(
-        txn_durability_t durability,
+        write_durability_t durability,
         int64_t expected_change_count) {
     throttler_acq_t acq(durability, expected_change_count);
     if (!acq.pre_spawn_flush()) {
@@ -109,7 +109,7 @@ cache_t::cache_t(serializer_t *serializer,
     : throttler_(MINIMUM_SOFT_UNWRITTEN_CHANGES_LIMIT),
       page_cache_(serializer, balancer, &throttler_),
       stats_(make_scoped<alt_cache_stats_t>(&page_cache_, perfmon_collection)),
-      soft_durability_flusher_(5000 /* ms */, [this]() {
+      soft_durability_flusher_(DEFAULT_FLUSH_INTERVAL, [this]() {
           page_cache_.begin_flush_pending_txns();
       }) {
 }
@@ -203,9 +203,7 @@ txn_t::txn_t(cache_conn_t *cache_conn,
     : cache_(cache_conn->cache()),
       cache_account_(cache_->page_cache_.default_reads_account()),
       access_(access_t::read),
-      // HSI: This was soft before, but it's really a read-only txn.  Make sure this
-      // gets treated appropriately.
-      durability_(txn_durability_t::SOFT()) {
+      durability_(write_durability_t::SOFT) {
     // Right now, cache_conn is only used to control flushing of write txns.  When we
     // need to support other cache_conn_t related features, we'll need to do something
     // fancier with read txns on cache conns.
@@ -213,7 +211,7 @@ txn_t::txn_t(cache_conn_t *cache_conn,
 }
 
 txn_t::txn_t(cache_conn_t *cache_conn,
-             txn_durability_t durability,
+             write_durability_t durability,
              int64_t expected_change_count)
     : cache_(cache_conn->cache()),
       cache_account_(cache_->page_cache_.default_reads_account()),
@@ -249,7 +247,7 @@ void txn_t::help_construct(int64_t expected_change_count,
 txn_t::~txn_t() {
     cache_->assert_thread();
 
-    if (!durability_.is_hard()) {
+    if (durability_ == write_durability_t::SOFT) {
         cache_->page_cache_.flush_and_destroy_txn(
             std::move(page_txn_),
             durability_,
@@ -830,3 +828,4 @@ void *buf_write_t::get_data_write(uint32_t block_size) {
 void *buf_write_t::get_data_write() {
     return get_data_write(lock_->cache()->max_block_size().value());
 }
+
