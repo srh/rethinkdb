@@ -23,7 +23,7 @@ primary_execution_t::primary_execution_t(
     guarantee(contract.primary->server == context->server_id);
     guarantee(raft_state.contracts.at(contract_id).first == region);
     latest_contract_home_thread = make_counted<contract_info_t>(
-        contract_id, contract, get_txn_durability(raft_state.config.config),
+        contract_id, contract, raft_state.config.config.durability,
         raft_state.config.config.write_ack_config);
     latest_contract_store_thread = latest_contract_home_thread;
     begin_write_mutex_assertion.rethread(store->home_thread());
@@ -70,7 +70,7 @@ void primary_execution_t::update_contract_or_raft_state(
     counted_t<contract_info_t> new_contract = make_counted<contract_info_t>(
         contract_id,
         contract,
-        get_txn_durability(raft_state.config.config),
+        raft_state.config.config.durability,
         raft_state.config.config.write_ack_config);
 
     /* Exit early if there aren't actually any changes. This is for performance reasons.
@@ -252,7 +252,7 @@ void primary_execution_t::run(auto_drainer_t::lock_t keepalive) {
 class primary_execution_t::write_callback_t : public primary_dispatcher_t::write_callback_t {
 public:
     write_callback_t(write_response_t *_r_out,
-                     txn_durability_t _default_write_durability,
+                     write_durability_t _default_write_durability,
                      write_ack_config_t _write_ack_config,
                      contract_t *contract) :
         ack_counter(*contract),
@@ -262,7 +262,7 @@ public:
 
     promise_t<bool> result;
 private:
-    txn_durability_t get_default_write_durability() {
+    write_durability_t get_default_write_durability() {
         /* This only applies to writes that don't specify the durability */
         return default_write_durability;
     }
@@ -289,7 +289,7 @@ private:
         }
     }
     ack_counter_t ack_counter;
-    txn_durability_t default_write_durability;
+    write_durability_t default_write_durability;
     write_ack_config_t write_ack_config;
     write_response_t *response_out;
 };
@@ -366,7 +366,6 @@ bool primary_execution_t::on_write(
     return res;
 }
 
-// HSI: Why do we do this when the read mode is MAJORITY?
 bool primary_execution_t::sync_committed_read(const read_t &read_request,
                                               order_token_t order_token,
                                               signal_t *interruptor,
@@ -392,7 +391,7 @@ bool primary_execution_t::sync_committed_read(const read_t &read_request,
     }
 
     write_callback_t write_callback(&response,
-                                    txn_durability_t::HARD(),
+                                    write_durability_t::HARD,
                                     write_ack_config_t::MAJORITY,
                                     &contract_snapshot->contract);
     our_dispatcher->spawn_write(request, order_token, &write_callback);
@@ -558,8 +557,8 @@ void primary_execution_t::sync_contract_with_replicas(
         /* Now try to actually put the write through */
         class safe_write_callback_t : public primary_dispatcher_t::write_callback_t {
         public:
-            txn_durability_t get_default_write_durability() {
-                return txn_durability_t::HARD();
+            write_durability_t get_default_write_durability() {
+                return write_durability_t::HARD;
             }
             void on_ack(const server_id_t &server, write_response_t &&) {
                 servers.insert(server);

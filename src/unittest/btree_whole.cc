@@ -60,7 +60,7 @@ public:
         sizer = make_scoped<short_value_sizer_t>(cache.get()->max_block_size());
 
         {
-            txn_t txn(cache_conn.get(), txn_durability_t::SOFT(), 1);
+            txn_t txn(cache_conn.get(), write_durability_t::SOFT, 1);
             buf_lock_t sb_lock(&txn, SUPERBLOCK_ID, alt_create_t::create);
             real_superblock_t superblock(std::move(sb_lock));
             btree_slice_t::init_real_superblock(&superblock, std::vector<char>(), binary_blob_t());
@@ -79,7 +79,7 @@ public:
                     nullptr,
                     write_access_t::write,
                     1,
-                    txn_durability_t::SOFT(),
+                    write_durability_t::SOFT,
                     &superblock,
                     &txn);
         } else {

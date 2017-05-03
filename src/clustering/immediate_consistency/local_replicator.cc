@@ -56,7 +56,7 @@ local_replicator_t::local_replicator_t(
                 primary->get_branch_birth_certificate().initial_timestamp))),
         order_source.check_in("local_replica_t(write)"),
         &write_token,
-        txn_durability_t::HARD(),
+        write_durability_t::HARD,
         interruptor);
 
     state_timestamp_t first_timestamp;
@@ -88,7 +88,7 @@ void local_replicator_t::do_write_sync(
         const write_t &write,
         state_timestamp_t timestamp,
         order_token_t order_token,
-        txn_durability_t durability,
+        write_durability_t durability,
         signal_t *interruptor,
         write_response_t *response_out) {
     replica.do_write(
@@ -103,7 +103,7 @@ void local_replicator_t::do_write_async(
         signal_t *interruptor) {
     write_response_t dummy;
     replica.do_write(
-        write, timestamp, order_token, txn_durability_t::SOFT(),
+        write, timestamp, order_token, write_durability_t::SOFT,
         interruptor, &dummy);
 }
 

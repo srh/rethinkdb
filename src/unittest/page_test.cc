@@ -54,15 +54,13 @@ public:
           throttler_(throttler) { }
 
     void flush(scoped_ptr_t<test_txn_t> txn) {
-        // HSI: What should txn durability be?
-        flush_and_destroy_txn(std::move(txn), txn_durability_t::SOFT(),
-                              nullptr);
+        flush_and_destroy_txn(std::move(txn), write_durability_t::SOFT, nullptr);
     }
 
     alt::throttler_acq_t make_throttler_acq() {
         // KSI: We could make these tests better by varying the expected change
         // count.
-        return throttler_->begin_txn_or_throttle(txn_durability_t::SOFT(), 0);
+        return throttler_->begin_txn_or_throttle(write_durability_t::SOFT, 0);
     }
 
 private:

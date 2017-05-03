@@ -330,10 +330,10 @@ private:
 
 class throttler_acq_t {
 public:
-    explicit throttler_acq_t(txn_durability_t durability,
+    explicit throttler_acq_t(write_durability_t durability,
                              int64_t expected_change_count)
         : expected_change_count_(expected_change_count),
-          pre_spawn_flush_(durability.is_hard()) { }
+          pre_spawn_flush_(durability == write_durability_t::HARD) { }
     ~throttler_acq_t() { }
     throttler_acq_t(throttler_acq_t &&movee)
         : expected_change_count_(movee.expected_change_count_),
@@ -435,7 +435,7 @@ public:
     // Takes a txn to be flushed.  Pulses on_complete_or_null when done.
     void flush_and_destroy_txn(
             scoped_ptr_t<page_txn_t> &&txn,
-            txn_durability_t durability,
+            write_durability_t durability,
             page_txn_complete_cb_t *on_complete_or_null);
 
     current_page_t *page_for_block_id(block_id_t block_id);
@@ -521,7 +521,8 @@ private:
     static std::vector<scoped_ptr_t<page_txn_t>>
     maximal_flushable_txn_set(page_txn_t *base);
 
-    void begin_waiting_for_flush(scoped_ptr_t<page_txn_t> &&txn, txn_durability_t durability);
+    void begin_waiting_for_flush(scoped_ptr_t<page_txn_t> &&txn,
+                                 write_durability_t durability);
 
     void spawn_flush_flushables(std::vector<scoped_ptr_t<page_txn_t>> &&flush_set);
 

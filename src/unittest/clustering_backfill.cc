@@ -46,7 +46,7 @@ TPTEST(ClusteringBackfill, BackfillTest) {
                 binary_blob_t(version_t(dummy_branch_id, timestamp))),
             order_source.check_in(strprintf("set_metainfo(i=%zu)", i)),
             &token,
-            txn_durability_t::HARD(),
+            write_durability_t::HARD,
             &non_interruptor);
     }
 
@@ -77,8 +77,7 @@ TPTEST(ClusteringBackfill, BackfillTest) {
                     binary_blob_t(version_t(dummy_branch_id, timestamp))
                 ),
                 w,
-                &response,
-                txn_durability_t::SOFT(),
+                &response, write_durability_t::SOFT,
                 timestamp,
                 order_source.check_in(strprintf("backfiller_store.write(j=%d)", j)),
                 &token,
