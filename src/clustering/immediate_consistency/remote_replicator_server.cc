@@ -49,7 +49,7 @@ void remote_replicator_server_t::proxy_replica_t::do_write_sync(
         const write_t &write,
         state_timestamp_t timestamp,
         order_token_t order_token,
-        txn_durability_t durability,
+        write_durability_t durability,
         signal_t *interruptor,
         write_response_t *response_out) {
     guarantee(is_ready);

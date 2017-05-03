@@ -156,21 +156,16 @@ void primary_dispatcher_t::spawn_write(
 
     DEBUG_VAR mutex_assertion_t::acq_t mutex_acq(&mutex);
 
-    txn_durability_t durability;
+    write_durability_t durability;
     switch (write.durability()) {
         case DURABILITY_REQUIREMENT_DEFAULT:
             durability = cb->get_default_write_durability();
             break;
-        case DURABILITY_REQUIREMENT_SOFT: {
-            durability = cb->get_default_write_durability();
-            if (durability.is_hard()) {
-                // HSI: cb should really give a durability config that specifies
-                // which flush interval to fall back to.
-                durability = txn_durability_t::SOFT();
-            }
-        } break;
+        case DURABILITY_REQUIREMENT_SOFT:
+            durability = write_durability_t::SOFT;
+            break;
         case DURABILITY_REQUIREMENT_HARD:
-            durability = txn_durability_t::HARD();
+            durability = write_durability_t::HARD;
             break;
         default:
             unreachable();
@@ -201,7 +196,7 @@ void primary_dispatcher_t::spawn_write(
 
 primary_dispatcher_t::incomplete_write_t::incomplete_write_t(
         const write_t &w, state_timestamp_t ts, order_token_t ot,
-        txn_durability_t dur, write_callback_t *cb) :
+        write_durability_t dur, write_callback_t *cb) :
     write(w), timestamp(ts), order_token(ot), durability(dur), callback(cb)
     { }
 

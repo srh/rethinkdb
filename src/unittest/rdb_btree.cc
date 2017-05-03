@@ -39,7 +39,7 @@ void insert_rows(int start, int finish, store_t *store) {
         write_token_t token;
         store->new_write_token(&token);
         store->acquire_superblock_for_write(
-            1, txn_durability_t::SOFT(),
+            1, write_durability_t::SOFT,
             &token, &txn, &superblock, &dummy_interruptor);
         buf_lock_t sindex_block(superblock->expose_buf(),
                                 superblock->get_sindex_block_id(),
@@ -328,7 +328,7 @@ TPTEST(RDBBtree, SindexEraseRange) {
         scoped_ptr_t<txn_t> txn;
         scoped_ptr_t<real_superblock_t> super_block;
         store.acquire_superblock_for_write(1,
-                                           txn_durability_t::SOFT(),
+                                           write_durability_t::SOFT,
                                            &token,
                                            &txn,
                                            &super_block,
