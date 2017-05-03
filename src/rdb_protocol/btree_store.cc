@@ -459,6 +459,10 @@ void store_t::sindex_drop(
                                      drainer.lock()));
 }
 
+void store_t::configure_flush_interval(flush_interval_t interval) {
+    cache->configure_flush_interval(interval);
+}
+
 new_mutex_in_line_t store_t::get_in_line_for_sindex_queue(buf_lock_t *sindex_block) {
     assert_thread();
     // The line for the sindex queue is there to guarantee that we push things to

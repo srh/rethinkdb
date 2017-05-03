@@ -1,4 +1,5 @@
 // Copyright 2010-2015 RethinkDB, all rights reserved.
+// File modified by Sam Hughes (2017).
 #include "clustering/table_manager/table_manager.hpp"
 
 #include "clustering/generic/minidir.tcc"
@@ -55,6 +56,13 @@ table_manager_t::table_manager_t(
         contract_executor.get_acks(),
         contract_ack_minidir_directory.get_values()),
     sindex_manager(
+        multistore_ptr,
+        raft.get_raft()->get_committed_state()->subview(
+            [](const raft_member_t<table_raft_state_t>::state_and_config_t &sc)
+                    -> table_config_t {
+                return sc.state.config.config;
+            })),
+    flush_interval_manager(
         multistore_ptr,
         raft.get_raft()->get_committed_state()->subview(
             [](const raft_member_t<table_raft_state_t>::state_and_config_t &sc)

@@ -57,6 +57,8 @@ public:
     // might consider supporting a mem_cap parameter.
     cache_account_t create_cache_account(int priority);
 
+    void configure_flush_interval(flush_interval_t interval);
+
 private:
     friend class txn_t;
     friend class buf_read_t;

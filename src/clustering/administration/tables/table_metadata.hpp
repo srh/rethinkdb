@@ -92,6 +92,7 @@ RDB_DECLARE_SERIALIZABLE(table_config_t);
 RDB_DECLARE_EQUALITY_COMPARABLE(table_config_t);
 
 txn_durability_t get_txn_durability(const table_config_t &);
+flush_interval_t get_flush_interval(const table_config_t &);
 
 class table_shard_scheme_t {
 public:

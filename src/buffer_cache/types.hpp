@@ -16,6 +16,12 @@ ARCHIVE_PRIM_MAKE_RANGED_SERIALIZABLE(write_durability_t, int8_t,
                                       write_durability_t::SOFT,
                                       write_durability_t::HARD);
 
+#define DEFAULT_FLUSH_INTERVAL 5000
+
+struct flush_interval_t {
+    int64_t millis;
+};
+
 class txn_durability_t {
 public:
     // What should the default value be?  I don't know.
