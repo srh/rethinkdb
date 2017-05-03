@@ -200,6 +200,8 @@ public:
             signal_t *interruptor)
             THROWS_ONLY(interrupted_exc_t);
 
+    void configure_flush_interval(flush_interval_t interval);
+
     new_mutex_in_line_t get_in_line_for_sindex_queue(buf_lock_t *sindex_block);
     rwlock_in_line_t get_in_line_for_cfeed_stamp(access_t access);
 
