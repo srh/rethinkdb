@@ -112,7 +112,7 @@ void resume_construct_sindex(
             scoped_ptr_t<real_superblock_t> superblock;
             try {
                 store->acquire_superblock_for_write(1,
-                                                    txn_durability_t::SOFT(),
+                                                    write_durability_t::SOFT,
                                                     &token,
                                                     &txn,
                                                     &superblock,
@@ -224,7 +224,7 @@ void post_construct_and_drain_queue(
             // needed here.
             store->acquire_superblock_for_write(
                 2 + mod_queue->size(),
-                txn_durability_t::HARD(),
+                write_durability_t::HARD,
                 &token,
                 &queue_txn,
                 &queue_superblock,
@@ -339,7 +339,7 @@ void post_construct_and_drain_queue(
         cond_t non_interruptor;
         store->acquire_superblock_for_write(
             2,
-            txn_durability_t::HARD(),
+            write_durability_t::HARD,
             &token,
             &queue_txn,
             &queue_superblock,
