@@ -1457,78 +1457,92 @@ struct ancillary_info_t {
     page_acq_t page_acq;
 };
 
-void page_cache_t::do_flush_changes(
-        page_cache_t *page_cache,
-        collapsed_txns_t *coltx,
-        fifo_enforcer_write_token_t index_write_token) {
-    std::unordered_map<block_id_t, block_change_t> &changes = coltx->changes;
-    rassert(!changes.empty());
+struct flush_prep_t {
     std::vector<block_token_tstamp_t> blocks_by_tokens;
-    blocks_by_tokens.reserve(changes.size());
 
     // ancillary_infos holds a page_acq_t for any page we need to write, to prevent its
     // buf from getting freed out from under us (by a force-eviction operation, or
     // anything else).
     std::vector<ancillary_info_t> ancillary_infos;
     std::vector<buf_write_info_t> write_infos;
-    ancillary_infos.reserve(changes.size());
-    write_infos.reserve(changes.size());
 
-    {
-        ASSERT_NO_CORO_WAITING;
+    void reserve(size_t size) {
+        blocks_by_tokens.reserve(size);
+        ancillary_infos.reserve(size);
+        write_infos.reserve(size);
+    }
+};
 
-        for (auto it = changes.begin(); it != changes.end(); ++it) {
-            if (it->second.modified) {
-                if (!it->second.page.has()) {
-                    // The block is deleted.
-                    blocks_by_tokens.emplace_back(
-                        it->first,
-                        true,
-                        counted_t<standard_block_token_t>(),
-                        repli_timestamp_t::invalid,
-                        nullptr);
-                } else {
-                    page_t *page = it->second.page.get_page_for_read();
-                    if (page->block_token().has()) {
-                        // It's already on disk, we're not going to flush it.
-                        blocks_by_tokens.emplace_back(
-                            it->first,
-                            false,
-                            page->block_token(),
-                            it->second.tstamp,
-                            page);
-                    } else {
-                        // We can't be in the process of loading a block we're going
-                        // to write for which we don't have a block token.  That's
-                        // because we _actually dirtied the page_.  We had to have
-                        // acquired the buf, and the only way to get rid of the buf
-                        // is for it to be evicted, in which case the block token
-                        // would be non-empty.
+flush_prep_t page_cache_t::prep_flush_changes(
+        page_cache_t *page_cache,
+        const std::unordered_map<block_id_t, block_change_t> &changes) {
+    ASSERT_NO_CORO_WAITING;
 
-                        rassert(page->is_loaded());
+    flush_prep_t prep;
+    prep.reserve(changes.size());
 
-                        write_infos.emplace_back(
-                            page->get_loaded_ser_buffer(),
-                            page->get_page_buf_size(),
-                            it->first);
-                        ancillary_infos.emplace_back(it->second.tstamp);
-                        // The account doesn't matter because the page is already
-                        // loaded.
-                        ancillary_infos.back().page_acq.init(
-                            page, page_cache, page_cache->default_reads_account());
-                    }
-                }
-            } else {
-                // We only touched the page.
-                blocks_by_tokens.emplace_back(
+    for (auto it = changes.begin(); it != changes.end(); ++it) {
+        if (it->second.modified) {
+            if (!it->second.page.has()) {
+                // The block is deleted.
+                prep.blocks_by_tokens.emplace_back(
                     it->first,
-                    false,
+                    true,
                     counted_t<standard_block_token_t>(),
-                    it->second.tstamp,
+                    repli_timestamp_t::invalid,
                     nullptr);
+            } else {
+                page_t *page = it->second.page.get_page_for_read();
+                if (page->block_token().has()) {
+                    // It's already on disk, we're not going to flush it.
+                    prep.blocks_by_tokens.emplace_back(
+                        it->first,
+                        false,
+                        page->block_token(),
+                        it->second.tstamp,
+                        page);
+                } else {
+                    // We can't be in the process of loading a block we're going
+                    // to write for which we don't have a block token.  That's
+                    // because we _actually dirtied the page_.  We had to have
+                    // acquired the buf, and the only way to get rid of the buf
+                    // is for it to be evicted, in which case the block token
+                    // would be non-empty.
+
+                    rassert(page->is_loaded());
+
+                    prep.write_infos.emplace_back(
+                        page->get_loaded_ser_buffer(),
+                        page->get_page_buf_size(),
+                        it->first);
+                    prep.ancillary_infos.emplace_back(it->second.tstamp);
+                    // The account doesn't matter because the page is already
+                    // loaded.
+                    prep.ancillary_infos.back().page_acq.init(
+                        page, page_cache, page_cache->default_reads_account());
+                }
             }
+        } else {
+            // We only touched the page.
+            prep.blocks_by_tokens.emplace_back(
+                it->first,
+                false,
+                counted_t<standard_block_token_t>(),
+                it->second.tstamp,
+                nullptr);
         }
     }
+
+    return prep;
+}
+
+void page_cache_t::do_flush_changes(
+        page_cache_t *page_cache,
+        collapsed_txns_t *coltx,
+        fifo_enforcer_write_token_t index_write_token) {
+    std::unordered_map<block_id_t, block_change_t> &changes = coltx->changes;
+    rassert(!changes.empty());
+    flush_prep_t prep = page_cache_t::prep_flush_changes(page_cache, changes);
 
     cond_t blocks_released_cond;
     {
@@ -1541,29 +1555,29 @@ void page_cache_t::do_flush_changes(
         } blocks_written_cb;
 
         std::vector<counted_t<standard_block_token_t> > tokens
-            = page_cache->serializer_->block_writes(write_infos,
+            = page_cache->serializer_->block_writes(prep.write_infos,
                                                     /* disk account is overridden
                                                      * by merger_serializer_t */
                                                     DEFAULT_DISK_ACCOUNT,
                                                     &blocks_written_cb);
 
-        rassert(tokens.size() == write_infos.size());
-        rassert(write_infos.size() == ancillary_infos.size());
-        for (size_t i = 0; i < write_infos.size(); ++i) {
-            blocks_by_tokens.emplace_back(
-                write_infos[i].block_id,
+        rassert(tokens.size() == prep.write_infos.size());
+        rassert(prep.write_infos.size() == prep.ancillary_infos.size());
+        for (size_t i = 0; i < prep.write_infos.size(); ++i) {
+            prep.blocks_by_tokens.emplace_back(
+                prep.write_infos[i].block_id,
                 false,
                 std::move(tokens[i]),
-                ancillary_infos[i].tstamp,
-                ancillary_infos[i].page_acq.page());
+                prep.ancillary_infos[i].tstamp,
+                prep.ancillary_infos[i].page_acq.page());
         }
 
         // KSI: Unnecessary copying between blocks_by_tokens and write_ops, inelegant
         // representation of deletion/touched blocks in blocks_by_tokens.
         std::vector<index_write_op_t> write_ops;
-        write_ops.reserve(blocks_by_tokens.size());
+        write_ops.reserve(prep.blocks_by_tokens.size());
 
-        for (auto it = blocks_by_tokens.begin(); it != blocks_by_tokens.end();
+        for (auto it = prep.blocks_by_tokens.begin(); it != prep.blocks_by_tokens.end();
              ++it) {
             if (it->is_deleted) {
                 write_ops.emplace_back(it->block_id,
@@ -1601,7 +1615,7 @@ void page_cache_t::do_flush_changes(
                 // until the index changes have been written to disk).
                 coro_t::spawn_on_thread([&]() {
                     // Update the block tokens of the written blocks
-                    for (auto &block : blocks_by_tokens) {
+                    for (auto &block : prep.blocks_by_tokens) {
                         if (block.block_token.has() && block.page != nullptr) {
                             // We know page is still a valid pointer because of the
                             // page_ptr_t in changes.
@@ -1623,7 +1637,7 @@ void page_cache_t::do_flush_changes(
 
                     // Clear the page acqs before we reset their associated page ptr's
                     // below.
-                    ancillary_infos.clear();
+                    prep.ancillary_infos.clear();
 
                     // Really this is what clears the changes -- the txn->changes_
                     // should already be reset.

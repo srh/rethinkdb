@@ -39,6 +39,7 @@ class current_page_acq_t;
 class page_cache_t;
 class page_txn_t;
 struct current_page_dirtier_t;
+struct flush_prep_t;
 
 enum class page_create_t { no, yes };
 
@@ -559,6 +560,10 @@ private:
     block_version_t gen_block_version();
 
     void merge_into_waiting_for_spawn_flush(scoped_ptr_t<page_txn_t> &&base);
+
+    static flush_prep_t prep_flush_changes(
+        page_cache_t *page_cache,
+        const std::unordered_map<block_id_t, block_change_t> &changes);
 
     const max_block_size_t max_block_size_;
 
