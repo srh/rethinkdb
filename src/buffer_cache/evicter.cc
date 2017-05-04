@@ -18,7 +18,8 @@ evicter_t::evicter_t()
       bytes_loaded_counter_(0),
       access_count_counter_(0),
       access_time_counter_(INITIAL_ACCESS_TIME),
-      evict_if_necessary_active_(false) { }
+      evict_if_necessary_active_(false),
+      last_force_flush_time_(0) { }
 
 evicter_t::~evicter_t() {
     assert_thread();
@@ -239,6 +240,18 @@ void evicter_t::evict_if_necessary() THROWS_NOTHING {
         page->evict_self(page_cache_);
         page_cache_->consider_evicting_current_page(page->block_id());
     }
+
+    if (in_memory_size() > memory_limit_ + memory_limit_ / 2) {
+        // This is pretty lame and hackish -- we'd like something better tuned.
+        // Basically we force a soft durability flush once every 5 seconds if we've got
+        // many unaccounted for dirty pages.
+        ticks_t ticks = get_ticks();
+        if (ticks - last_force_flush_time_ > 5 * BILLION) {
+            last_force_flush_time_ = ticks;
+            page_cache_->soft_durability_interval_flush(0);
+        }
+    }
+
     evict_if_necessary_active_ = false;
 }
 
