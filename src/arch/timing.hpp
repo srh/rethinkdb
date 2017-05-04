@@ -71,9 +71,11 @@ public:
     // later).
     void clamp_next_ring(int64_t delay_ms);
 
+    int64_t interval_ms() const { return interval; }
+
 private:
     void on_timer(ticks_t ticks);
-    int64_t interval;
+    int64_t interval;  // milliseconds
     ticks_t last_ticks;
     ticks_t expected_next_ticks;
     timer_token_t *timer;

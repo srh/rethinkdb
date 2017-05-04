@@ -431,7 +431,7 @@ public:
     ~page_cache_t();
 
     // Begins to flush pending txn's.
-    void begin_flush_pending_txns();
+    void begin_flush_pending_txns(bool asap, ticks_t soft_deadline /* 0 is okay */);
 
     // Takes a txn to be flushed.  Pulses on_complete_or_null when done.
     void flush_and_destroy_txn(
@@ -498,16 +498,19 @@ private:
     static std::vector<counted_t<standard_block_token_t>> do_write_blocks(
         page_cache_t *page_cache,
         const std::vector<buf_write_info_t> &write_infos,
-        state_timestamp_t our_write_number);
+        state_timestamp_t our_write_number,
+        ticks_t soft_deadline /* 0 is okay */);
     static void do_flush_changes(
         page_cache_t *page_cache,
         collapsed_txns_t *coltx,
         fifo_enforcer_write_token_t index_write_token,
-        bool asap);
+        bool asap,
+        ticks_t soft_deadline /* 0 is okay */);
     static void do_flush_txn_set(
         page_cache_t *page_cache,
         collapsed_txns_t *coltx_ptr,
-        bool asap);
+        bool asap,
+        ticks_t soft_deadline);
 
     static void remove_txn_set_from_graph(
         page_cache_t *page_cache,
@@ -534,7 +537,8 @@ private:
     // "asap = true" says to flush immediately, a hard durability transaction (or
     // otherwise high priority) is waiting.
     void spawn_flush_flushables(std::vector<scoped_ptr_t<page_txn_t>> &&flush_set,
-                                bool asap);
+                                bool asap,
+                                ticks_t soft_deadline);
 
     friend class current_page_acq_t;
     repli_timestamp_t recency_for_block_id(block_id_t id) {
