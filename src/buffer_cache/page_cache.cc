@@ -316,6 +316,10 @@ void page_cache_t::begin_flush_pending_txns(bool asap, ticks_t soft_deadline) {
     spawn_flush_flushables(std::move(full_flush_set), asap, soft_deadline);
 }
 
+void page_cache_t::soft_durability_interval_flush(ticks_t soft_deadline) {
+    begin_flush_pending_txns(false, soft_deadline);
+}
+
 void page_cache_t::flush_and_destroy_txn(
         scoped_ptr_t<page_txn_t> &&txn,
         write_durability_t durability,
