@@ -242,12 +242,12 @@ void evicter_t::evict_if_necessary() THROWS_NOTHING {
 
     if (in_memory_size() > memory_limit_ + memory_limit_ / 2) {
         // This is pretty lame and hackish -- we'd like something better tuned.
-        // Basically we force a soft durability flush once every 5 seconds if we've got
-        // many unaccounted for dirty pages.
+        // Basically we force a fast flush once every 5 seconds if we've got many
+        // unaccounted for dirty pages.
         ticks_t ticks = get_ticks();
         if (ticks - last_force_flush_time_ > 5 * BILLION) {
             last_force_flush_time_ = ticks;
-            page_cache_->soft_durability_interval_flush(0);
+            page_cache_->begin_flush_pending_txns(true, 0);
         }
     }
 
