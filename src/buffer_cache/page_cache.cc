@@ -277,7 +277,7 @@ page_cache_t::~page_cache_t() {
     // Flush all pending soft-durability transactions.  All txn's must have had
     // flush_and_destroy_txn called on them before we entered this destructor, so we
     // know the entire set of txn's will be flushed.
-    begin_flush_pending_txns();
+    begin_flush_pending_txns(true, 0);
 
     drainer_.reset();
     size_t i = 0;
@@ -302,7 +302,7 @@ page_cache_t::~page_cache_t() {
     }
 }
 
-void page_cache_t::begin_flush_pending_txns() {
+void page_cache_t::begin_flush_pending_txns(bool asap, ticks_t soft_deadline) {
     ASSERT_FINITE_CORO_WAITING;
     std::vector<scoped_ptr_t<page_txn_t>> full_flush_set;
     while (page_txn_t *ptr = waiting_for_spawn_flush_.head()) {
@@ -313,7 +313,7 @@ void page_cache_t::begin_flush_pending_txns() {
         std::move(flush_set.begin(), flush_set.end(),
                   std::back_inserter(full_flush_set));
     }
-    spawn_flush_flushables(std::move(full_flush_set), false);
+    spawn_flush_flushables(std::move(full_flush_set), asap, soft_deadline);
 }
 
 void page_cache_t::flush_and_destroy_txn(
@@ -1570,7 +1570,8 @@ struct iocallback_cond_t : public iocallback_t, public cond_t {
 std::vector<counted_t<standard_block_token_t>> page_cache_t::do_write_blocks(
         page_cache_t *page_cache,
         const std::vector<buf_write_info_t> &write_infos,
-        UNUSED state_timestamp_t our_write_number) {
+        state_timestamp_t our_write_number,
+        ticks_t soft_deadline) {
 
     size_t pos = 0;
 
@@ -1578,6 +1579,8 @@ std::vector<counted_t<standard_block_token_t>> page_cache_t::do_write_blocks(
 
     while (pos < write_infos.size() &&
            our_write_number > page_cache->ser_thread_max_asap_write_token_timestamp_) {
+
+        ticks_t before = get_ticks();
 
         size_t end_pos = decent_sized_write(write_infos, pos);
 
@@ -1592,6 +1595,43 @@ std::vector<counted_t<standard_block_token_t>> page_cache_t::do_write_blocks(
         vec_move_append(&tokens, std::move(tmp));
         tokens.reserve(write_infos.size());
         blocks_written_cb.wait();
+
+        ticks_t after = get_ticks();
+        ticks_t duration = after - before;
+
+        if (after < soft_deadline) {
+            /* Our naptime algo is kind of hacky.
+            (Assuming equal block sizes, because whatever.)
+            - Proportion written is (end_pos - pos) / (size - pos).
+            - We want this to equal (after + naptime - before) / (soft_deadline -
+            before).
+            So:
+
+            (end_pos - pos) / (size - pos) = (after + naptime - before) /
+                (soft_deadline - before)
+
+            (soft_deadline - before) * (end_pos - pos) / (size - pos)
+                 = (after + naptime - before)
+
+            (soft_deadline - before) * (end_pos - pos) / (size - pos) - (after - before)
+                 = naptime
+
+            The units match.
+            */
+
+            ticks_t wakeup_time = (soft_deadline - before) * (end_pos - pos) / (write_infos.size() - pos);
+
+            if (wakeup_time > duration) {
+                ticks_t naptime = wakeup_time - duration;
+                nap(naptime / MILLION);
+            } else {
+                // We're not flushing fast enough to keep up with our smear interval.
+                // That's okay.
+            }
+
+
+        }
+
         pos = end_pos;
     }
 
@@ -1619,7 +1659,8 @@ void page_cache_t::do_flush_changes(
         page_cache_t *page_cache,
         collapsed_txns_t *coltx,
         fifo_enforcer_write_token_t index_write_token,
-        bool asap) {
+        bool asap,
+        ticks_t soft_deadline) {
     std::unordered_map<block_id_t, block_change_t> &changes = coltx->changes;
     rassert(!changes.empty());
     flush_prep_t prep = page_cache_t::prep_flush_changes(page_cache, changes);
@@ -1635,7 +1676,8 @@ void page_cache_t::do_flush_changes(
 
         std::vector<counted_t<standard_block_token_t>> tokens
             = page_cache_t::do_write_blocks(page_cache, prep.write_infos,
-                                            index_write_token.timestamp);
+                                            index_write_token.timestamp,
+                                            soft_deadline);
 
         rassert(tokens.size() == prep.write_infos.size());
         rassert(prep.write_infos.size() == prep.ancillary_infos.size());
@@ -1743,7 +1785,8 @@ void page_cache_t::pulse_flush_complete(collapsed_txns_t &&coltx) {
 void page_cache_t::do_flush_txn_set(
         page_cache_t *page_cache,
         collapsed_txns_t *coltx_ptr,
-        bool asap) {
+        bool asap,
+        ticks_t soft_deadline) {
     // This is called with spawn_now_dangerously!  The reason is partly so that we
     // don't put a zillion coroutines on the message loop when doing a bunch of
     // reads.  The other reason is that passing changes through a std::bind without
@@ -1764,7 +1807,7 @@ void page_cache_t::do_flush_txn_set(
     // Okay, yield, thank you.
     coro_t::yield();
 
-    do_flush_changes(page_cache, &coltx, index_write_token, asap);
+    do_flush_changes(page_cache, &coltx, index_write_token, asap, soft_deadline);
 
     // Flush complete.
     page_cache_t::pulse_flush_complete(std::move(coltx));
@@ -1887,7 +1930,8 @@ page_cache_t::maximal_flushable_txn_set(page_txn_t *base) {
 
 void page_cache_t::spawn_flush_flushables(
         std::vector<scoped_ptr_t<page_txn_t>> &&flush_set,
-        bool asap) {
+        bool asap,
+        ticks_t soft_deadline) {
     // The flush set's txn's are already disconnected from the graph.
     if (!flush_set.empty()) {
         collapsed_txns_t coltx
@@ -1897,7 +1941,8 @@ void page_cache_t::spawn_flush_flushables(
             coro_t::spawn_now_dangerously(std::bind(&page_cache_t::do_flush_txn_set,
                                                     this,
                                                     &coltx,
-                                                    asap));
+                                                    asap,
+                                                    soft_deadline));
         } else {
             // Flush complete.  do_flush_txn_set does this in the write case.
             page_cache_t::pulse_flush_complete(std::move(coltx));
@@ -1939,7 +1984,7 @@ void page_cache_t::begin_waiting_for_flush(
             = page_cache_t::maximal_flushable_txn_set(base_unscoped);
 
         page_cache_t::remove_txn_set_from_graph(this, flush_set);
-        spawn_flush_flushables(std::move(flush_set), true);
+        spawn_flush_flushables(std::move(flush_set), true, 0 /* no soft deadline */);
     }
 }
 
