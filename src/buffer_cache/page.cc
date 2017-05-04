@@ -496,8 +496,13 @@ uint32_t page_t::hypothetical_memory_usage(page_cache_t *page_cache) const {
     // `block_token_.has()` is `true`. However there are some places in the code
     // that assume that `hypothetical_memory_usage` doesn't change after setting
     // the block token.
-    size_t base_size = sizeof(current_page_t) + sizeof(page_t) +
-        sizeof(standard_block_token_t);
+    size_t base_size = sizeof(current_page_t) + sizeof(page_t)
+        + sizeof(standard_block_token_t);
+    // page_cache->current_pages_ fluff
+    base_size += sizeof(std::pair<block_id_t, current_page_t *>) + 24;
+    // Account for page_txn_t overhead a bit...
+    base_size += sizeof(current_page_dirtier_t)
+        + sizeof(std::pair<block_id_t, block_change_t>) + 24;
     if (buf_.has()) {
         return base_size + buf_.aligned_block_size();
     } else if (block_token_.has()) {
