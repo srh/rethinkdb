@@ -536,7 +536,7 @@ private:
                                  write_durability_t durability);
 
     // "asap = true" says to flush immediately, a hard durability transaction (or
-    // otherwise high priority) is waiting.
+    // otherwise high priority) is waiting.  flush_set must not be empty.
     void spawn_flush_flushables(std::vector<scoped_ptr_t<page_txn_t>> &&flush_set,
                                 bool asap,
                                 ticks_t soft_deadline);
@@ -596,6 +596,8 @@ private:
     // the most recently spawned "asap" write had this timestamp.  (If this is bigger
     // than an ongoing write, the ongoing write becomes "asap" too.)
     state_timestamp_t ser_thread_max_asap_write_token_timestamp_;
+    // Number of flushes started, not yet completed, that are asap=false.
+    bool num_active_asap_false_flushes_;
 
     scoped_ptr_t<page_cache_index_write_sink_t> index_write_sink_;
 
