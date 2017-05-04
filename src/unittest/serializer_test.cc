@@ -1,3 +1,4 @@
+// File modified by Sam Hughes (2017).
 #include <functional>
 
 #include "arch/runtime/starter.hpp"
@@ -48,7 +49,7 @@ void run_AddDeleteRepeatedly(bool perform_index_write) {
         } cb;
 
         std::vector<counted_t<standard_block_token_t> > tokens
-            = ser.block_writes(infos, account.get(), &cb);
+            = ser.block_writes(infos.data(), infos.size(), account.get(), &cb);
 
         // Wait for it to be written (because we're nice).
         cb.wait();
