@@ -1536,6 +1536,30 @@ flush_prep_t page_cache_t::prep_flush_changes(
     return prep;
 }
 
+std::vector<counted_t<standard_block_token_t>> page_cache_t::do_write_blocks(
+        page_cache_t *page_cache,
+        const std::vector<buf_write_info_t> &write_infos) {
+    struct : public iocallback_t, public cond_t {
+        void on_io_complete() {
+            pulse();
+        }
+    } blocks_written_cb;
+
+    std::vector<counted_t<standard_block_token_t> > tokens
+        = page_cache->serializer_->block_writes(write_infos,
+                                                /* disk account is overridden
+                                                 * by merger_serializer_t */
+                                                DEFAULT_DISK_ACCOUNT,
+                                                &blocks_written_cb);
+
+    // Note: There is some reason related to fixing issue 4545 (see efec93e092c1)
+    // why we don't just update pages' block tokens during writing, or after, and
+    // instead wait for index writes to be reflected below.
+    blocks_written_cb.wait();
+
+    return tokens;
+}
+
 void page_cache_t::do_flush_changes(
         page_cache_t *page_cache,
         collapsed_txns_t *coltx,
@@ -1554,19 +1578,8 @@ void page_cache_t::do_flush_changes(
                 = index_write_token.timestamp;
         }
 
-        struct : public iocallback_t, public cond_t {
-            void on_io_complete() {
-                pulse();
-            }
-        } blocks_written_cb;
-
-        std::vector<counted_t<standard_block_token_t> > tokens
-            = page_cache->serializer_->block_writes(prep.write_infos.data(),
-                                                    prep.write_infos.size(),
-                                                    /* disk account is overridden
-                                                     * by merger_serializer_t */
-                                                    DEFAULT_DISK_ACCOUNT,
-                                                    &blocks_written_cb);
+        std::vector<counted_t<standard_block_token_t>> tokens
+            = page_cache_t::do_write_blocks(page_cache, prep.write_infos);
 
         rassert(tokens.size() == prep.write_infos.size());
         rassert(prep.write_infos.size() == prep.ancillary_infos.size());
@@ -1600,11 +1613,6 @@ void page_cache_t::do_flush_changes(
                                        it->tstamp);
             }
         }
-
-        blocks_written_cb.wait();
-        // Note: There is some reason related to fixing issue 4545 (see efec93e092c1)
-        // why we don't just update pages' block tokens here, and instead wait for index
-        // writes to be reflected below.
 
         fifo_enforcer_sink_t::exit_write_t exiter(&page_cache->index_write_sink_->sink,
                                                   index_write_token);
