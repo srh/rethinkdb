@@ -314,11 +314,16 @@ void page_cache_t::begin_flush_pending_txns(bool asap, ticks_t soft_deadline) {
         std::move(flush_set.begin(), flush_set.end(),
                   std::back_inserter(full_flush_set));
     }
-    spawn_flush_flushables(std::move(full_flush_set), asap, soft_deadline);
+    if (!full_flush_set.empty()) {
+        spawn_flush_flushables(std::move(full_flush_set), asap, soft_deadline);
+    }
 }
 
 void page_cache_t::soft_durability_interval_flush(ticks_t soft_deadline) {
-    begin_flush_pending_txns(false, soft_deadline);
+    // We only start a soft durability flush if one isn't already running.
+    if (num_active_asap_false_flushes_ == 0) {
+        begin_flush_pending_txns(false, soft_deadline);
+    }
 }
 
 void page_cache_t::flush_and_destroy_txn(
@@ -1809,10 +1814,14 @@ void page_cache_t::do_flush_txn_set(
     fifo_enforcer_write_token_t index_write_token
         = page_cache->index_write_source_.enter_write();
 
+    page_cache->num_active_asap_false_flushes_ += (asap ? 0 : 1);
+
     // Okay, yield, thank you.
     coro_t::yield();
 
     do_flush_changes(page_cache, &coltx, index_write_token, asap, soft_deadline);
+
+    page_cache->num_active_asap_false_flushes_ -= (asap ? 0 : 1);
 
     // Flush complete.
     page_cache_t::pulse_flush_complete(std::move(coltx));
@@ -1937,21 +1946,21 @@ void page_cache_t::spawn_flush_flushables(
         std::vector<scoped_ptr_t<page_txn_t>> &&flush_set,
         bool asap,
         ticks_t soft_deadline) {
+    rassert(!flush_set.empty());
     // The flush set's txn's are already disconnected from the graph.
-    if (!flush_set.empty()) {
-        collapsed_txns_t coltx
-            = page_cache_t::compute_changes(this, std::move(flush_set));
 
-        if (!coltx.changes.empty()) {
-            coro_t::spawn_now_dangerously(std::bind(&page_cache_t::do_flush_txn_set,
-                                                    this,
-                                                    &coltx,
-                                                    asap,
-                                                    soft_deadline));
-        } else {
-            // Flush complete.  do_flush_txn_set does this in the write case.
-            page_cache_t::pulse_flush_complete(std::move(coltx));
-        }
+    collapsed_txns_t coltx
+        = page_cache_t::compute_changes(this, std::move(flush_set));
+
+    if (!coltx.changes.empty()) {
+        coro_t::spawn_now_dangerously(std::bind(&page_cache_t::do_flush_txn_set,
+                                                this,
+                                                &coltx,
+                                                asap,
+                                                soft_deadline));
+    } else {
+        // Flush complete.  do_flush_txn_set does this in the write case.
+        page_cache_t::pulse_flush_complete(std::move(coltx));
     }
 }
 
@@ -1988,8 +1997,10 @@ void page_cache_t::begin_waiting_for_flush(
         std::vector<scoped_ptr_t<page_txn_t>> flush_set
             = page_cache_t::maximal_flushable_txn_set(base_unscoped);
 
-        page_cache_t::remove_txn_set_from_graph(this, flush_set);
-        spawn_flush_flushables(std::move(flush_set), true, 0 /* no soft deadline */);
+        if (!flush_set.empty()) {
+            page_cache_t::remove_txn_set_from_graph(this, flush_set);
+            spawn_flush_flushables(std::move(flush_set), true, 0 /* no soft deadline */);
+        }
     }
 }
 
