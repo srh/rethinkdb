@@ -1546,7 +1546,8 @@ std::vector<counted_t<standard_block_token_t>> page_cache_t::do_write_blocks(
     } blocks_written_cb;
 
     std::vector<counted_t<standard_block_token_t> > tokens
-        = page_cache->serializer_->block_writes(write_infos,
+        = page_cache->serializer_->block_writes(write_infos.data(),
+                                                write_infos.size(),
                                                 /* disk account is overridden
                                                  * by merger_serializer_t */
                                                 DEFAULT_DISK_ACCOUNT,
