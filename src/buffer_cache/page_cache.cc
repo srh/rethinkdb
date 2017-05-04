@@ -313,7 +313,7 @@ void page_cache_t::begin_flush_pending_txns() {
         std::move(flush_set.begin(), flush_set.end(),
                   std::back_inserter(full_flush_set));
     }
-    spawn_flush_flushables(std::move(full_flush_set));
+    spawn_flush_flushables(std::move(full_flush_set), false);
 }
 
 void page_cache_t::flush_and_destroy_txn(
@@ -1539,7 +1539,8 @@ flush_prep_t page_cache_t::prep_flush_changes(
 void page_cache_t::do_flush_changes(
         page_cache_t *page_cache,
         collapsed_txns_t *coltx,
-        fifo_enforcer_write_token_t index_write_token) {
+        fifo_enforcer_write_token_t index_write_token,
+        bool asap) {
     std::unordered_map<block_id_t, block_change_t> &changes = coltx->changes;
     rassert(!changes.empty());
     flush_prep_t prep = page_cache_t::prep_flush_changes(page_cache, changes);
@@ -1548,6 +1549,11 @@ void page_cache_t::do_flush_changes(
     {
         on_thread_t th(page_cache->serializer_->home_thread());
 
+        if (asap) {
+            page_cache->ser_thread_max_asap_write_token_timestamp_
+                = index_write_token.timestamp;
+        }
+
         struct : public iocallback_t, public cond_t {
             void on_io_complete() {
                 pulse();
@@ -1555,7 +1561,8 @@ void page_cache_t::do_flush_changes(
         } blocks_written_cb;
 
         std::vector<counted_t<standard_block_token_t> > tokens
-            = page_cache->serializer_->block_writes(prep.write_infos,
+            = page_cache->serializer_->block_writes(prep.write_infos.data(),
+                                                    prep.write_infos.size(),
                                                     /* disk account is overridden
                                                      * by merger_serializer_t */
                                                     DEFAULT_DISK_ACCOUNT,
@@ -1671,7 +1678,8 @@ void page_cache_t::pulse_flush_complete(collapsed_txns_t &&coltx) {
 
 void page_cache_t::do_flush_txn_set(
         page_cache_t *page_cache,
-        collapsed_txns_t *coltx_ptr) {
+        collapsed_txns_t *coltx_ptr,
+        bool asap) {
     // This is called with spawn_now_dangerously!  The reason is partly so that we
     // don't put a zillion coroutines on the message loop when doing a bunch of
     // reads.  The other reason is that passing changes through a std::bind without
@@ -1692,7 +1700,7 @@ void page_cache_t::do_flush_txn_set(
     // Okay, yield, thank you.
     coro_t::yield();
 
-    do_flush_changes(page_cache, &coltx, index_write_token);
+    do_flush_changes(page_cache, &coltx, index_write_token, asap);
 
     // Flush complete.
     page_cache_t::pulse_flush_complete(std::move(coltx));
@@ -1814,15 +1822,18 @@ page_cache_t::maximal_flushable_txn_set(page_txn_t *base) {
 }
 
 void page_cache_t::spawn_flush_flushables(
-        std::vector<scoped_ptr_t<page_txn_t>> &&flush_set) {
+        std::vector<scoped_ptr_t<page_txn_t>> &&flush_set,
+        bool asap) {
     // The flush set's txn's are already disconnected from the graph.
     if (!flush_set.empty()) {
-        collapsed_txns_t coltx = page_cache_t::compute_changes(this, std::move(flush_set));
+        collapsed_txns_t coltx
+            = page_cache_t::compute_changes(this, std::move(flush_set));
 
         if (!coltx.changes.empty()) {
             coro_t::spawn_now_dangerously(std::bind(&page_cache_t::do_flush_txn_set,
                                                     this,
-                                                    &coltx));
+                                                    &coltx,
+                                                    asap));
         } else {
             // Flush complete.  do_flush_txn_set does this in the write case.
             page_cache_t::pulse_flush_complete(std::move(coltx));
@@ -1864,7 +1875,7 @@ void page_cache_t::begin_waiting_for_flush(
             = page_cache_t::maximal_flushable_txn_set(base_unscoped);
 
         page_cache_t::remove_txn_set_from_graph(this, flush_set);
-        spawn_flush_flushables(std::move(flush_set));
+        spawn_flush_flushables(std::move(flush_set), true);
     }
 }
 

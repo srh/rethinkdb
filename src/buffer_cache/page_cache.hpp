@@ -497,10 +497,12 @@ private:
     static void do_flush_changes(
         page_cache_t *page_cache,
         collapsed_txns_t *coltx,
-        fifo_enforcer_write_token_t index_write_token);
+        fifo_enforcer_write_token_t index_write_token,
+        bool asap);
     static void do_flush_txn_set(
         page_cache_t *page_cache,
-        collapsed_txns_t *coltx_ptr);
+        collapsed_txns_t *coltx_ptr,
+        bool asap);
 
     static void remove_txn_set_from_graph(
         page_cache_t *page_cache,
@@ -524,7 +526,10 @@ private:
     void begin_waiting_for_flush(scoped_ptr_t<page_txn_t> &&txn,
                                  write_durability_t durability);
 
-    void spawn_flush_flushables(std::vector<scoped_ptr_t<page_txn_t>> &&flush_set);
+    // "asap = true" says to flush immediately, a hard durability transaction (or
+    // otherwise high priority) is waiting.
+    void spawn_flush_flushables(std::vector<scoped_ptr_t<page_txn_t>> &&flush_set,
+                                bool asap);
 
     friend class current_page_acq_t;
     repli_timestamp_t recency_for_block_id(block_id_t id) {
@@ -577,6 +582,11 @@ private:
     // move to the serializer thread and get a bunch of blocks written.
     // index_write_sink's pointee's home thread is on the serializer.
     fifo_enforcer_source_t index_write_source_;
+    // (Has nothing to do with repli_timestamp_t.)  The fifo_enforcer_write_token_t of
+    // the most recently spawned "asap" write had this timestamp.  (If this is bigger
+    // than an ongoing write, the ongoing write becomes "asap" too.)
+    state_timestamp_t ser_thread_max_asap_write_token_timestamp_;
+
     scoped_ptr_t<page_cache_index_write_sink_t> index_write_sink_;
 
     serializer_t *serializer_;
