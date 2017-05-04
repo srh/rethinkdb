@@ -1537,28 +1537,83 @@ flush_prep_t page_cache_t::prep_flush_changes(
     return prep;
 }
 
+template <class T>
+void vec_move_append(std::vector<T> *onto, std::vector<T> &&from) {
+    if (onto->empty()) {
+        *onto = std::move(from);
+    } else {
+        std::move(from.begin(), from.end(), std::back_inserter(*onto));
+    }
+}
+
+size_t decent_sized_write(const std::vector<buf_write_info_t> &write_infos, size_t pos) {
+    const size_t bound = 4 * MEGABYTE;
+    const size_t n = write_infos.size();
+    size_t acc = 0;
+    while (pos < n) {
+        size_t bs = write_infos[pos].block_size.ser_value();
+        if (bound - acc < bs) {
+            return pos;
+        } else {
+            acc += bs;
+            ++pos;
+        }
+    }
+    return pos;
+}
+
 std::vector<counted_t<standard_block_token_t>> page_cache_t::do_write_blocks(
         page_cache_t *page_cache,
-        const std::vector<buf_write_info_t> &write_infos) {
-    struct : public iocallback_t, public cond_t {
-        void on_io_complete() {
-            pulse();
-        }
-    } blocks_written_cb;
+        const std::vector<buf_write_info_t> &write_infos,
+        UNUSED state_timestamp_t our_write_number) {
 
-    std::vector<counted_t<standard_block_token_t> > tokens
-        = page_cache->serializer_->block_writes(write_infos.data(),
-                                                write_infos.size(),
-                                                /* disk account is overridden
-                                                 * by merger_serializer_t */
-                                                DEFAULT_DISK_ACCOUNT,
-                                                &blocks_written_cb);
+    size_t pos = 0;
+
+    std::vector<counted_t<standard_block_token_t> > tokens;
+
+    while (pos < write_infos.size() &&
+           our_write_number > page_cache->ser_thread_max_asap_write_token_timestamp_) {
+
+        size_t end_pos = decent_sized_write(write_infos, pos);
+
+        struct : public iocallback_t, public cond_t {
+            void on_io_complete() {
+                pulse();
+            }
+        } blocks_written_cb;
+        std::vector<counted_t<standard_block_token_t> > tmp
+            = page_cache->serializer_->block_writes(write_infos.data() + pos,
+                                                    end_pos - pos,
+                                                    /* disk account is overridden
+                                                     * by merger_serializer_t */
+                                                    DEFAULT_DISK_ACCOUNT,
+                                                    &blocks_written_cb);
+        vec_move_append(&tokens, std::move(tmp));
+        blocks_written_cb.wait();
+        pos = end_pos;
+    }
+
+    if (pos < write_infos.size()) {
+        struct : public iocallback_t, public cond_t {
+            void on_io_complete() {
+                pulse();
+            }
+        } blocks_written_cb;
+        std::vector<counted_t<standard_block_token_t> > tmp
+            = page_cache->serializer_->block_writes(write_infos.data() + pos,
+                                                    write_infos.size() - pos,
+                                                    /* disk account is overridden
+                                                     * by merger_serializer_t */
+                                                    DEFAULT_DISK_ACCOUNT,
+                                                    &blocks_written_cb);
+
+        vec_move_append(&tokens, std::move(tmp));
+        blocks_written_cb.wait();
+    }
 
     // Note: There is some reason related to fixing issue 4545 (see efec93e092c1)
     // why we don't just update pages' block tokens during writing, or after, and
     // instead wait for index writes to be reflected below.
-    blocks_written_cb.wait();
-
     return tokens;
 }
 
@@ -1581,7 +1636,8 @@ void page_cache_t::do_flush_changes(
         }
 
         std::vector<counted_t<standard_block_token_t>> tokens
-            = page_cache_t::do_write_blocks(page_cache, prep.write_infos);
+            = page_cache_t::do_write_blocks(page_cache, prep.write_infos,
+                                            index_write_token.timestamp);
 
         rassert(tokens.size() == prep.write_infos.size());
         rassert(prep.write_infos.size() == prep.ancillary_infos.size());

@@ -497,7 +497,8 @@ private:
     friend class page_txn_t;
     static std::vector<counted_t<standard_block_token_t>> do_write_blocks(
         page_cache_t *page_cache,
-        const std::vector<buf_write_info_t> &write_infos);
+        const std::vector<buf_write_info_t> &write_infos,
+        state_timestamp_t our_write_number);
     static void do_flush_changes(
         page_cache_t *page_cache,
         collapsed_txns_t *coltx,
