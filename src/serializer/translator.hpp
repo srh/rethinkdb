@@ -1,4 +1,5 @@
 // Copyright 2010-2014 RethinkDB, all rights reserved.
+// File modified by Sam Hughes (2017).
 #ifndef SERIALIZER_TRANSLATOR_HPP_
 #define SERIALIZER_TRANSLATOR_HPP_
 
@@ -118,7 +119,8 @@ public:
                      const std::vector<index_write_op_t> &write_ops);
 
     std::vector<counted_t<standard_block_token_t> >
-    block_writes(const std::vector<buf_write_info_t> &write_infos, file_account_t *io_account, iocallback_t *cb);
+    block_writes(buf_write_info_t *write_infos, size_t write_infos_count,
+                 file_account_t *io_account, iocallback_t *cb);
 
     max_block_size_t max_block_size() const;
 
