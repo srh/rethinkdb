@@ -112,8 +112,7 @@ cache_t::cache_t(serializer_t *serializer,
       stats_(make_scoped<alt_cache_stats_t>(&page_cache_, perfmon_collection)),
       soft_durability_flusher_(DEFAULT_FLUSH_INTERVAL, [this]() {
           // Smear it over 25% of the time.
-          page_cache_.begin_flush_pending_txns(
-              false,
+          page_cache_.soft_durability_interval_flush(
               get_ticks() + soft_durability_flusher_.interval_ms() * MILLION / 4);
       }) {
 }

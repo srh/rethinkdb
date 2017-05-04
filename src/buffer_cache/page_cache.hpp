@@ -432,6 +432,8 @@ public:
 
     // Begins to flush pending txn's.
     void begin_flush_pending_txns(bool asap, ticks_t soft_deadline /* 0 is okay */);
+    // Starts an official soft durability interval flush, if one isn't running already.
+    void soft_durability_interval_flush(ticks_t soft_deadline);
 
     // Takes a txn to be flushed.  Pulses on_complete_or_null when done.
     void flush_and_destroy_txn(
