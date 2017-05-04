@@ -10,6 +10,7 @@
 #include "concurrency/cache_line_padded.hpp"
 #include "concurrency/pubsub.hpp"
 #include "threading.hpp"
+#include "time.hpp"
 
 class cache_balancer_t;
 class alt_txn_throttler_t;
@@ -97,6 +98,8 @@ private:
     eviction_bag_t evictable_disk_backed_;
     eviction_bag_t evictable_unbacked_;
     eviction_bag_t evicted_;
+
+    ticks_t last_force_flush_time_;
 
     auto_drainer_t drainer_;
 
