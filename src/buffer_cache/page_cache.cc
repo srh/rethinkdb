@@ -1591,6 +1591,7 @@ std::vector<counted_t<standard_block_token_t>> page_cache_t::do_write_blocks(
                                                     DEFAULT_DISK_ACCOUNT,
                                                     &blocks_written_cb);
         vec_move_append(&tokens, std::move(tmp));
+        tokens.reserve(write_infos.size());
         blocks_written_cb.wait();
         pos = end_pos;
     }
