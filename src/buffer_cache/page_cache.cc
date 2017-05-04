@@ -1561,6 +1561,12 @@ size_t decent_sized_write(const std::vector<buf_write_info_t> &write_infos, size
     return pos;
 }
 
+struct iocallback_cond_t : public iocallback_t, public cond_t {
+    void on_io_complete() {
+        pulse();
+    }
+};
+
 std::vector<counted_t<standard_block_token_t>> page_cache_t::do_write_blocks(
         page_cache_t *page_cache,
         const std::vector<buf_write_info_t> &write_infos,
@@ -1575,11 +1581,7 @@ std::vector<counted_t<standard_block_token_t>> page_cache_t::do_write_blocks(
 
         size_t end_pos = decent_sized_write(write_infos, pos);
 
-        struct : public iocallback_t, public cond_t {
-            void on_io_complete() {
-                pulse();
-            }
-        } blocks_written_cb;
+        iocallback_cond_t blocks_written_cb;
         std::vector<counted_t<standard_block_token_t> > tmp
             = page_cache->serializer_->block_writes(write_infos.data() + pos,
                                                     end_pos - pos,
@@ -1593,11 +1595,7 @@ std::vector<counted_t<standard_block_token_t>> page_cache_t::do_write_blocks(
     }
 
     if (pos < write_infos.size()) {
-        struct : public iocallback_t, public cond_t {
-            void on_io_complete() {
-                pulse();
-            }
-        } blocks_written_cb;
+        iocallback_cond_t blocks_written_cb;
         std::vector<counted_t<standard_block_token_t> > tmp
             = page_cache->serializer_->block_writes(write_infos.data() + pos,
                                                     write_infos.size() - pos,
