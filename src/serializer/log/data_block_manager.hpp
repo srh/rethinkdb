@@ -82,12 +82,13 @@ public:
     double garbage_ratio() const;
 
     std::vector<counted_t<ls_block_token_pointee_t> >
-    many_writes(const std::vector<buf_write_info_t> &writes,
+    many_writes(const buf_write_info_t *writes,
+                size_t writes_count,
                 file_account_t *io_account,
                 iocallback_t *cb);
 
     std::vector<std::vector<counted_t<ls_block_token_pointee_t> > >
-    gimme_some_new_offsets(const std::vector<buf_write_info_t> &writes);
+    gimme_some_new_offsets(const buf_write_info_t *writes, size_t writes_count);
 
     bool is_gc_active() const;
 
