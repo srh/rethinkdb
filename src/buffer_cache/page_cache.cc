@@ -686,7 +686,6 @@ void current_page_acq_t::mark_deleted() {
     rassert(current_page_ != nullptr);
     dirty_the_page();
     current_page_->mark_deleted(help());
-    // HSI: This is gross and fragile that we need this knowledge here.
     if (current_page_->last_dirtier_ == the_txn_) {
         current_page_->last_dirtier_recency_ = repli_timestamp_t::invalid;
     }
@@ -769,7 +768,6 @@ void current_page_t::reset(page_cache_t *page_cache) {
     // null.
     rassert(last_write_acquirer_ == nullptr);
 
-    // HSI: Should this be null, or might it need to snapshot the dirtied page?
     rassert(last_dirtier_ == nullptr);
 
     page_.reset_page_ptr(page_cache);
@@ -1140,7 +1138,7 @@ void remove_unique(std::vector<T> *vec, T removee) {
 // reorder *vec however it wants to.
 template <class T>
 bool merge_replace(std::vector<T> *vec, T replacee, T replacement) {
-    // HSI: We could do this in one traversal.
+    // TODO: We could do this in one traversal.
     auto it = std::find(vec->begin(), vec->end(), replacee);
     rassert(it != vec->end());
     auto jt = std::find(vec->begin(), vec->end(), replacement);
@@ -1193,7 +1191,8 @@ void page_txn_t::merge(scoped_ptr_t<page_txn_t> &&scoped_other) {
     // Merge throttler acqs.
     throttler_acq_.merge(std::move(other->throttler_acq_));
 
-    // HSI: Add back/forward indices to preceders_/subseqers_ instead.
+    // We could add back/forward indices to preceders_/subseqers_ instead of walking
+    // arrays like we do here.  These arrays won't be big though.
     for (page_txn_t *o_prec : other->preceders_) {
         if (o_prec == this) {
             remove_unique(&subseqers_, other);
@@ -1743,8 +1742,8 @@ void page_cache_t::do_flush_changes(
                             // We know page is still a valid pointer because of the
                             // page_ptr_t in changes.
 
-                            // HSI: This assertion would fail if we try to force-evict
-                            // the page simultaneously as this write.
+                            // This assertion would fail if we try to force-evict the
+                            // page simultaneously as this write.
                             rassert(!block.page->block_token().has());
                             eviction_bag_t *old_bag
                                 = page_cache->evicter().correct_eviction_category(

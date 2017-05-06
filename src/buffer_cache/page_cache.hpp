@@ -27,8 +27,6 @@
 #include "repli_timestamp.hpp"
 #include "serializer/types.hpp"
 
-// HSI: unordered_map allocates too much, use a different hash table type.
-
 class alt_txn_throttler_t;
 class cache_balancer_t;
 class auto_drainer_t;
@@ -663,10 +661,6 @@ private:
 // Situation '(a)' can happen as a matter of course, assuming transactions don't
 // greedily save their modified copy of a page.  Situation '(b)' can happen if
 // transactions apply a commutative operation on a block, like with the stats block.
-// Right now, situation '(a)' doesn't happen because transactions do greedily keep
-// their copies of the block.
-//
-// HSI: Check this comment.
 class page_txn_t : public intrusive_list_node_t<page_txn_t> {
 public:
     // Our transaction has to get committed to disk _after_ or at the same time as
