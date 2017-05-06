@@ -75,13 +75,12 @@ void migrate_metadata_v2_1_to_v2_3(cluster_version_t serialization_version,
     case cluster_version_t::v2_2:
         migrate_metadata_v2_1_to_v2_3<cluster_version_t::v2_2>(txn, interruptor);
         break;
-    case cluster_version_t::v2_3:
+    case cluster_version_t::v2_3_is_latest_disk:
         // This only really needs to migrate auth data, but this should be fine
-        migrate_metadata_v2_1_to_v2_3<cluster_version_t::v2_3>(txn, interruptor);
+        migrate_metadata_v2_1_to_v2_3<cluster_version_t::v2_3_is_latest_disk>(txn, interruptor);
         break;
 
     case cluster_version_t::v2_3_ext:
-        // HSI: Should v2_3 be v2_3_is_latest_disk?
     case cluster_version_t::v1_14:
     case cluster_version_t::v1_15:
     case cluster_version_t::v1_16:
