@@ -22,7 +22,6 @@ flush_interval_manager_t::flush_interval_manager_t(
 void flush_interval_manager_t::update_blocking(signal_t *interruptor) {
     flush_interval_t flush_interval;
     table_config->apply_read([&](const table_config_t *config) {
-        // HSI: Oh definitely read the value out of the config, thank you.
         flush_interval = get_flush_interval(*config);
     });
 
