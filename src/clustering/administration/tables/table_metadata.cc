@@ -97,8 +97,12 @@ flush_interval_t get_flush_interval(const table_config_t &config) {
             return flush_interval_t{DEFAULT_FLUSH_INTERVAL};
         }
 
-        // Divide by 2 to avoid thinking about rounding up to 2**63.
-        if (value_ms >= static_cast<double>(INT64_MAX / 2)) {
+        // We don't want any flush interval bigger than NEVER_FLUSH_INTERVAL.  (We also
+        // don't want a value in milliseconds that would overflow when converted to
+        // nanoseconds.  Hence this logic here.)
+        static_assert(NEVER_FLUSH_INTERVAL == (0x100000000ll * 1000ll),
+                      "NEVER_FLUSH_INTERVAL value changed");
+        if (value_ms >= static_cast<double>(NEVER_FLUSH_INTERVAL)) {
             return flush_interval_t{NEVER_FLUSH_INTERVAL};
         }
 
