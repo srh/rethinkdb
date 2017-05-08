@@ -1649,6 +1649,13 @@ std::vector<counted_t<standard_block_token_t>> page_cache_t::do_write_blocks(
 
             if (wakeup_time > duration) {
                 ticks_t naptime = wakeup_time - duration;
+                // But don't nap more than 7/8 of the time.  We'll finish our smear early.
+                naptime = std::min<ticks_t>(naptime, duration * 7);
+
+                // This smearing logic is so bad.  Much nicer would be if we could
+                // update the priority of writes in-flight.  I don't know if anything is
+                // stopping that, it would take some engineering time.
+
                 nap(naptime / MILLION);
             } else {
                 // We're not flushing fast enough to keep up with our smear interval.
