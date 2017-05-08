@@ -43,7 +43,8 @@ void throttler_acq_t::update_dirty_page_count(int64_t new_count) {
     rassert(
         block_changes_semaphore_acq_.count() == index_changes_semaphore_acq_.count());
     new_count = std::max<int64_t>(new_count, expected_change_count_);
-    if (pre_spawn_flush_ && new_count > block_changes_semaphore_acq_.count()) {
+    if (pre_spawn_flush_ && new_count > block_changes_semaphore_acq_.count()
+        && !prevent_updates_) {
         block_changes_semaphore_acq_.change_count(new_count);
         index_changes_semaphore_acq_.change_count(new_count);
     }
@@ -53,6 +54,11 @@ void throttler_acq_t::mark_dirty_pages_written() {
     block_changes_semaphore_acq_.change_count(0);
 }
 
+void throttler_acq_t::set_prevent_updates() {
+    prevent_updates_ = true;
+}
+
+
 void throttler_acq_t::merge(throttler_acq_t &&other) {
     expected_change_count_ += other.expected_change_count_;
     other.expected_change_count_ = 0;
@@ -60,6 +66,10 @@ void throttler_acq_t::merge(throttler_acq_t &&other) {
     // this are for txn's that could belong in waiting_for_spawn_flush_, and txn's in
     // compute_changes.)
     rassert(pre_spawn_flush_ == other.pre_spawn_flush_);
+
+    // If a soft durability txn is flushing in combination with a hard durability txn, I
+    // guess we'll count its pages... if any more are acquired.
+    prevent_updates_ &= other.prevent_updates_;
 
     if (!has_txn_throttler()) {
         block_changes_semaphore_acq_ = std::move(other.block_changes_semaphore_acq_);
@@ -306,6 +316,14 @@ page_cache_t::~page_cache_t() {
 void page_cache_t::begin_flush_pending_txns(bool asap, ticks_t soft_deadline) {
     ASSERT_FINITE_CORO_WAITING;
     std::vector<scoped_ptr_t<page_txn_t>> full_flush_set;
+
+    if (!asap) {
+        for (page_txn_t *ptr = waiting_for_spawn_flush_.head(); ptr != nullptr;
+             ptr = waiting_for_spawn_flush_.next(ptr)) {
+            ptr->throttler_acq_.set_prevent_updates();
+        }
+    }
+
     while (page_txn_t *ptr = waiting_for_spawn_flush_.head()) {
         page_txn_t::propagate_pre_spawn_flush(ptr);
         std::vector<scoped_ptr_t<page_txn_t>> flush_set
