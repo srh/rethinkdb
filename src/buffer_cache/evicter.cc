@@ -207,7 +207,7 @@ void evicter_t::evict_if_necessary() THROWS_NOTHING {
         page_cache_->consider_evicting_current_page(page->block_id());
     }
 
-    if (in_memory_size() > memory_limit_ + memory_limit_ / 2) {
+    if (in_memory_size() > memory_limit_) {
         // This is pretty lame and hackish -- we'd like something better tuned.
         // Basically we force a fast flush once every 5 seconds if we've got many
         // unaccounted for dirty pages.
