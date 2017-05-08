@@ -103,17 +103,31 @@ void alt_txn_throttler_t::inform_memory_limit_change(uint64_t memory_limit,
     unwritten_block_changes_semaphore_.set_capacity(throttler_limit);
 }
 
+int64_t clamp_ring_length(which_cpu_shard_t w, int64_t interval) {
+    if (w.which_shard == 0) {
+        return interval;
+    } else {
+        return interval * w.which_shard / w.num_shards;
+    }
+}
+
 cache_t::cache_t(serializer_t *serializer,
                  cache_balancer_t *balancer,
-                 perfmon_collection_t *perfmon_collection)
+                 perfmon_collection_t *perfmon_collection,
+                 which_cpu_shard_t which_cpu_shard)
     : throttler_(MINIMUM_SOFT_UNWRITTEN_CHANGES_LIMIT),
       page_cache_(serializer, balancer, &throttler_),
       stats_(make_scoped<alt_cache_stats_t>(&page_cache_, perfmon_collection)),
       soft_durability_flusher_(DEFAULT_FLUSH_INTERVAL, [this]() {
-          // Smear it over 6.25% of the time.
+          // Smear it over 6.25% of the time.  (Not a well thought-through number.)
+          // 6.25% is a worst case -- we'll smear faster if we can.
           page_cache_.soft_durability_interval_flush(
               get_ticks() + soft_durability_flusher_.interval_ms() * MILLION / 16);
-      }) {
+      }),
+      which_cpu_shard_(which_cpu_shard) {
+
+  soft_durability_flusher_.clamp_next_ring(
+      clamp_ring_length(which_cpu_shard, DEFAULT_FLUSH_INTERVAL));
 }
 
 cache_t::~cache_t() {
@@ -123,6 +137,8 @@ cache_t::~cache_t() {
 void cache_t::configure_flush_interval(flush_interval_t interval) {
     rassert(interval.millis > 0);
     soft_durability_flusher_.change_interval(interval.millis);
+    soft_durability_flusher_.clamp_next_ring(
+        clamp_ring_length(which_cpu_shard_, interval.millis));
 }
 
 cache_account_t cache_t::create_cache_account(int priority) {
