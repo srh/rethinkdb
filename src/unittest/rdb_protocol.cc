@@ -1,4 +1,5 @@
 // Copyright 2010-2015 RethinkDB, all rights reserved.
+// File modified by Sam Hughes (2017).
 #include "unittest/rdb_protocol.hpp"
 
 #include <vector>
@@ -86,7 +87,8 @@ void run_with_namespace_interface(
                     make_scoped<store_t>(region_t::universe(), serializers[i].get(),
                         &balancer, temp_files[i]->name().permanent_path(), do_create,
                         &get_global_perfmon_collection(), &ctx, &io_backender,
-                        base_path_t("."), generate_uuid(), update_sindexes_t::UPDATE));
+                        base_path_t("."), generate_uuid(), update_sindexes_t::UPDATE,
+                        which_cpu_shard_t{0, 1}));
         }
 
         std::vector<scoped_ptr_t<store_view_t> > stores;
