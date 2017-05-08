@@ -330,14 +330,17 @@ class throttler_acq_t {
 public:
     explicit throttler_acq_t(write_durability_t durability,
                              int64_t expected_change_count)
-        : expected_change_count_(expected_change_count),
+        : prevent_updates_(false),
+          expected_change_count_(expected_change_count),
           pre_spawn_flush_(durability == write_durability_t::HARD) { }
     ~throttler_acq_t() { }
     throttler_acq_t(throttler_acq_t &&movee)
-        : expected_change_count_(movee.expected_change_count_),
+        : prevent_updates_(movee.prevent_updates_),
+          expected_change_count_(movee.expected_change_count_),
           pre_spawn_flush_(movee.pre_spawn_flush_),
           block_changes_semaphore_acq_(std::move(movee.block_changes_semaphore_acq_)),
           index_changes_semaphore_acq_(std::move(movee.index_changes_semaphore_acq_)) {
+        movee.prevent_updates_ = false;
         movee.pre_spawn_flush_ = false;
         movee.expected_change_count_ = 0;
         movee.block_changes_semaphore_acq_.reset();
@@ -371,7 +374,14 @@ public:
         }
     }
 
+    void set_prevent_updates();
+
 private:
+    // Prevents pages the semaphores from updating their dirty page count when true,
+    // despite update_dirty_page_count getting called.  (Allows
+    // mark_dirty_pages_written.)
+    bool prevent_updates_;
+
     // The original expected_change_count value.  Once pre_spawn_flush_ is true and we
     // start to block the semaphores, we jump up to this value.
     int64_t expected_change_count_;
