@@ -49,13 +49,23 @@ public:
                              bool read_ahead_ok);
 
     uint64_t next_access_time() {
-        guarantee(initialized_);
+        guarantee_initialized();
         return ++access_time_counter_;
     }
 
-    uint64_t memory_limit() const;
-    uint64_t access_count() const;
-    int64_t get_bytes_loaded() const;
+    uint64_t memory_limit() const {
+        guarantee_initialized();
+        return memory_limit_;
+    }
+    uint64_t access_count() const {
+        guarantee_initialized();
+        return access_count_counter_;
+    }
+    int64_t get_bytes_loaded() const {
+        guarantee_initialized();
+        return bytes_loaded_counter_;
+    }
+
 
     uint64_t in_memory_size() const;
 
@@ -64,6 +74,11 @@ public:
     static const uint64_t INITIAL_ACCESS_TIME = UINT64_MAX - 100;
 
 private:
+    void guarantee_initialized() const {
+        assert_thread();
+        guarantee(initialized_);
+    }
+
     friend class usage_adjuster_t;
 
     // Tells the cache balancer about a page being loaded
