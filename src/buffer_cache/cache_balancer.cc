@@ -1,3 +1,4 @@
+// File modified by Sam Hughes (2017).
 #include "buffer_cache/cache_balancer.hpp"
 
 #include <limits>
@@ -226,10 +227,9 @@ void alt_cache_balancer_t::collect_stats_from_thread(
     bool all_access_counts_zero = true;
 
     per_evicter_data->reserve(evicters->size());
-    for (auto j = evicters->begin(); j != evicters->end(); ++j) {
-        cache_data_t data(*j);
-        all_access_counts_zero &= (data.access_count == 0);
-        per_evicter_data->push_back(data);
+    for (alt::evicter_t *evicter : *evicters) {
+        per_evicter_data->emplace_back(evicter);
+        all_access_counts_zero &= (per_evicter_data->back().access_count == 0);
     }
 
     per_thread_data[index].wake_up_balancer = all_access_counts_zero;
@@ -245,13 +245,13 @@ void alt_cache_balancer_t::apply_rebalance_to_thread(int index,
     const std::vector<cache_data_t> *sizes = &(*new_sizes)[index];
 
     ASSERT_NO_CORO_WAITING;
-    for (auto it = sizes->begin(); it != sizes->end(); ++it) {
+    for (const cache_data_t &new_size : *sizes) {
         // Make sure the evicter still exists
-        if (evicters->find(it->evicter) != evicters->end()) {
-            it->evicter->update_memory_limit(it->new_size,
-                                             it->bytes_loaded,
-                                             it->access_count,
-                                             new_read_ahead_ok);
+        if (evicters->find(new_size.evicter) != evicters->end()) {
+            new_size.evicter->update_memory_limit(new_size.new_size,
+                                                  new_size.bytes_loaded,
+                                                  new_size.access_count,
+                                                  new_read_ahead_ok);
         }
     }
 }
