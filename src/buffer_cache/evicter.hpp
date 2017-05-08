@@ -60,6 +60,19 @@ public:
         guarantee_initialized();
         return access_count_counter_;
     }
+    uint64_t unevictable_size() const {
+        guarantee_initialized();
+        return unevictable_.size();
+    }
+    uint64_t evictable_disk_backed_size() const {
+        guarantee_initialized();
+        return evictable_disk_backed_.size();
+    }
+    uint64_t evictable_unbacked_size() const {
+        guarantee_initialized();
+        return evictable_unbacked_.size();
+    }
+
     int64_t get_bytes_loaded() const {
         guarantee_initialized();
         return bytes_loaded_counter_;
