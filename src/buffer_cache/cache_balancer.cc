@@ -201,6 +201,9 @@ void alt_cache_balancer_t::rebalance_blocking(UNUSED signal_t *interruptor) {
 
                     int64_t existing_unevictable
                         = data->unevictable_size + data->evictable_unbacked_size;
+                    // Give soft durability flush caches with high intervals some
+                    // breathing room.  (This is really gross.)
+                    existing_unevictable *= 1.05;
 
                     // Avoid underflow
                     if (static_cast<int64_t>(data->new_size) + delta > existing_unevictable) {
