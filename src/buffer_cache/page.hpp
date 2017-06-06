@@ -1,3 +1,4 @@
+// File has been changed by Sam Hughes (to add soft durability flush interval)
 #ifndef BUFFER_CACHE_PAGE_HPP_
 #define BUFFER_CACHE_PAGE_HPP_
 

@@ -1,3 +1,4 @@
+// File has been changed by Sam Hughes (to add soft durability flush interval)
 // Copyright 2010-2015 RethinkDB, all rights reserved.
 #include "clustering/administration/persist/file_keys.hpp"
 

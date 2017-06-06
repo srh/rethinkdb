@@ -1,3 +1,4 @@
+// File has been changed by Sam Hughes (to add soft durability flush interval)
 #ifndef BUFFER_CACHE_EVICTION_BAG_HPP_
 #define BUFFER_CACHE_EVICTION_BAG_HPP_
 

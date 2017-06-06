@@ -1,3 +1,4 @@
+// File has been changed by Sam Hughes (to add soft durability flush interval)
 // Copyright 2010-2016 RethinkDB, all rights reserved.
 #include "clustering/administration/persist/migrate/migrate_v2_1.hpp"
 

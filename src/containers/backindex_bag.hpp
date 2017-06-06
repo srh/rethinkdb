@@ -1,3 +1,4 @@
+// File has been changed by Sam Hughes (to add soft durability flush interval)
 #ifndef CONTAINERS_BACKINDEX_BAG_HPP_
 #define CONTAINERS_BACKINDEX_BAG_HPP_
 

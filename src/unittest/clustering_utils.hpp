@@ -1,3 +1,4 @@
+// File has been changed by Sam Hughes (to add soft durability flush interval)
 // Copyright 2010-2014 RethinkDB, all rights reserved.
 #ifndef UNITTEST_CLUSTERING_UTILS_HPP_
 #define UNITTEST_CLUSTERING_UTILS_HPP_
