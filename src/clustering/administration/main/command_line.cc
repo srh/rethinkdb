@@ -54,6 +54,8 @@
 #include "crypto/random.hpp"
 #include "logger.hpp"
 
+#define ENABLE_UPDATE_CHECK 0
+
 #define RETHINKDB_EXPORT_SCRIPT "rethinkdb-export"
 #define RETHINKDB_IMPORT_SCRIPT "rethinkdb-import"
 #define RETHINKDB_DUMP_SCRIPT "rethinkdb-dump"
@@ -1374,8 +1376,12 @@ options::help_section_t get_log_options(std::vector<options::option_t> *options_
     help.add("--log-file file", "specify the file to log to, defaults to 'log_file'");
     options_out->push_back(options::option_t(options::names_t("--no-update-check"),
                                             options::OPTIONAL_NO_PARAMETER));
+#if ENABLE_UPDATE_CHECK
     help.add("--no-update-check", "disable checking for available updates.  Also turns "
              "off anonymous usage data collection.");
+#else
+    help.add("--no-update-check", "ignored, update check is always disabled.");
+#endif
     return help;
 }
 
@@ -1864,9 +1870,14 @@ MUST_USE bool parse_io_threads_option(const std::map<std::string, options::value
 }
 
 update_check_t parse_update_checking_option(const std::map<std::string, options::values_t> &opts) {
+#if ENABLE_UPDATE_CHECK
     return exists_option(opts, "--no-update-check")
         ? update_check_t::do_not_perform
         : update_check_t::perform;
+#else
+    (void)opts;
+    return update_check_t::do_not_perform;
+#endif
 }
 
 file_direct_io_mode_t parse_direct_io_mode_option(const std::map<std::string, options::values_t> &opts) {
