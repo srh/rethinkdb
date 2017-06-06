@@ -1,3 +1,4 @@
+// File has been changed by Sam Hughes (to add soft durability flush interval)
 // Copyright 2010-2015 RethinkDB, all rights reserved.
 #ifndef CLUSTERING_TABLE_MANAGER_FLUSH_INTERVAL_MANAGER_HPP_
 #define CLUSTERING_TABLE_MANAGER_FLUSH_INTERVAL_MANAGER_HPP_

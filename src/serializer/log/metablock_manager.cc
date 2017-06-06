@@ -1,3 +1,4 @@
+// File has been changed by Sam Hughes (to add soft durability flush interval)
 // Copyright 2010-2013 RethinkDB, all rights reserved.
 #include "serializer/log/metablock_manager.hpp"
 

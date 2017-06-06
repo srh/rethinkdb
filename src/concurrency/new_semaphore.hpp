@@ -1,3 +1,4 @@
+// File has been changed by Sam Hughes (to add soft durability flush interval)
 // Copyright 2014 RethinkDB, all rights reserved.
 #ifndef CONCURRENCY_NEW_SEMAPHORE_HPP_
 #define CONCURRENCY_NEW_SEMAPHORE_HPP_

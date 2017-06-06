@@ -1,3 +1,4 @@
+// File has been changed by Sam Hughes (to add soft durability flush interval)
 #include "concurrency/new_semaphore.hpp"
 
 new_semaphore_t::new_semaphore_t(int64_t _capacity)

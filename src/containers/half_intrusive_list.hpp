@@ -1,3 +1,4 @@
+// File has been changed by Sam Hughes (to add soft durability flush interval)
 #ifndef CONTAINERS_HALF_INTRUSIVE_LIST_HPP_
 #define CONTAINERS_HALF_INTRUSIVE_LIST_HPP_
 

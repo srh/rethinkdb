@@ -1,3 +1,4 @@
+// File has been changed by Sam Hughes (to add soft durability flush interval)
 // Copyright 2010-2013 RethinkDB, all rights reserved.
 #ifndef ARCH_TIMER_HPP_
 #define ARCH_TIMER_HPP_

@@ -1,3 +1,4 @@
+// File has been changed by Sam Hughes (to add soft durability flush interval)
 #include <functional>
 
 #include "arch/runtime/starter.hpp"

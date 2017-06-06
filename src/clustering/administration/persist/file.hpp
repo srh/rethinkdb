@@ -1,3 +1,4 @@
+// File has been changed by Sam Hughes (to add soft durability flush interval)
 // Copyright 2010-2015 RethinkDB, all rights reserved.
 #ifndef CLUSTERING_ADMINISTRATION_PERSIST_FILE_HPP_
 #define CLUSTERING_ADMINISTRATION_PERSIST_FILE_HPP_

@@ -1,3 +1,4 @@
+// File has been changed by Sam Hughes (to add soft durability flush interval)
 #ifndef REGION_REGION_MAP_HPP_
 #define REGION_REGION_MAP_HPP_
 

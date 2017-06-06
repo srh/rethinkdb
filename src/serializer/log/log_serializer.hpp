@@ -1,3 +1,4 @@
+// File has been changed by Sam Hughes (to add soft durability flush interval)
 // Copyright 2010-2014 RethinkDB, all rights reserved.
 #ifndef SERIALIZER_LOG_LOG_SERIALIZER_HPP_
 #define SERIALIZER_LOG_LOG_SERIALIZER_HPP_

@@ -1,3 +1,4 @@
+// File has been changed by Sam Hughes (to add soft durability flush interval)
 #ifndef VERSION_HPP_
 #define VERSION_HPP_
 

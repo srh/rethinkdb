@@ -1,3 +1,4 @@
+// File has been changed by Sam Hughes (to add soft durability flush interval)
 // Copyright 2010-2014 RethinkDB, all rights reserved.
 #ifndef CLUSTERING_ADMINISTRATION_TABLES_TABLE_METADATA_HPP_
 #define CLUSTERING_ADMINISTRATION_TABLES_TABLE_METADATA_HPP_
