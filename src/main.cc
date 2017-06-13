@@ -11,8 +11,11 @@
 #include "utils.hpp"
 #include "config/args.hpp"
 #include "extproc/extproc_spawner.hpp"
+#include "rdb_protocol/terms/string.hpp"
 
 int main(int argc, char *argv[]) {
+
+    ql::test_icu_chars();
 
     startup_shutdown_t startup_shutdown;
     crypto::initialization_guard_t crypto_initialization_guard;

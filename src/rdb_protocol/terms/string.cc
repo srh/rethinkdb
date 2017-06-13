@@ -29,6 +29,56 @@ static bool is_whitespace_character(char32_t c) {
     return u_isUWhiteSpace(c);
 }
 
+std::vector<std::pair<char32_t, char32_t>> compute_ranges(bool (*func)(char32_t)) {
+    std::vector<std::pair<char32_t, char32_t>> ret;
+    bool in_range = false;
+    char32_t range_low = 0;
+    char32_t x = 0;
+    while (x < 0x110000) {
+        if (func(x)) {
+            if (!in_range) {
+                range_low = x;
+            }
+            in_range = true;
+        } else {
+            if (in_range) {
+                ret.push_back(std::make_pair(range_low, x));
+            }
+            in_range = false;
+        }
+        ++x;
+    }
+
+    if (in_range) {
+        ret.push_back(std::make_pair(range_low, x));
+    }
+
+    return ret;
+}
+
+std::string print_ranges(const std::vector<std::pair<char32_t, char32_t>> &ranges) {
+    std::string build;
+    for (auto &p : ranges) {
+        if (!build.empty()) {
+            build += ',';
+        }
+        build += std::to_string(p.first);
+        if (p.second - p.first > 1) {
+            build += '-';
+            build += std::to_string(p.second - 1);
+        }
+    }
+    return build;
+}
+
+void test_icu_chars() {
+    std::vector<std::pair<char32_t, char32_t>> ranges = compute_ranges(&is_combining_character);
+    std::cout << "Combining: " << print_ranges(ranges) << "\n";
+    std::vector<std::pair<char32_t, char32_t>> r2 = compute_ranges(&is_whitespace_character);
+    std::cout << "Whitespace: " << print_ranges(r2) << std::endl;
+}
+
+
 class match_term_t : public op_term_t {
 public:
     match_term_t(compile_env_t *env, const raw_term_t &term)
