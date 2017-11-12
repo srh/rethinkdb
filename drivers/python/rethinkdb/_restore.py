@@ -124,6 +124,16 @@ def parse_options(argv):
     res["password-file"] = options.password_file
     return res
 
+class ProgressFile:
+    def __init__(self, file, reportRead):
+        self.file = file
+        self.reportRead = reportRead
+
+    def read(self, size):
+        buf = self.file.read(size)
+        self.reportRead(len(buf))
+        return buf
+
 def do_unzip(temp_dir, options):
     if not options["quiet"]:
         print("Unzipping archive file...")
@@ -164,28 +174,43 @@ def do_unzip(temp_dir, options):
         name = options["in_file"]
 
     try:
-        with tarfile.open(name, "r|*") as f:
-            os.chdir(temp_dir)
-            try:
-                for member in f:
-                    base, db, table = parse_path(member)
-                    if len(base) > 0:
-                        if sub_path is None:
-                            sub_path = base
-                        elif sub_path != base:
-                            raise RuntimeError("Error: Archive file has an unexpected directory structure (%s vs %s)" % (sub_path, base))
+        input_size = os.stat(name).st_size
+        utils_common.print_progress(0.0)
+        with open(name, "rb") as fileobj:
+            input_consumed = [0]
+            def progressFunc(num_read):
+                input_consumed[0] += num_read
+                if not options["quiet"]:
+                    utils_common.print_progress(float(input_consumed[0]) / input_size)
 
-                        if len(tables_to_export) == 0 or \
-                           (db, table) in tables_to_export or \
-                           (db, None) in tables_to_export:
-                            members.append(member)
-                        f.extract(member)
 
-                if sub_path is None:
-                    raise RuntimeError("Error: Archive file had no files")
+            with tarfile.open(mode="r|*", fileobj=ProgressFile(fileobj, progressFunc)) as f:
+                os.chdir(temp_dir)
+                try:
+                    for member in f:
+                        base, db, table = parse_path(member)
+                        if len(base) > 0:
+                            if sub_path is None:
+                                sub_path = base
+                            elif sub_path != base:
+                                raise RuntimeError("Error: Archive file has an unexpected directory structure (%s vs %s)" % (sub_path, base))
 
-            finally:
-                os.chdir(original_dir)
+                            if len(tables_to_export) == 0 or \
+                            (db, table) in tables_to_export or \
+                            (db, None) in tables_to_export:
+                                members.append(member)
+                            f.extract(member)
+
+                    if sub_path is None:
+                        raise RuntimeError("Error: Archive file had no files")
+                finally:
+                    os.chdir(original_dir)
+
+        # Print progress once more to ensure we get 100%, and print newline.
+        if not options["quiet"]:
+            utils_common.print_progress(1.0)
+            print()
+
     finally:
         if tar_temp_file_path is not None:
             os.remove(tar_temp_file_path)
