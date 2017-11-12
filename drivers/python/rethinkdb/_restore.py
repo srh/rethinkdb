@@ -164,7 +164,7 @@ def do_unzip(temp_dir, options):
         name = options["in_file"]
 
     try:
-        with tarfile.open(name, "r:*") as f:
+        with tarfile.open(name, "r|*") as f:
             os.chdir(temp_dir)
             try:
                 for member in f:
@@ -179,11 +179,10 @@ def do_unzip(temp_dir, options):
                            (db, table) in tables_to_export or \
                            (db, None) in tables_to_export:
                             members.append(member)
+                        f.extract(member)
 
                 if sub_path is None:
                     raise RuntimeError("Error: Archive file had no files")
-
-                f.extractall(members=members)
 
             finally:
                 os.chdir(original_dir)
@@ -197,7 +196,7 @@ def do_unzip(temp_dir, options):
 
 def do_import(temp_dir, options):
     from . import _import
-    
+
     if not options["quiet"]:
         print("Importing from directory...")
 
@@ -213,7 +212,7 @@ def do_import(temp_dir, options):
         import_args.append("--password")
     if options["password-file"]:
         import_args.extend(["--password-file", options["password-file"]])
-    
+
     for db, table in options["tables"]:
         if table is None:
             import_args.extend(["--import", db])
@@ -230,7 +229,7 @@ def do_import(temp_dir, options):
         import_args.extend(["--no-secondary-indexes"])
     if options["quiet"]:
         import_args.extend(["--quiet"])
-    
+
     res = _import.main(import_args)
 
     if res == 2:
