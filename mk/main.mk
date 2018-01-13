@@ -75,7 +75,7 @@ else
 endif
 
 .PHONY: generate
-generate: generate-web-assets-cc generate-headers
+generate: generate-web-assets-cc generate-headers generate-protos
 
 .PHONY: test
 test: $(BUILD_DIR)/rethinkdb $(BUILD_DIR)/rethinkdb-unittest web-assets rb-driver py-driver

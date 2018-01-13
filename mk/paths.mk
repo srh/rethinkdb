@@ -66,7 +66,6 @@ PACKAGE_NAME := $(VANILLA_PACKAGE_NAME)
 SERVER_UNIT_TEST_NAME := $(SERVER_EXEC_NAME)-unittest
 
 PROTO_FILE_SRC := $(TOP)/src/rdb_protocol/ql2.proto
-PROTO_DIR := $(BUILD_ROOT_DIR)/proto
 
 DEP_DIR := $(BUILD_DIR)/dep
 OBJ_DIR := $(BUILD_DIR)/obj

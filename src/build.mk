@@ -208,21 +208,11 @@ ifeq ($(HAS_TERMCAP),1)
   RT_CXXFLAGS += -DHAS_TERMCAP
 endif
 
-RT_CXXFLAGS += -I$(PROTO_DIR)
-
 #### Finding what to build
 
 SOURCES := $(shell find $(TOP)/src -name '*.cc' -not -name '\.*')
 
 SERVER_EXEC_SOURCES := $(filter-out $(TOP)/src/unittest/%,$(SOURCES))
-
-QL2_PROTO_NAMES := rdb_protocol/ql2
-QL2_PROTO_SOURCES := $(foreach _,$(QL2_PROTO_NAMES),$(TOP)/src/$_.proto)
-QL2_PROTO_HEADERS := $(foreach _,$(QL2_PROTO_NAMES),$(PROTO_DIR)/$_.pb.h)
-QL2_PROTO_CODE := $(foreach _,$(QL2_PROTO_NAMES),$(PROTO_DIR)/$_.pb.cc)
-QL2_PROTO_OBJS := $(foreach _,$(QL2_PROTO_NAMES),$(OBJ_DIR)/$_.pb.o)
-
-PROTOCFLAGS_CXX := --proto_path=$(TOP)/src
 
 ifeq (/,$(firstword $(subst /,/ ,$(CWD))))
   DEPS_POSTFIX := .abs
@@ -234,11 +224,11 @@ endif
 
 NAMES := $(patsubst $(TOP)/src/%.cc,%,$(SOURCES))
 DEPS := $(patsubst %,$(DEP_DIR)/%$(DEPS_POSTFIX).d,$(NAMES))
-OBJS := $(QL2_PROTO_OBJS) $(patsubst %,$(OBJ_DIR)/%.o,$(NAMES))
+OBJS := $(patsubst %,$(OBJ_DIR)/%.o,$(NAMES))
 
-SERVER_EXEC_OBJS := $(QL2_PROTO_OBJS) $(patsubst $(TOP)/src/%.cc,$(OBJ_DIR)/%.o,$(SERVER_EXEC_SOURCES))
+SERVER_EXEC_OBJS := $(patsubst $(TOP)/src/%.cc,$(OBJ_DIR)/%.o,$(SERVER_EXEC_SOURCES))
 
-SERVER_NOMAIN_OBJS := $(QL2_PROTO_OBJS) $(patsubst $(TOP)/src/%.cc,$(OBJ_DIR)/%.o,$(filter-out %/main.cc,$(SOURCES)))
+SERVER_NOMAIN_OBJS := $(patsubst $(TOP)/src/%.cc,$(OBJ_DIR)/%.o,$(filter-out %/main.cc,$(SOURCES)))
 
 SERVER_UNIT_TEST_OBJS := $(SERVER_NOMAIN_OBJS) $(OBJ_DIR)/unittest/main.o
 
@@ -257,23 +247,23 @@ ifeq ($(UNIT_TESTS),1)
   $(TOP)/src/all: $(BUILD_DIR)/$(SERVER_UNIT_TEST_NAME)
 endif
 
-.PRECIOUS: $(PROTO_DIR)/. $(QL2_PROTO_HEADERS) $(QL2_PROTO_CODE)
-
-$(PROTO_DIR)/%.pb.h $(PROTO_DIR)/%.pb.cc: $(TOP)/src/%.proto $(PROTOC_BIN_DEP) | $(PROTO_DIR)/.
-	$P PROTOC
-
-#	# See issue #2965
-	+rm -f $(PROTO_DIR)/$*.pb.h $(PROTO_DIR)/$*.pb.cc
-
-	$(PROTOC) $(PROTOCFLAGS_CXX) --cpp_out $(PROTO_DIR) $<
-
 $(TOP)/src/rpc/semilattice/joins/macros.hpp: $(TOP)/scripts/generate_join_macros.py
 $(TOP)/src/rpc/serialize_macros.hpp: $(TOP)/scripts/generate_serialize_macros.py
 $(TOP)/src/rpc/semilattice/joins/macros.hpp $(TOP)/src/rpc/serialize_macros.hpp:
 	$P GEN $@
 	$< > $@
 
+.PHONY: generate-headers
 generate-headers: $(TOP)/src/rpc/semilattice/joins/macros.hpp $(TOP)/src/rpc/serialize_macros.hpp
+
+$(TOP)/src/rdb_protocol/ql2.pb.h $(TOP)/src/rdb_protocol/ql2.pb.cc: $(TOP)/src/rdb_protocol/ql2.proto
+	$P PROTOC
+#	# See issue #2965
+	+rm -f $(TOP)/src/rdb_protocol/ql2.pb.h $(TOP)/src/rdb_protocol/ql2.pb.cc
+	$(PROTOC) --proto_path=$(TOP)/src --cpp_out $(TOP)/src $<
+
+.PHONY: generate-protos
+generate-protos: $(TOP)/src/rdb_protocol/ql2.pb.h $(TOP)/src/rdb_protocol/ql2.pb.cc
 
 .PHONY: rethinkdb
 rethinkdb: $(BUILD_DIR)/$(SERVER_EXEC_NAME)
@@ -330,12 +320,7 @@ $(BUILD_DIR)/$(GDB_FUNCTIONS_NAME): | $(BUILD_DIR)/.
 	$P CP $@
 	cp $(TOP)/scripts/$(GDB_FUNCTIONS_NAME) $@
 
-$(OBJ_DIR)/%.pb.o: $(PROTO_DIR)/%.pb.cc $(MAKEFILE_DEPENDENCY) $(QL2_PROTO_HEADERS)
-	mkdir -p $(dir $@)
-	$P CC
-	$(RT_CXX) $(RT_CXXFLAGS) -w -c -o $@ $<
-
-$(OBJ_DIR)/%.o: $(TOP)/src/%.cc $(MAKEFILE_DEPENDENCY) $(ALL_INCLUDE_DEPS) | $(QL2_PROTO_OBJS)
+$(OBJ_DIR)/%.o: $(TOP)/src/%.cc $(MAKEFILE_DEPENDENCY) $(ALL_INCLUDE_DEPS)
 	mkdir -p $(dir $@) $(dir $(DEP_DIR)/$*)
 	$P CC
 	$(RT_CXX) $(RT_CXXFLAGS) -c -o $@ $< \
@@ -346,7 +331,7 @@ $(OBJ_DIR)/%.o: $(TOP)/src/%.cc $(MAKEFILE_DEPENDENCY) $(ALL_INCLUDE_DEPS) | $(Q
 	)
 
 FORCE_ALL_DEPS := $(patsubst %,force-dep/%,$(NAMES))
-force-dep/%: $(TOP)/src/%.cc $(QL2_PROTO_HEADERS) $(ALL_INCLUDE_DEPS)
+force-dep/%: $(TOP)/src/%.cc $(ALL_INCLUDE_DEPS)
 	$P CXX_DEPS $(DEP_DIR)/$*$(DEPS_POSTFIX).d
 	mkdir -p $(dir $(DEP_DIR)/$*)
 	$(RT_CXX) $(RT_CXXFLAGS) $(TOP)/src/$*.cc -MP -MQ $(OBJ_DIR)/$*.o -M -MF $(DEP_DIR)/$*$(DEPS_POSTFIX).d

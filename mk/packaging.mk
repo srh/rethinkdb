@@ -67,7 +67,7 @@ else ifneq ($(DEB_RELEASE),)
 endif
 
 ifneq (1,$(BUILD_PORTABLE))
-  DEB_BUILD_DEPENDS += , protobuf-compiler, libprotobuf-dev
+  DEB_BUILD_DEPENDS += , libprotobuf-dev
 endif
 
 ifeq ($(BUILD_PORTABLE),1)
@@ -172,22 +172,12 @@ $(DIST_DIR)/configure.default: FORCE | reset-dist-dir
 	echo $(DIST_CONFIGURE_DEFAULT) >> $(DIST_DIR)/configure.default
 	echo $(DIST_CONFIGURE_DEFAULT_FETCH) >> $(DIST_DIR)/configure.default
 
-$(DIST_DIR)/precompiled/%: $(BUILD_ROOT_DIR)/% | reset-dist-dir
-	$P CP
-	mkdir -p $(@D)
-	cp -f $< $@
-
 $(DIST_DIR)/VERSION.OVERRIDE: FORCE | reset-dist-dir
 	$P ECHO "> $@"
 	echo -n $(RETHINKDB_CODE_VERSION) > $@
 
-PRECOMPILED_ASSETS := $(DIST_DIR)/precompiled/proto/rdb_protocol/ql2.pb.h
-PRECOMPILED_ASSETS += $(DIST_DIR)/precompiled/proto/rdb_protocol/ql2.pb.cc
-
-.PRECIOUS: $(PRECOMPILED_ASSETS)
-
 .PHONY: dist-dir
-dist-dir: reset-dist-dir $(DIST_DIR)/custom.mk $(PRECOMPILED_ASSETS)
+dist-dir: reset-dist-dir $(DIST_DIR)/custom.mk
 dist-dir: $(DIST_DIR)/VERSION.OVERRIDE $(DIST_SUPPORT) $(DIST_DIR)/configure.default
 ifneq (,$(MISSING_DIST_SUPPORT_PACKAGES))
 	$(error Missing source packages in external. Please configure with '$(patsubst %,--fetch %,$(MISSING_DIST_SUPPORT_PACKAGES))')

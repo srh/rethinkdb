@@ -70,7 +70,7 @@
       <xsl:for-each select="build">
         <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='{@configuration}|{@platform}'">
           <LinkIncremental>true</LinkIncremental>
-          <IncludePath>$(ProjectDir)\build\proto;$(ProjectDir)\src;$(IncludePath)</IncludePath>
+          <IncludePath>$(ProjectDir)\src;$(IncludePath)</IncludePath>
           <LibraryPath>$(ProjectDir)\build\windows_deps\lib\<xsl:value-of select="@platform" />\<xsl:value-of select="@configuration" />;$(LibraryPath)</LibraryPath>
         </PropertyGroup>
 
@@ -171,7 +171,6 @@
         </ItemDefinitionGroup>
 
         <ItemGroup Condition="'$(Configuration)|$(Platform)'=='{@configuration}|{@platform}'">
-          <ClCompile Include="build\proto\rdb_protocol\ql2.pb.cc" />
           <ClCompile Include="src\**\*.cc">
             <xsl:choose>
               <xsl:when test="/config/unittest">
@@ -191,11 +190,9 @@
         <ClInclude Include="src\**\*.hpp" />
         <ClInclude Include="src\**\*.tcc" />
         <ClInclude Include="src\**\*.h" />
-        <ClInclude Include="build\proto\rdb_protocol\ql2.pb.h" />
       </ItemGroup>
       <ItemGroup>
         <None Include="src\rdb_protocol\ql2.proto" />
-        <None Include="src\rdb_protocol\ql2_extensions.proto" />
       </ItemGroup>
       <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
       <ImportGroup Label="ExtensionTargets" />

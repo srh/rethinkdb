@@ -25,8 +25,6 @@ SOURCES_NOUNIT := $(filter-out $(TOP)/src/unittest/%,$(SOURCES))
 
 LIB_DEPS := $(foreach dep, $(FETCH_LIST), $(SUPPORT_BUILD_DIR)/$(dep)_$($(dep)_VERSION)/$(INSTALL_WITNESS))
 
-PROTO_DEPS := $(PROTO_DIR)/rdb_protocol/ql2.pb.h $(PROTO_DIR)/rdb_protocol/ql2.pb.cc
-
 MSBUILD_FLAGS := /nologo /maxcpucount
 MSBUILD_FLAGS += /p:Configuration=$(CONFIGURATION)
 MSBUILD_FLAGS += /p:Platform=$(PLATFORM)
@@ -47,8 +45,3 @@ $(TOP)/build/$(CONFIGURATION)_$(PLATFORM)/rethinkdb-unittest.exe: $(TOP)/rethink
 build-clean:
 	$P RM $(BUILD_ROOT_DIR)
 	rm -rf $(BUILD_ROOT_DIR)
-
-$(PROTO_DIR)/%.pb.h $(PROTO_DIR)/%.pb.cc: $(TOP)/src/%.proto $(PROTOC_BIN_DEP) | $(PROTO_DIR)/.
-	$P PROTOC
-	+rm -f $(PROTO_DIR)/$*.pb.h $(PROTO_DIR)/$*.pb.cc
-	$(PROTOC) --proto_path="$(shell cygpath -w '$(TOP)/src')" --cpp_out "$(shell cygpath -w '$(PROTO_DIR)')" $<
