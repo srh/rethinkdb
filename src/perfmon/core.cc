@@ -75,6 +75,7 @@ ql::datum_t perfmon_collection_t::end_stats(void *_context) {
 }
 
 void perfmon_collection_t::add(perfmon_membership_t *perfmon) {
+    printf("Adding %s\n", perfmon->name.c_str());
     scoped_ptr_t<on_thread_t> thread_switcher;
     if (coroutines_have_been_initialized() && coro_t::self() != nullptr) {
         thread_switcher.init(new on_thread_t(home_thread()));
@@ -97,12 +98,14 @@ void perfmon_collection_t::remove(perfmon_membership_t *perfmon) {
 perfmon_membership_t::perfmon_membership_t(perfmon_collection_t *_parent, perfmon_t *_perfmon, const char *_name, bool _own_the_perfmon)
     : name(_name != nullptr ? _name : ""), parent(_parent), perfmon(_perfmon), own_the_perfmon(_own_the_perfmon)
 {
+    printf("Constructing membership %s\n", name.c_str());
     parent->add(this);
 }
 
 perfmon_membership_t::perfmon_membership_t(perfmon_collection_t *_parent, perfmon_t *_perfmon, const std::string &_name, bool _own_the_perfmon)
     : name(_name), parent(_parent), perfmon(_perfmon), own_the_perfmon(_own_the_perfmon)
 {
+    printf("Constructing membership(II) %s\n", name.c_str());
     parent->add(this);
 }
 

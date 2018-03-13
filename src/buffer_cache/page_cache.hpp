@@ -54,7 +54,7 @@ public:
 };
 
 
-class cache_conn_t : public half_intrusive_list_node_t<cache_conn_t> {
+class cache_conn_t : public half_intrusive_list_node_t<cache_conn_t>, perfmon::ctor_counter<cache_conn_t> {
 public:
     explicit cache_conn_t(cache_t *cache)
         : cache_(cache),
@@ -84,7 +84,7 @@ namespace alt {
 // known by the current_page_acq_t.
 class current_page_help_t;
 
-class current_page_t {
+class current_page_t : perfmon::ctor_counter<current_page_t> {
 public:
     current_page_t(block_id_t block_id, buf_ptr_t buf, page_cache_t *page_cache);
     current_page_t(block_id_t block_id, buf_ptr_t buf,
@@ -201,7 +201,8 @@ inline backindex_bag_index_t *access_backindex(current_page_dirtier_t dirtier) {
 
 
 class current_page_acq_t : public intrusive_list_node_t<current_page_acq_t>,
-                           public home_thread_mixin_debug_only_t {
+                           public home_thread_mixin_debug_only_t,
+                           perfmon::ctor_counter<current_page_acq_t> {
 public:
     // KSI: Right now we support a default constructor but buf_lock_t actually
     // uses a scoped pointer now, because getting this type to be swappable was too
@@ -306,7 +307,8 @@ private:
 
 // This object lives on the serializer thread.
 class page_read_ahead_cb_t : public home_thread_mixin_t,
-                             public serializer_read_ahead_callback_t {
+                             public serializer_read_ahead_callback_t,
+                             perfmon::ctor_counter<page_read_ahead_cb_t> {
 public:
     page_read_ahead_cb_t(serializer_t *serializer,
                          page_cache_t *cache);
@@ -670,7 +672,7 @@ private:
 // Situation '(a)' can happen as a matter of course, assuming transactions don't
 // greedily save their modified copy of a page.  Situation '(b)' can happen if
 // transactions apply a commutative operation on a block, like with the stats block.
-class page_txn_t : public intrusive_list_node_t<page_txn_t> {
+class page_txn_t : public intrusive_list_node_t<page_txn_t>, perfmon::ctor_counter<page_txn_t> {
 public:
     // Our transaction has to get committed to disk _after_ or at the same time as
     // preceding transactions on cache_conn, if that parameter is not NULL.  (The

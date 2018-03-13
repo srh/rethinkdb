@@ -10,6 +10,7 @@
 #include "buffer_cache/page_cache.hpp"
 #include "buffer_cache/types.hpp"
 #include "containers/two_level_array.hpp"
+#include "perfmon/ctor_counter.hpp"
 #include "repli_timestamp.hpp"
 
 class serializer_t;
@@ -20,7 +21,7 @@ class alt_snapshot_node_t;
 class perfmon_collection_t;
 class cache_balancer_t;
 
-class alt_txn_throttler_t {
+class alt_txn_throttler_t : perfmon::ctor_counter<alt_txn_throttler_t> {
 public:
     explicit alt_txn_throttler_t(int64_t minimum_unwritten_changes_limit);
     ~alt_txn_throttler_t();
@@ -45,7 +46,7 @@ struct which_cpu_shard_t {
     int num_shards;
 };
 
-class cache_t : public home_thread_mixin_t {
+class cache_t : public home_thread_mixin_t, perfmon::ctor_counter<cache_t> {
 public:
     explicit cache_t(serializer_t *serializer,
                      cache_balancer_t *balancer,
@@ -92,7 +93,7 @@ private:
     DISABLE_COPYING(cache_t);
 };
 
-class txn_t {
+class txn_t : public perfmon::ctor_counter<txn_t> {
 public:
     // Constructor for read-only transactions.
     txn_t(cache_conn_t *cache_conn, read_access_t read_access);
@@ -131,7 +132,7 @@ private:
 
 class buf_parent_t;
 
-class buf_lock_t {
+class buf_lock_t : public perfmon::ctor_counter<buf_lock_t> {
 public:
     buf_lock_t();
 

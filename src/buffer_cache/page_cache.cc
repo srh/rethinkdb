@@ -27,7 +27,6 @@ cache_conn_t::~cache_conn_t() {
     }
 }
 
-
 namespace alt {
 
 class current_page_help_t {

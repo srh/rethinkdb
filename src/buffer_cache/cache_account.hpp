@@ -1,6 +1,7 @@
 #ifndef BUFFER_CACHE_CACHE_ACCOUNT_HPP_
 #define BUFFER_CACHE_CACHE_ACCOUNT_HPP_
 
+#include "perfmon/ctor_counter.hpp"
 #include "threading.hpp"
 
 class file_account_t;
@@ -9,7 +10,7 @@ namespace alt {
 class page_cache_t;
 }
 
-class cache_account_t {
+class cache_account_t : perfmon::ctor_counter<cache_account_t> {
 public:
     cache_account_t();
     ~cache_account_t();

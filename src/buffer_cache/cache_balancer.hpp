@@ -13,13 +13,14 @@
 #include "concurrency/pump_coro.hpp"
 #include "concurrency/watchable.hpp"
 #include "containers/scoped.hpp"
+#include "perfmon/ctor_counter.hpp"
 
 namespace alt {
 class evicter_t;
 }
 
 // Base class so we can have a dummy implementation for tests
-class cache_balancer_t : public home_thread_mixin_t {
+class cache_balancer_t : public home_thread_mixin_t, perfmon::ctor_counter<cache_balancer_t> {
 public:
     cache_balancer_t() { }
     virtual ~cache_balancer_t() { }

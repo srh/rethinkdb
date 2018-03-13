@@ -4,6 +4,7 @@
 #include "concurrency/cond_var.hpp"
 #include "containers/backindex_bag.hpp"
 #include "containers/half_intrusive_list.hpp"
+#include "perfmon/ctor_counter.hpp"
 #include "repli_timestamp.hpp"
 #include "serializer/buf_ptr.hpp"
 #include "serializer/types.hpp"
@@ -22,7 +23,7 @@ class deferred_block_token_t;
 // A page_t represents a page (a byte buffer of a specific size), having a definite
 // value known at the construction of the page_t (and possibly later modified
 // in-place, but still a definite known value).
-class page_t {
+class page_t : perfmon::ctor_counter<page_t> {
 public:
     // Defers loading the block for the given block id (but does go and get its block
     // token ASAP, so that we can't lose access to the current version of the block).
@@ -163,7 +164,7 @@ inline backindex_bag_index_t *access_backindex(page_t *page) {
 }
 
 // A page_ptr_t holds a pointer to a page_t.
-class page_ptr_t {
+class page_ptr_t : perfmon::ctor_counter<page_ptr_t> {
 public:
     explicit page_ptr_t(page_t *page) : page_(nullptr) {
         init(page);
@@ -215,7 +216,7 @@ private:
     DISABLE_COPYING(page_ptr_t);
 };
 
-class timestamped_page_ptr_t {
+class timestamped_page_ptr_t : perfmon::ctor_counter<timestamped_page_ptr_t> {
 public:
     timestamped_page_ptr_t();
     ~timestamped_page_ptr_t();
@@ -243,7 +244,7 @@ private:
 
 // This type's purpose is to wait for the page to be loaded, and to prevent it from
 // being unloaded.
-class page_acq_t : public half_intrusive_list_node_t<page_acq_t> {
+class page_acq_t : public half_intrusive_list_node_t<page_acq_t>, perfmon::ctor_counter<page_acq_t> {
 public:
     page_acq_t();
     ~page_acq_t();

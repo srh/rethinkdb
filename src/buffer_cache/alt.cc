@@ -35,7 +35,6 @@ const int64_t INDEX_CHANGES_LIMIT_FACTOR = 5;
 // page cache, which often may need to load or evict blocks, which may involve a
 // spawn_now call.
 
-
 // The intrusive list of alt_snapshot_node_t contains all the snapshot nodes for a
 // given block id, in order by version. (See cache_t::snapshot_nodes_by_block_id_.)
 class alt_snapshot_node_t : public intrusive_list_node_t<alt_snapshot_node_t> {
