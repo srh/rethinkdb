@@ -133,16 +133,18 @@ void page_cache_t::consider_evicting_current_page(block_id_t block_id) {
     // of a current_page_t entry to figure out whether the read-ahead page could be
     // out of date.
     if (read_ahead_cb_ != nullptr) {
+        ++cecp_read_ahead_;
         return;
     }
 
     auto page_it = current_pages_.find(block_id);
     if (page_it == current_pages_.end()) {
+        ++cecp_not_found_;
         return;
     }
 
     current_page_t *page_ptr = page_it->second;
-    if (page_ptr->should_be_evicted()) {
+    if (page_ptr->should_be_evicted(this)) {
         current_pages_.erase(block_id);
         page_ptr->reset(this);
         delete page_ptr;
@@ -242,6 +244,20 @@ page_cache_t::page_cache_t(serializer_t *serializer,
                            cache_balancer_t *balancer,
                            alt_txn_throttler_t *throttler)
     : max_block_size_(serializer->max_block_size()),
+      cecp_read_ahead_(),
+      cecp_read_ahead_membership_(&get_global_perfmon_collection(), &cecp_read_ahead_, std::string("cecp_read_ahead"), false),
+      cecp_not_found_(),
+      cecp_not_found_membership_(&get_global_perfmon_collection(), &cecp_not_found_, std::string("cecp_not_found"), false),
+      cecp_has_acquirers_(),
+      cecp_has_acquirers_membership_(&get_global_perfmon_collection(), &cecp_has_acquirers_, std::string("cecp_has_acquirers"), false),
+      cecp_last_write_acquirer_(),
+      cecp_last_write_acquirer_membership_(&get_global_perfmon_collection(), &cecp_last_write_acquirer_, std::string("cecp_last_write_acquirer"), false),
+      cecp_last_dirtier_(),
+      cecp_last_dirtier_membership_(&get_global_perfmon_collection(), &cecp_last_dirtier_, std::string("cecp_last_dirtier"), false),
+      cecp_has_keepalives_(),
+      cecp_has_keepalives_membership_(&get_global_perfmon_collection(), &cecp_has_keepalives_, std::string("cecp_has_keepalives"), false),
+      cecp_has_legit_page_(),
+      cecp_has_legit_page_membership_(&get_global_perfmon_collection(), &cecp_has_legit_page_, std::string("cecp_has_legit_page"), false),
       serializer_(serializer),
       // Start the counter at 1 so we can distinguish empty values.
       next_block_version_(block_version_t().subsequent()),
@@ -799,26 +815,30 @@ void current_page_t::reset(page_cache_t *page_cache) {
     }
 }
 
-bool current_page_t::should_be_evicted() const {
+bool current_page_t::should_be_evicted(page_cache_t *pc) const {
     // Consider reasons why the current_page_t should not be evicted.
 
     // A reason: It still has acquirers.  (Important.)
     if (!acquirers_.empty()) {
+        ++pc->cecp_has_acquirers_;
         return false;
     }
 
     // A reason: We still have a connection to last_write_acquirer_.  (Important.)
     if (last_write_acquirer_ != nullptr) {
+        ++pc->cecp_last_write_acquirer_;
         return false;
     }
 
     // A reason: We have a last dirtier.
     if (last_dirtier_ != nullptr) {
+        ++pc->cecp_last_dirtier_;
         return false;
     }
 
     // A reason: The current_page_t has snapshotted ex-acquirers.  (Important.)
     if (num_keepalives_ > 0) {
+        ++pc->cecp_has_keepalives_;
         return false;
     }
 
@@ -829,6 +849,7 @@ bool current_page_t::should_be_evicted() const {
         page_t *page = page_.get_page_for_read();
         if (page->is_loading() || page->has_waiters() || page->is_loaded()
             || page->page_ptr_count() != 1) {
+            ++pc->cecp_has_legit_page_;
             return false;
         }
         // is_loading is false and is_loaded is false -- it must be disk-backed.

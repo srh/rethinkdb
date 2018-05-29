@@ -100,7 +100,7 @@ public:
     // current_page_acq_t's, last write acquirer page_txn_t's, and read-ahead logic.)
     void reset(page_cache_t *page_cache);
 
-    bool should_be_evicted() const;
+    bool should_be_evicted(page_cache_t *pc) const;
 
 private:
     // current_page_acq_t should not access our fields directly.
@@ -591,6 +591,27 @@ private:
         const std::unordered_map<block_id_t, block_change_t> &changes);
 
     const max_block_size_t max_block_size_;
+
+    perfmon_counter_t cecp_read_ahead_;
+    perfmon_membership_t cecp_read_ahead_membership_;
+
+    perfmon_counter_t cecp_not_found_;
+    perfmon_membership_t cecp_not_found_membership_;
+
+    perfmon_counter_t cecp_has_acquirers_;
+    perfmon_membership_t cecp_has_acquirers_membership_;
+
+    perfmon_counter_t cecp_last_write_acquirer_;
+    perfmon_membership_t cecp_last_write_acquirer_membership_;
+
+    perfmon_counter_t cecp_last_dirtier_;
+    perfmon_membership_t cecp_last_dirtier_membership_;
+
+    perfmon_counter_t cecp_has_keepalives_;
+    perfmon_membership_t cecp_has_keepalives_membership_;
+
+    perfmon_counter_t cecp_has_legit_page_;
+    perfmon_membership_t cecp_has_legit_page_membership_;
 
     // We use a separate I/O account for reads in each page cache.
     // Note that block writes use a shared I/O account that sits in the
