@@ -102,6 +102,20 @@ public:
 
     bool should_be_evicted(page_cache_t *pc) const;
 
+    enum class evictability {
+        unevictable,
+        has_acquirers,
+        has_last_write_acquirer,
+        has_last_dirtier,
+        has_keepalives,
+        page_is_loading,
+        page_with_waiters,
+        page_is_loaded,
+        page_with_page_ptr,
+    };
+
+    evictability compute_evictability() const;
+
 private:
     // current_page_acq_t should not access our fields directly.
     friend class current_page_acq_t;

@@ -800,26 +800,31 @@ void current_page_t::reset(page_cache_t *page_cache) {
 }
 
 bool current_page_t::should_be_evicted(page_cache_t *pc) const {
+    // TODO: pc is unused.
+    return compute_evictability() != evictability::unevictable;
+}
+
+current_page_t::evictability current_page_t::compute_evictability() const {
     // Consider reasons why the current_page_t should not be evicted.
 
     // A reason: It still has acquirers.  (Important.)
     if (!acquirers_.empty()) {
-        return false;
+        return evictability::has_acquirers;
     }
 
     // A reason: We still have a connection to last_write_acquirer_.  (Important.)
     if (last_write_acquirer_ != nullptr) {
-        return false;
+        return evictability::has_last_write_acquirer;
     }
 
     // A reason: We have a last dirtier.
     if (last_dirtier_ != nullptr) {
-        return false;
+        return evictability::has_last_dirtier;
     }
 
     // A reason: The current_page_t has snapshotted ex-acquirers.  (Important.)
     if (num_keepalives_ > 0) {
-        return false;
+        return evictability::has_keepalives;
     }
 
     // A reason: Its page_t isn't evicted, or has other snapshotters or waiters
@@ -827,15 +832,23 @@ bool current_page_t::should_be_evicted(page_cache_t *pc) const {
     // current_page_t's with unloaded, otherwise unused page_t's.)
     if (page_.has()) {
         page_t *page = page_.get_page_for_read();
-        if (page->is_loading() || page->has_waiters() || page->is_loaded()
-            || page->page_ptr_count() != 1) {
-            return false;
+        if (page->is_loading()) {
+            return evictability::page_is_loading;
+        }
+        if (page->has_waiters()) {
+            return evictability::page_with_waiters;
+        }
+        if (page->is_loaded()) {
+            return evictability::page_is_loaded;
+        }
+        if (page->page_ptr_count() != 1) {
+            return evictability::page_with_page_ptr;
         }
         // is_loading is false and is_loaded is false -- it must be disk-backed.
         rassert(page->is_disk_backed() || page->is_deferred_loading());
     }
 
-    return true;
+    return evictability::unevictable;
 }
 
 void current_page_t::add_acquirer(current_page_acq_t *acq) {
