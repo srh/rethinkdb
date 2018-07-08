@@ -103,6 +103,7 @@ public:
     bool should_be_evicted(page_cache_t *pc) const;
 
     enum class evictability {
+        not_computed,
         unevictable,
         has_acquirers,
         has_last_write_acquirer,
@@ -115,6 +116,7 @@ public:
     };
 
     evictability compute_evictability() const;
+    void recompute_evictability();
 
 private:
     // current_page_acq_t should not access our fields directly.
@@ -155,6 +157,9 @@ private:
 
 
     bool is_deleted() const { return is_deleted_; }
+
+    // TODO: Keep track of this precisely.
+    evictability evictability_ = evictability::not_computed;
 
     // KSI: We could get rid of this variable if
     // page_txn_t::pages_write_acquired_last_ noted each page's block_id_t.  Other

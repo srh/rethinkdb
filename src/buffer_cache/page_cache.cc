@@ -740,7 +740,9 @@ current_page_t::current_page_t(block_id_t block_id, page_cache_t *page_cache)
       last_write_acquirer_(nullptr),
       last_write_acquirer_version_(page_cache->gen_block_version()),
       last_dirtier_(nullptr),
-      num_keepalives_(0) { }
+      num_keepalives_(0) {
+    recompute_evictability();
+}
 
 current_page_t::current_page_t(block_id_t block_id,
                                buf_ptr_t buf,
@@ -751,7 +753,9 @@ current_page_t::current_page_t(block_id_t block_id,
       last_write_acquirer_(nullptr),
       last_write_acquirer_version_(page_cache->gen_block_version()),
       last_dirtier_(nullptr),
-      num_keepalives_(0) { }
+      num_keepalives_(0) {
+    recompute_evictability();
+}
 
 current_page_t::current_page_t(block_id_t block_id,
                                buf_ptr_t buf,
@@ -763,11 +767,15 @@ current_page_t::current_page_t(block_id_t block_id,
       last_write_acquirer_(nullptr),
       last_write_acquirer_version_(page_cache->gen_block_version()),
       last_dirtier_(nullptr),
-      num_keepalives_(0) { }
+      num_keepalives_(0) {
+    recompute_evictability();
+}
 
 current_page_t::~current_page_t() {
     // Check that reset() has been called.
     rassert(last_write_acquirer_version_.debug_value() == 0);
+
+    // TODO: Do something with evictability_ or compute_evictability.
 
     // An imperfect sanity check.
     rassert(!page_.has());
@@ -802,6 +810,15 @@ void current_page_t::reset(page_cache_t *page_cache) {
 bool current_page_t::should_be_evicted(page_cache_t *pc) const {
     // TODO: pc is unused.
     return compute_evictability() != evictability::unevictable;
+}
+
+void current_page_t::recompute_evictability() {
+    evictability_ = compute_evictability();
+
+    /* TODO: Call this when:
+    - modifying last_write_acquirer_
+    - etc.
+    */
 }
 
 current_page_t::evictability current_page_t::compute_evictability() const {
@@ -884,12 +901,14 @@ void current_page_t::add_acquirer(current_page_acq_t *acq) {
     }
 
     acquirers_.push_back(acq);
+    recompute_evictability();
     pulse_pulsables(acq);
 }
 
 void current_page_t::remove_acquirer(current_page_acq_t *acq) {
     current_page_acq_t *next = acquirers_.next(acq);
     acquirers_.remove(acq);
+    recompute_evictability();
     if (next != nullptr) {
         pulse_pulsables(next);
     }
@@ -943,6 +962,7 @@ void current_page_t::pulse_pulsables(current_page_acq_t *const acq) {
                         current_recency,
                         the_page_for_read_or_deleted(help));
                 acquirers_.remove(cur);
+                recompute_evictability();
             }
             cur = next;
         } else {
