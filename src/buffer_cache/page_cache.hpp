@@ -592,27 +592,6 @@ private:
 
     const max_block_size_t max_block_size_;
 
-    perfmon_counter_t cecp_read_ahead_;
-    perfmon_membership_t cecp_read_ahead_membership_;
-
-    perfmon_counter_t cecp_not_found_;
-    perfmon_membership_t cecp_not_found_membership_;
-
-    perfmon_counter_t cecp_has_acquirers_;
-    perfmon_membership_t cecp_has_acquirers_membership_;
-
-    perfmon_counter_t cecp_last_write_acquirer_;
-    perfmon_membership_t cecp_last_write_acquirer_membership_;
-
-    perfmon_counter_t cecp_last_dirtier_;
-    perfmon_membership_t cecp_last_dirtier_membership_;
-
-    perfmon_counter_t cecp_has_keepalives_;
-    perfmon_membership_t cecp_has_keepalives_membership_;
-
-    perfmon_counter_t cecp_has_legit_page_;
-    perfmon_membership_t cecp_has_legit_page_membership_;
-
     // We use a separate I/O account for reads in each page cache.
     // Note that block writes use a shared I/O account that sits in the
     // merger_serializer_t (as long as you use one, otherwise they use the
