@@ -104,7 +104,7 @@ public:
 
     enum class evictability {
         not_computed,
-        unevictable,
+        evictable,
         has_acquirers,
         has_last_write_acquirer,
         has_last_dirtier,

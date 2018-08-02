@@ -809,7 +809,7 @@ void current_page_t::reset(page_cache_t *page_cache) {
 
 bool current_page_t::should_be_evicted(page_cache_t *pc) const {
     // TODO: pc is unused.
-    return compute_evictability() != evictability::unevictable;
+    return compute_evictability() == evictability::evictable;
 }
 
 void current_page_t::recompute_evictability() {
@@ -865,7 +865,7 @@ current_page_t::evictability current_page_t::compute_evictability() const {
         rassert(page->is_disk_backed() || page->is_deferred_loading());
     }
 
-    return evictability::unevictable;
+    return evictability::evictable;
 }
 
 void current_page_t::add_acquirer(current_page_acq_t *acq) {
