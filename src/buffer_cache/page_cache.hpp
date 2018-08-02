@@ -436,8 +436,9 @@ struct block_change_t {
 
     // This function has a specific obligation to leave other in an arbitrary
     // safe-to-destruct state.  (other's page must be reset.)  Returns the net
-    // difference in the number of dirty pages.  (Either 0 or -1.)
-    MUST_USE int merge(page_cache_t *page_cache, block_change_t &&other);
+    // difference in the number of dirty pages.  (Either 0 or -1.)  Caller must call
+    // consider_evicting_current_page.
+    MUST_USE int merge2(page_cache_t *page_cache, block_change_t &&other);
 
     block_version_t version;
 
