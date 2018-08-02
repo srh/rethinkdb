@@ -1288,8 +1288,9 @@ void page_txn_t::add_snapshotted_dirtied_page(
         dirty_changes_pages_ += ptr.has();
         jt->second = make_block_change(version, tstamp, std::move(ptr));
     } else {
-        dirty_changes_pages_ += jt->second.merge(page_cache_,
+        dirty_changes_pages_ += jt->second.merge2(page_cache_,
             make_block_change(version, tstamp, std::move(ptr)));
+        page_cache_->consider_evicting_current_page(block_id);
     }
 }
 
@@ -1306,7 +1307,7 @@ void page_txn_t::add_touched_page(
     }
 }
 
-int block_change_t::merge(page_cache_t *page_cache, block_change_t &&other) {
+int block_change_t::merge2(page_cache_t *page_cache, block_change_t &&other) {
     rassert(version != other.version);
     int old_pages_count = page.has() + other.page.has();
     // This function is commutative -- changes from the later version supercede those of
@@ -1341,7 +1342,8 @@ int64_t page_cache_t::merge_changes(
         if (res.second) {
             jt->second = std::move(p.second);
         } else {
-            total_net_dirty += jt->second.merge(page_cache, std::move(p.second));
+            total_net_dirty += jt->second.merge2(page_cache, std::move(p.second));
+            page_cache->consider_evicting_current_page(p.first);
         }
     }
     from.clear();
