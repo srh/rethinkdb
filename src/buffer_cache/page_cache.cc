@@ -743,6 +743,7 @@ current_page_t::current_page_t(block_id_t block_id, page_cache_t *page_cache)
       last_write_acquirer_version_(page_cache->gen_block_version()),
       last_dirtier_(nullptr),
       num_keepalives_(0) {
+      ++page_cache->get_pc_pair(last_cecp_evictability_);
 }
 
 current_page_t::current_page_t(block_id_t block_id,
@@ -755,6 +756,7 @@ current_page_t::current_page_t(block_id_t block_id,
       last_write_acquirer_version_(page_cache->gen_block_version()),
       last_dirtier_(nullptr),
       num_keepalives_(0) {
+      ++page_cache->get_pc_pair(last_cecp_evictability_);
 }
 
 current_page_t::current_page_t(block_id_t block_id,
@@ -768,6 +770,7 @@ current_page_t::current_page_t(block_id_t block_id,
       last_write_acquirer_version_(page_cache->gen_block_version()),
       last_dirtier_(nullptr),
       num_keepalives_(0) {
+      ++page_cache->get_pc_pair(last_cecp_evictability_);
 }
 
 current_page_t::~current_page_t() {
@@ -781,8 +784,39 @@ current_page_t::~current_page_t() {
     rassert(num_keepalives_ == 0);
 }
 
+pc_pair_t &page_cache_t::get_pc_pair(current_page_t::evictability ev) {
+    switch (ev) {
+    case current_page_t::evictability::not_computed:
+        return pc_not_computed_;
+    case current_page_t::evictability::evictable:
+        return pc_evictable_;
+    case current_page_t::evictability::readahead:
+        return pc_readahead_;
+    case current_page_t::evictability::has_acquirers:
+        return pc_has_acquirers_;
+    case current_page_t::evictability::has_last_write_acquirer:
+        return pc_has_last_write_acquirer_;
+    case current_page_t::evictability::has_last_dirtier:
+        return pc_has_last_dirtier_;
+    case current_page_t::evictability::has_keepalives:
+        return pc_has_keepalives_;
+    case current_page_t::evictability::page_is_loading:
+        return pc_page_is_loading_;
+    case current_page_t::evictability::page_with_waiters:
+        return pc_page_with_waiters_;
+    case current_page_t::evictability::page_is_loaded:
+        return pc_page_is_loaded_;
+    case current_page_t::evictability::page_with_page_ptr:
+        return pc_page_with_page_ptr_;
+    }
+}
+
 void current_page_t::set_last_cecp_evictability(page_cache_t *pc, evictability ev) {
+    evictability prev = last_cecp_evictability_;
+
+    --pc->get_pc_pair(prev);
     last_cecp_evictability_ = ev;
+    ++pc->get_pc_pair(ev);
 }
 
 void current_page_t::reset(page_cache_t *page_cache) {
@@ -808,6 +842,7 @@ void current_page_t::reset(page_cache_t *page_cache) {
         page_cache->free_list()->release_block_id(block_id_);
         block_id_ = NULL_BLOCK_ID;
     }
+    --page_cache->get_pc_pair(last_cecp_evictability_);
 }
 
 bool current_page_t::should_be_evicted(page_cache_t *pc) {

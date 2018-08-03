@@ -114,7 +114,6 @@ public:
         page_with_waiters,
         page_is_loaded,
         page_with_page_ptr,
-        NUM_VALUES,
     };
 
     evictability compute_evictability() const;
@@ -460,8 +459,8 @@ struct pc_pair_t {
         : counter(),
           membership(&get_global_perfmon_collection(), &counter, name) {}
 
-    void operator++(int) { ++counter; }
-    void operator--(int) { --counter; }
+    void operator++() { ++counter; }
+    void operator--() { --counter; }
 };
 
 
@@ -625,13 +624,13 @@ private:
 
     const max_block_size_t max_block_size_;
 
-    // This describes the number of current_page_t's that are actually evictable.
-    pc_pair_t pc_actually_evictable_{"cecp_actually_evictable"};
+    pc_pair_t &get_pc_pair(current_page_t::evictability ev);
 
     // These describe the last state observed when we _considered_ evicting the current
     // page.
     pc_pair_t pc_not_computed_{"cecp_not_computed"};
     pc_pair_t pc_evictable_{"cecp_evictable"};
+    pc_pair_t pc_readahead_{"cecp_readahead"};
     pc_pair_t pc_has_acquirers_{"cecp_has_acquirers"};
     pc_pair_t pc_has_last_write_acquirer_{"cecp_has_last_write_acquirer"};
     pc_pair_t pc_has_last_dirtier_{"cecp_has_last_dirtier"};
