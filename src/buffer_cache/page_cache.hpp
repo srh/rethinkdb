@@ -5,6 +5,7 @@
 
 #include <functional>
 #include <map>
+#include <memory>
 #include <set>
 #include <unordered_map>
 #include <utility>
@@ -488,6 +489,8 @@ public:
     auto_drainer_t::lock_t drainer_lock() { return drainer_->lock(); }
     serializer_t *serializer() { return serializer_; }
 
+    void freed_a_buf();
+
 private:
     void help_take_snapshotted_dirtied_page(
         current_page_t *cp, block_id_t block_id, page_txn_t *dirtier);
@@ -640,6 +643,30 @@ private:
     intrusive_list_t<page_txn_t> want_to_spawn_flush_;
 
     free_list_t free_list_;
+
+    // Stop-gap to work around a memory leak:
+    //
+    // We walk through the block id space (wrapping back to zero when we get to the end)
+    // gradually vacuuming up evictable current_page_t objects.   The number of
+    // current_page_t's ought to be O(number of bufs), so every time we free a buf, we
+    // call consider_evicting_current_page on O(1) current pages.
+    //
+    // Ideally we'd precisely call consider_evicting_current_page exactly where it's
+    // possible that a current_page_t went from unevictable to evictable.  But
+    // apparently, we're missing some edge case, and the issue is hard to reproduce.
+    //
+    // Instead of worrying about removing this band-aid, I'd focus my energy on
+    // replacing the entire cache and storage engine.
+    //
+    // The bucket number refers to hash table buckets in the current_pages_ unordered
+    // map.  See C++11 documentation -- unordered_map exposes "buckets".  We can walk
+    // through the buckets, and if the hash table gets reallocated, it's not the end of
+    // the world.
+    size_t current_page_vacuum_bucket_number_;
+    // Non-zero only while some freed_a_buf call is running.
+    uint64_t current_page_vacuum_accounting_;
+    std::unique_ptr<block_id_t[]> current_page_vacuum_scratch_;
+
 
     evicter_t evicter_;
 
