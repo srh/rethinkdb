@@ -386,6 +386,7 @@ void page_t::remove_snapshotter(page_cache_t *page_cache) {
         rassert(waiters_.empty());
 
         page_cache->evicter().remove_page(this);
+        page_cache->freed_a_buf();  // Possibly the buf was already freed, that's OK.
         delete this;
     }
 }
@@ -551,7 +552,7 @@ void page_t::remove_waiter(page_acq_t *acq) {
     rassert(snapshot_refcount_ > 0);
 }
 
-void page_t::evict_self(DEBUG_VAR page_cache_t *page_cache) {
+void page_t::evict_self(page_cache_t *page_cache) {
     // A page_t can only self-evict if it has a block token (for now).
     rassert(waiters_.empty());
     rassert(block_token_.has());
@@ -561,6 +562,7 @@ void page_t::evict_self(DEBUG_VAR page_cache_t *page_cache) {
     const uint32_t usage_before = hypothetical_memory_usage(page_cache);
 #endif
     buf_.reset();
+    page_cache->freed_a_buf();
     // Hypothetical memory usage shouldn't have changed -- the block token has the
     // same block size.
     rassert(usage_before == hypothetical_memory_usage(page_cache));

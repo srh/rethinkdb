@@ -145,7 +145,7 @@ void page_cache_t::consider_evicting_current_page(block_id_t block_id) {
 
     current_page_t *page_ptr = page_it->second;
     if (page_ptr->should_be_evicted()) {
-        current_pages_.erase(block_id);
+        current_pages_.erase(page_it);
         page_ptr->reset(this);
         delete page_ptr;
     }
@@ -202,14 +202,67 @@ void page_cache_t::have_read_ahead_cb_destroyed() {
     }
 }
 
+void page_cache_t::freed_a_buf() {
+    size_t num_buckets = current_pages_.bucket_count();
+    if (num_buckets == 0) {
+        return;
+    }
+
+    size_t bucket = current_page_vacuum_bucket_number_;
+
+    // Load factor is 1.0, so a bucket with 16 block id's would be overkill, except in
+    // rare cases.  We copy out the block id's first, so that we can't possibly resize
+    // current_pages_ while we iterate it.
+    constexpr size_t len = 16;
+    block_id_t block_ids[len];
+    size_t i = 0;
+
+    // We do 4 buckets, assuming minimally load is 0.25 (because a reasonable hash table
+    // implementation would have that property), so that we process at least one
+    // current_page_t on average.
+    for (size_t bucket_i = 0; bucket_i < 4; ++bucket_i) {
+        if (bucket >= num_buckets) {
+            bucket = 0;
+        }
+
+        // This is an unordered_map<>::local_iterator, by the way...
+        auto local_it = current_pages_.begin(bucket);
+        auto local_end = current_pages_.end(bucket);
+
+        while (local_it != local_end) {
+            block_ids[i] = local_it->first;
+            ++local_it;
+            ++i;
+
+            if (i == len) {
+                ++bucket;
+                goto done;
+            }
+        }
+        ++bucket;
+    }
+ done:
+
+    current_page_vacuum_bucket_number_ = bucket;
+
+    for (size_t j = 0; j < i; ++j) {
+        consider_evicting_current_page(block_ids[j]);
+    }
+}
+
+std::vector<block_id_t> current_page_block_ids(const std::unordered_map<block_id_t, current_page_t *> &current_pages) {
+    std::vector<block_id_t> current_block_ids;
+    current_block_ids.reserve(current_pages.size());
+    for (const auto &current_page : current_pages) {
+        current_block_ids.push_back(current_page.first);
+    }
+    return current_block_ids;
+}
+
 void page_cache_t::consider_evicting_all_current_pages(page_cache_t *page_cache,
                                                        auto_drainer_t::lock_t lock) {
     // Atomically grab a list of block IDs that currently exist in current_pages.
-    std::vector<block_id_t> current_block_ids;
-    current_block_ids.reserve(page_cache->current_pages_.size());
-    for (const auto &current_page : page_cache->current_pages_) {
-        current_block_ids.push_back(current_page.first);
-    }
+    std::vector<block_id_t> current_block_ids = current_page_block_ids(page_cache->current_pages_);
 
     // In a separate step, evict current pages that should be evicted.
     // We do this separately so that we can yield between evictions.
@@ -248,6 +301,7 @@ page_cache_t::page_cache_t(serializer_t *serializer,
       // Start the counter at 1 so we can distinguish empty values.
       next_block_version_(block_version_t().subsequent()),
       free_list_(serializer),
+      current_page_vacuum_bucket_number_(0),
       evicter_(),
       read_ahead_cb_(nullptr),
       drainer_(make_scoped<auto_drainer_t>()) {
@@ -291,14 +345,26 @@ page_cache_t::~page_cache_t() {
     begin_flush_pending_txns(true, 0);
 
     drainer_.reset();
+
+    // We might now recursively consider evicting current pages (because we do that
+    // every time we free a page buf).  So we copy block id's out first.
+
+    std::vector<block_id_t> current_block_ids = current_page_block_ids(current_pages_);
+
     size_t i = 0;
-    for (auto &&page : current_pages_) {
+    for (block_id_t id : current_block_ids) {
         if (i % 256 == 255) {
             coro_t::yield();
         }
         ++i;
-        page.second->reset(this);
-        delete page.second;
+        auto page_it = current_pages_.find(id);
+        if (page_it == current_pages_.end()) {
+            continue;
+        }
+        current_page_t *page_ptr = page_it->second;
+        current_pages_.erase(page_it);
+        page_ptr->reset(this);
+        delete page_ptr;
     }
 
     {
@@ -460,7 +526,8 @@ cache_account_t page_cache_t::create_cache_account(int priority) {
 
 
 current_page_acq_t::current_page_acq_t()
-    : page_cache_(nullptr), the_txn_(nullptr) { }
+    : page_cache_(nullptr), the_txn_(nullptr) {
+}
 
 current_page_acq_t::current_page_acq_t(page_txn_t *txn,
                                        block_id_t block_id,
