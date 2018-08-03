@@ -452,6 +452,18 @@ struct block_change_t {
     repli_timestamp_t tstamp;
 };
 
+struct pc_pair_t {
+    perfmon_counter_t counter;
+    perfmon_membership_t membership;
+
+    explicit pc_pair_t(const char *name)
+        : counter(),
+          membership(&get_global_perfmon_collection(), &counter, name) {}
+
+    void operator++(int) { ++counter; }
+    void operator--(int) { --counter; }
+};
+
 
 class page_cache_t : public home_thread_mixin_t {
 public:
@@ -612,6 +624,22 @@ private:
         const std::unordered_map<block_id_t, block_change_t> &changes);
 
     const max_block_size_t max_block_size_;
+
+    // This describes the number of current_page_t's that are actually evictable.
+    pc_pair_t pc_actually_evictable_{"cecp_actually_evictable"};
+
+    // These describe the last state observed when we _considered_ evicting the current
+    // page.
+    pc_pair_t pc_not_computed_{"cecp_not_computed"};
+    pc_pair_t pc_evictable_{"cecp_evictable"};
+    pc_pair_t pc_has_acquirers_{"cecp_has_acquirers"};
+    pc_pair_t pc_has_last_write_acquirer_{"cecp_has_last_write_acquirer"};
+    pc_pair_t pc_has_last_dirtier_{"cecp_has_last_dirtier"};
+    pc_pair_t pc_has_keepalives_{"cecp_has_keepalives"};
+    pc_pair_t pc_page_is_loading_{"cecp_page_is_loading"};
+    pc_pair_t pc_page_with_waiters_{"cecp_page_with_waiters"};
+    pc_pair_t pc_page_is_loaded_{"cecp_page_is_loaded"};
+    pc_pair_t pc_page_with_page_ptr_{"cecp_page_with_page_ptr"};
 
     // We use a separate I/O account for reads in each page cache.
     // Note that block writes use a shared I/O account that sits in the
