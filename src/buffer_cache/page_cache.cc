@@ -129,19 +129,21 @@ void page_read_ahead_cb_t::destroy_self() {
 
 void page_cache_t::consider_evicting_current_page(block_id_t block_id) {
     ASSERT_NO_CORO_WAITING;
-    // We can't do anything until read-ahead is done, because it uses the existence
-    // of a current_page_t entry to figure out whether the read-ahead page could be
-    // out of date.
-    if (read_ahead_cb_ != nullptr) {
-        return;
-    }
-
     auto page_it = current_pages_.find(block_id);
     if (page_it == current_pages_.end()) {
         return;
     }
 
     current_page_t *page_ptr = page_it->second;
+
+    // We can't do anything until read-ahead is done, because it uses the existence
+    // of a current_page_t entry to figure out whether the read-ahead page could be
+    // out of date.
+    if (read_ahead_cb_ != nullptr) {
+        page_ptr->set_last_cecp_evictability(this, current_page_t::evictability::readahead);
+        return;
+    }
+
     if (page_ptr->should_be_evicted(this)) {
         current_pages_.erase(block_id);
         page_ptr->reset(this);
@@ -741,7 +743,6 @@ current_page_t::current_page_t(block_id_t block_id, page_cache_t *page_cache)
       last_write_acquirer_version_(page_cache->gen_block_version()),
       last_dirtier_(nullptr),
       num_keepalives_(0) {
-    recompute_evictability();
 }
 
 current_page_t::current_page_t(block_id_t block_id,
@@ -754,7 +755,6 @@ current_page_t::current_page_t(block_id_t block_id,
       last_write_acquirer_version_(page_cache->gen_block_version()),
       last_dirtier_(nullptr),
       num_keepalives_(0) {
-    recompute_evictability();
 }
 
 current_page_t::current_page_t(block_id_t block_id,
@@ -768,7 +768,6 @@ current_page_t::current_page_t(block_id_t block_id,
       last_write_acquirer_version_(page_cache->gen_block_version()),
       last_dirtier_(nullptr),
       num_keepalives_(0) {
-    recompute_evictability();
 }
 
 current_page_t::~current_page_t() {
@@ -780,6 +779,10 @@ current_page_t::~current_page_t() {
     // An imperfect sanity check.
     rassert(!page_.has());
     rassert(num_keepalives_ == 0);
+}
+
+void current_page_t::set_last_cecp_evictability(page_cache_t *pc, evictability ev) {
+    last_cecp_evictability_ = ev;
 }
 
 void current_page_t::reset(page_cache_t *page_cache) {
@@ -807,18 +810,11 @@ void current_page_t::reset(page_cache_t *page_cache) {
     }
 }
 
-bool current_page_t::should_be_evicted(page_cache_t *pc) const {
+bool current_page_t::should_be_evicted(page_cache_t *pc) {
     // TODO: pc is unused.
-    return compute_evictability() == evictability::evictable;
-}
-
-void current_page_t::recompute_evictability() {
-    evictability_ = compute_evictability();
-
-    /* TODO: Call this when:
-    - modifying last_write_acquirer_
-    - etc.
-    */
+    evictability ev = compute_evictability();
+    set_last_cecp_evictability(pc, ev);
+    return ev == evictability::evictable;
 }
 
 current_page_t::evictability current_page_t::compute_evictability() const {
@@ -901,14 +897,12 @@ void current_page_t::add_acquirer(current_page_acq_t *acq) {
     }
 
     acquirers_.push_back(acq);
-    recompute_evictability();
     pulse_pulsables(acq);
 }
 
 void current_page_t::remove_acquirer(current_page_acq_t *acq) {
     current_page_acq_t *next = acquirers_.next(acq);
     acquirers_.remove(acq);
-    recompute_evictability();
     if (next != nullptr) {
         pulse_pulsables(next);
     }
@@ -962,7 +956,6 @@ void current_page_t::pulse_pulsables(current_page_acq_t *const acq) {
                         current_recency,
                         the_page_for_read_or_deleted(help));
                 acquirers_.remove(cur);
-                recompute_evictability();
             }
             cur = next;
         } else {

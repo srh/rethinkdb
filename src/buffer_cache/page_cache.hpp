@@ -100,11 +100,12 @@ public:
     // current_page_acq_t's, last write acquirer page_txn_t's, and read-ahead logic.)
     void reset(page_cache_t *page_cache);
 
-    bool should_be_evicted(page_cache_t *pc) const;
+    bool should_be_evicted(page_cache_t *pc);
 
     enum class evictability {
         not_computed,
         evictable,
+        readahead,
         has_acquirers,
         has_last_write_acquirer,
         has_last_dirtier,
@@ -113,10 +114,11 @@ public:
         page_with_waiters,
         page_is_loaded,
         page_with_page_ptr,
+        NUM_VALUES,
     };
 
     evictability compute_evictability() const;
-    void recompute_evictability();
+    void set_last_cecp_evictability(page_cache_t *pc, evictability ev);
 
 private:
     // current_page_acq_t should not access our fields directly.
@@ -158,8 +160,7 @@ private:
 
     bool is_deleted() const { return is_deleted_; }
 
-    // TODO: Keep track of this precisely.
-    evictability evictability_ = evictability::not_computed;
+    evictability last_cecp_evictability_ = evictability::not_computed;
 
     // KSI: We could get rid of this variable if
     // page_txn_t::pages_write_acquired_last_ noted each page's block_id_t.  Other
