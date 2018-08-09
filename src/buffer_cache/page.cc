@@ -386,8 +386,11 @@ void page_t::remove_snapshotter(page_cache_t *page_cache) {
         rassert(waiters_.empty());
 
         page_cache->evicter().remove_page(this);
-        page_cache->freed_a_buf();  // Possibly the buf was already freed, that's OK.
+        bool freed_a_buf = buf_.has();
         delete this;
+        if (freed_a_buf) {
+            page_cache->freed_a_buf();
+        }
     }
 }
 

@@ -5,6 +5,7 @@
 
 #include <functional>
 #include <map>
+#include <memory>
 #include <set>
 #include <unordered_map>
 #include <utility>
@@ -658,6 +659,10 @@ private:
     // through the buckets, and if the hash table gets reallocated, it's not the end of
     // the world.
     size_t current_page_vacuum_bucket_number_;
+    // Non-zero only while some freed_a_buf call is running.
+    uint64_t current_page_vacuum_accounting_;
+    std::unique_ptr<block_id_t[]> current_page_vacuum_scratch_;
+
 
     evicter_t evicter_;
 
