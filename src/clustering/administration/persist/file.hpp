@@ -7,6 +7,7 @@
 #include "buffer_cache/alt.hpp"
 #include "buffer_cache/types.hpp"
 #include "concurrency/rwlock.hpp"
+#include "rockstore/store.hpp"
 #include "serializer/types.hpp"
 #include "utils.hpp"
 
