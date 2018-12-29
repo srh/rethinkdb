@@ -63,6 +63,7 @@
 #include "containers/scoped.hpp"
 #include "crypto/random.hpp"
 #include "logger.hpp"
+#include "rockstore/store.hpp"
 
 #define RETHINKDB_EXPORT_SCRIPT "rethinkdb-export"
 #define RETHINKDB_IMPORT_SCRIPT "rethinkdb-import"
@@ -1057,7 +1058,8 @@ void run_rethinkdb_create(const base_path_t &base_path,
     server_config.config.cache_size_bytes = total_cache_size;
     server_config.version = 1;
 
-    io_backender_t io_backender(direct_io_mode, max_concurrent_io_requests);
+    rockstore::store rocks = rockstore::create_rockstore(base_path);
+    io_backender_t io_backender(&rocks, direct_io_mode, max_concurrent_io_requests);
 
     perfmon_collection_t metadata_perfmon_collection;
     perfmon_membership_t metadata_perfmon_membership(&get_global_perfmon_collection(), &metadata_perfmon_collection, "metadata");
@@ -1066,7 +1068,6 @@ void run_rethinkdb_create(const base_path_t &base_path,
         cond_t non_interruptor;
         metadata_file_t metadata_file(
             &io_backender,
-            base_path,
             &metadata_perfmon_collection,
             [&](metadata_file_t::write_txn_t *write_txn, signal_t *interruptor) {
                 write_txn->write(mdkey_server_id(),
@@ -1155,7 +1156,8 @@ void run_rethinkdb_serve(const base_path_t &base_path,
 
     logNTC("Loading data from directory %s\n", base_path.path().c_str());
 
-    io_backender_t io_backender(direct_io_mode, max_concurrent_io_requests);
+    rockstore::store rocks = rockstore::create_rockstore(base_path);
+    io_backender_t io_backender(&rocks, direct_io_mode, max_concurrent_io_requests);
 
     perfmon_collection_t metadata_perfmon_collection;
     perfmon_membership_t metadata_perfmon_membership(&get_global_perfmon_collection(), &metadata_perfmon_collection, "metadata");
@@ -1166,7 +1168,6 @@ void run_rethinkdb_serve(const base_path_t &base_path,
         if (our_server_id != nullptr && cluster_metadata != nullptr) {
             metadata_file.init(new metadata_file_t(
                 &io_backender,
-                base_path,
                 &metadata_perfmon_collection,
                 [&](metadata_file_t::write_txn_t *write_txn, signal_t *interruptor) {
                     write_txn->write(mdkey_server_id(),
@@ -1186,7 +1187,6 @@ void run_rethinkdb_serve(const base_path_t &base_path,
         } else {
             metadata_file.init(new metadata_file_t(
                 &io_backender,
-                base_path,
                 &metadata_perfmon_collection,
                 &non_interruptor));
             /* The `metadata_file_t` constructor will migrate the main metadata if it

@@ -2,11 +2,14 @@
 #ifndef CLUSTERING_ADMINISTRATION_PERSIST_FILE_HPP_
 #define CLUSTERING_ADMINISTRATION_PERSIST_FILE_HPP_
 
+#include "rocksdb/write_batch.h"
+
 #include "btree/keys.hpp"
 #include "btree/stats.hpp"
 #include "buffer_cache/alt.hpp"
 #include "buffer_cache/types.hpp"
 #include "concurrency/rwlock.hpp"
+#include "containers/archive/string_stream.hpp"
 #include "rockstore/store.hpp"
 #include "serializer/types.hpp"
 #include "utils.hpp"
@@ -57,14 +60,12 @@ public:
     // Used to open an existing metadata file
     metadata_file_t(
         io_backender_t *io_backender,
-        const base_path_t &base_path,
         perfmon_collection_t *perfmon_parent,
         signal_t *interruptor);
 
     // Used top create a new metadata file
     metadata_file_t(
         io_backender_t *io_backender,
-        const base_path_t &base_path,
         perfmon_collection_t *perfmon_parent,
         const std::function<void(write_txn_t *, signal_t *)> &initializer,
         signal_t *interruptor);
@@ -74,22 +75,16 @@ private:
     friend class metadata::read_txn_t;
     friend class metadata::write_txn_t;
 
-    void init_serializer(
-        filepath_file_opener_t *file_opener,
-        perfmon_collection_t *perfmon_parent);
-
-    static serializer_filepath_t get_filename(const base_path_t &path);
-
-    scoped_ptr_t<merger_serializer_t> serializer;
-    scoped_ptr_t<cache_balancer_t> balancer;
-    scoped_ptr_t<cache_t> cache;
-    scoped_ptr_t<cache_conn_t> cache_conn;
-    btree_stats_t btree_stats;
+    rockstore::write_options rocks_options;
+    rockstore::store *rocks;
     rwlock_t rwlock;
 };
 
 
 namespace metadata {
+
+// This read_txn_t/write_txn_t stuff might be kind of obtuse and overengineered with
+// the rocksdb backend -- but we are maintaining compatibility with older callers.
 class read_txn_t {
 public:
     read_txn_t(metadata_file_t *file, signal_t *interruptor);
@@ -107,16 +102,17 @@ public:
             const key_t<T> &key,
             T *value_out,
             signal_t *interruptor) {
-        bool found = false;
-        read_bin(
-            key.key,
-            [&](read_stream_t *bin_value) {
-                archive_result_t res = deserialize<W>(bin_value, value_out);
-                guarantee_deserialization(res, "metadata_file_t::read_txn_t::read");
-                found = true;
-            },
-            interruptor);
-        return found;
+        // TODO: Remove interruptor param?
+        (void)interruptor;
+        std::pair<std::string, bool> value = read_bin(key.key);
+        if (!value.second) {
+            return false;
+        }
+        string_read_stream_t stream(std::move(value.first), 0);
+        // TODO: No need for W template param?
+        archive_result_t res = deserialize<W>(&stream, value_out);
+        guarantee_deserialization(res, "metadata_file_t::read_txn_t::read");
+        return true;
     }
 
     template<class T, cluster_version_t W = cluster_version_t::LATEST_DISK>
@@ -144,15 +140,8 @@ private:
     /* This constructor is used by `write_txn_t` */
     read_txn_t(metadata_file_t *file, write_access_t, signal_t *interruptor);
 
-    void blob_to_stream(
-        buf_parent_t parent,
-        const void *ref,
-        const std::function<void(read_stream_t *)> &callback);
-
-    void read_bin(
-        const store_key_t &key,
-        const std::function<void(read_stream_t *)> &callback,
-        signal_t *interruptor);
+    std::pair<std::string, bool> read_bin(
+        const store_key_t &key);
 
     void read_many_bin(
         const store_key_t &key_prefix,
@@ -161,7 +150,6 @@ private:
         signal_t *interruptor);
 
     metadata_file_t *file;
-    txn_t txn;
     rwlock_acq_t rwlock_acq;
 };
 
@@ -189,11 +177,13 @@ public:
     // is not interrupted in the middle, which could leave the
     // metadata in an inconsistent state.
     void commit() {
-        txn.commit();
+        file->rocks->write_batch(std::move(batch), file->rocks_options);
     }
 
 private:
-    friend class ::metadata_file_t;
+    friend class metadata_file_t;
+
+    rocksdb::WriteBatch batch;
 
     void write_bin(
         const store_key_t &key,

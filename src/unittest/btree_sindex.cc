@@ -20,8 +20,9 @@ namespace unittest {
 
 TPTEST(BTreeSindex, LowLevelOps) {
     temp_file_t temp_file;
+    temp_rockstore rocks;
 
-    io_backender_t io_backender(file_direct_io_mode_t::buffered_desired);
+    io_backender_t io_backender(rocks.rocks(), file_direct_io_mode_t::buffered_desired);
     dummy_cache_balancer_t balancer(GIGABYTE);
 
     filepath_file_opener_t file_opener(temp_file.name(), &io_backender);
@@ -145,8 +146,8 @@ TPTEST(BTreeSindex, LowLevelOps) {
 
 TPTEST(BTreeSindex, BtreeStoreAPI) {
     temp_file_t temp_file;
-
-    io_backender_t io_backender(file_direct_io_mode_t::buffered_desired);
+    temp_rockstore temp_rocks;
+    io_backender_t io_backender(temp_rocks.rocks(), file_direct_io_mode_t::buffered_desired);
     dummy_cache_balancer_t balancer(GIGABYTE);
 
     filepath_file_opener_t file_opener(temp_file.name(), &io_backender);

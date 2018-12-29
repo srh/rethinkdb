@@ -10,6 +10,7 @@
 #include "containers/scoped.hpp"
 #include "paths.hpp"
 #include "rdb_protocol/protocol.hpp"
+#include "rockstore/store.hpp"
 #include "rpc/serialize_macros.hpp"
 
 class rng_t;
@@ -43,6 +44,18 @@ private:
     base_path_t directory;
 
     DISABLE_COPYING(temp_directory_t);
+};
+
+class temp_rockstore {
+public:
+    temp_rockstore() : dir_(), rocks_(rockstore::create_rockstore(dir_.path())) { }
+    DISABLE_COPYING(temp_rockstore);
+
+    rockstore::store *rocks() { return &rocks_; }
+
+private:
+    temp_directory_t dir_;
+    rockstore::store rocks_;
 };
 
 void let_stuff_happen();

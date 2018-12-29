@@ -41,7 +41,8 @@ private:
 class BTreeTestContext {
 public:
     BTreeTestContext()
-        : io_backender(file_direct_io_mode_t::buffered_desired),
+        : rocks(),
+          io_backender(rocks.rocks(), file_direct_io_mode_t::buffered_desired),
           file_opener(temp_file.name(), &io_backender),
           balancer(GIGABYTE) {
 
@@ -310,6 +311,7 @@ public:
 
 private:
     temp_file_t temp_file;
+    temp_rockstore rocks;
     io_backender_t io_backender;
     filepath_file_opener_t file_opener;
     dummy_cache_balancer_t balancer;

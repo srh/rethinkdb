@@ -60,7 +60,8 @@ void run_with_namespace_interface(
         temp_files.push_back(make_scoped<temp_file_t>());
     }
 
-    io_backender_t io_backender(file_direct_io_mode_t::buffered_desired);
+    temp_rockstore temp_rocks;
+    io_backender_t io_backender(temp_rocks.rocks(), file_direct_io_mode_t::buffered_desired);
     dummy_cache_balancer_t balancer(GIGABYTE);
 
     scoped_array_t<scoped_ptr_t<serializer_t> > serializers(store_shards.size());

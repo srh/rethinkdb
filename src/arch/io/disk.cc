@@ -201,9 +201,11 @@ private:
     DISABLE_COPYING(linux_disk_manager_t);
 };
 
-io_backender_t::io_backender_t(file_direct_io_mode_t _direct_io_mode,
+io_backender_t::io_backender_t(rockstore::store *rocks,
+                               file_direct_io_mode_t _direct_io_mode,
                                int max_concurrent_io_requests)
     : direct_io_mode(_direct_io_mode),
+      rocks_(rocks),
       diskmgr(new linux_disk_manager_t(&linux_thread_pool_t::get_thread()->queue,
                                        DEFAULT_IO_BATCH_FACTOR,
                                        max_concurrent_io_requests,

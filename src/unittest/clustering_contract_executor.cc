@@ -40,7 +40,7 @@ them communicate with each other. */
 class executor_tester_context_t {
 public:
     executor_tester_context_t() :
-        io_backender(file_direct_io_mode_t::buffered_desired),
+        io_backender(temp_rocks.rocks(), file_direct_io_mode_t::buffered_desired),
         published_state(state)
         { }
     /* Note that when you create or destroy contracts with `add_contract()` and
@@ -78,6 +78,7 @@ public:
 private:
     friend class executor_tester_t;
     simple_mailbox_cluster_t cluster;
+    temp_rockstore temp_rocks;
     io_backender_t io_backender;
     standard_backfill_throttler_t backfill_throttler;
     backfill_progress_tracker_t backfill_progress_tracker;

@@ -246,8 +246,8 @@ void check_keys_are_NOT_present(store_t *store,
 TPTEST(RDBBtree, SindexPostConstruct) {
     recreate_temporary_directory(base_path_t("."));
     temp_file_t temp_file;
-
-    io_backender_t io_backender(file_direct_io_mode_t::buffered_desired);
+    temp_rockstore temp_rocks;
+    io_backender_t io_backender(temp_rocks.rocks(), file_direct_io_mode_t::buffered_desired);
     dummy_cache_balancer_t balancer(GIGABYTE);
 
     filepath_file_opener_t file_opener(temp_file.name(), &io_backender);
@@ -289,8 +289,8 @@ TPTEST(RDBBtree, SindexPostConstruct) {
 TPTEST(RDBBtree, SindexEraseRange) {
     recreate_temporary_directory(base_path_t("."));
     temp_file_t temp_file;
-
-    io_backender_t io_backender(file_direct_io_mode_t::buffered_desired);
+    temp_rockstore temp_rocks;
+    io_backender_t io_backender(temp_rocks.rocks(), file_direct_io_mode_t::buffered_desired);
     dummy_cache_balancer_t balancer(GIGABYTE);
 
     filepath_file_opener_t file_opener(temp_file.name(), &io_backender);
@@ -376,8 +376,8 @@ TPTEST(RDBBtree, SindexEraseRange) {
 TPTEST(RDBBtree, SindexInterruptionViaDrop) {
     recreate_temporary_directory(base_path_t("."));
     temp_file_t temp_file;
-
-    io_backender_t io_backender(file_direct_io_mode_t::buffered_desired);
+    temp_rockstore temp_rocks;
+    io_backender_t io_backender(temp_rocks.rocks(), file_direct_io_mode_t::buffered_desired);
     dummy_cache_balancer_t balancer(GIGABYTE);
 
     filepath_file_opener_t file_opener(temp_file.name(), &io_backender);
@@ -419,8 +419,8 @@ TPTEST(RDBBtree, SindexInterruptionViaDrop) {
 TPTEST(RDBBtree, SindexInterruptionViaStoreDelete) {
     recreate_temporary_directory(base_path_t("."));
     temp_file_t temp_file;
-
-    io_backender_t io_backender(file_direct_io_mode_t::buffered_desired);
+    temp_rockstore temp_rocks;
+    io_backender_t io_backender(temp_rocks.rocks(), file_direct_io_mode_t::buffered_desired);
     dummy_cache_balancer_t balancer(GIGABYTE);
 
     filepath_file_opener_t file_opener(temp_file.name(), &io_backender);
