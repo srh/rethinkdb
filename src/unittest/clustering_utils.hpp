@@ -62,7 +62,7 @@ public:
     test_store_t(io_backender_t *io_backender, order_source_t *order_source, rdb_context_t *ctx) :
             serializer(create_and_construct_serializer(&temp_file, io_backender)),
             balancer(new dummy_cache_balancer_t(GIGABYTE)),
-            store(region_t::universe(), serializer.get(), balancer.get(),
+            store(region_t::universe(), io_backender->rocks(), serializer.get(), balancer.get(),
                 temp_file.name().permanent_path(), true,
                 &get_global_perfmon_collection(), ctx, io_backender, base_path_t("."),
                 generate_uuid(), update_sindexes_t::UPDATE) {

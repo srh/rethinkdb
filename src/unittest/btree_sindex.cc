@@ -162,6 +162,7 @@ TPTEST(BTreeSindex, BtreeStoreAPI) {
 
     store_t store(
             region_t::universe(),
+            io_backender.rocks(),
             &serializer,
             &balancer,
             "unit_test_store",

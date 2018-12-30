@@ -16,6 +16,8 @@ class read_txn_t;
 class write_txn_t;
 }
 
+namespace rockstore { class store; }
+
 class multi_table_manager_timestamp_epoch_t {
     using epoch_t = multi_table_manager_timestamp_epoch_t;
 public:

@@ -6,6 +6,7 @@
 #include "clustering/administration/persist/raft_storage_interface.hpp"
 #include "clustering/table_manager/table_metadata.hpp"
 
+namespace rockstore { class store; }
 class cache_balancer_t;
 class metadata_file_t;
 class real_multistore_ptr_t;

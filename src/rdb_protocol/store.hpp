@@ -24,6 +24,7 @@
 #include "rdb_protocol/changefeed.hpp"
 #include "rdb_protocol/protocol.hpp"
 #include "rdb_protocol/store_metainfo.hpp"
+#include "rockstore/store.hpp"
 #include "rpc/mailbox/typed.hpp"
 #include "store_view.hpp"
 #include "utils.hpp"
@@ -78,6 +79,7 @@ public:
     using home_thread_mixin_t::assert_thread;
 
     store_t(const region_t &region,
+            rockstore::store *rocks,
             serializer_t *serializer,
             cache_balancer_t *balancer,
             const std::string &perfmon_name,
@@ -369,6 +371,7 @@ public:
     fifo_enforcer_sink_t main_token_sink, sindex_token_sink;
 
     perfmon_collection_t perfmon_collection;
+    rockstore::store *rocks;
     // Mind the constructor ordering. We must destruct the cache and btree
     // before we destruct perfmon_collection
     scoped_ptr_t<cache_t> cache;

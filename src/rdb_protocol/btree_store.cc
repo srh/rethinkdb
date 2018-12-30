@@ -78,6 +78,7 @@ const char* sindex_not_ready_exc_t::what() const throw() {
 sindex_not_ready_exc_t::~sindex_not_ready_exc_t() throw() { }
 
 store_t::store_t(const region_t &_region,
+                 rockstore::store *_rocks,
                  serializer_t *serializer,
                  cache_balancer_t *balancer,
                  const std::string &perfmon_name,
@@ -90,6 +91,7 @@ store_t::store_t(const region_t &_region,
                  update_sindexes_t _update_sindexes)
     : store_view_t(_region),
       perfmon_collection(),
+      rocks(_rocks),
       io_backender_(io_backender), base_path_(base_path),
       perfmon_collection_membership(parent_perfmon_collection, &perfmon_collection, perfmon_name),
       ctx(_ctx),

@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <array>
 
+#include "arch/io/disk.hpp"
 #include "clustering/administration/persist/branch_history_manager.hpp"
 #include "clustering/administration/persist/file_keys.hpp"
 #include "clustering/administration/persist/raft_storage_interface.hpp"
@@ -18,6 +19,7 @@ class real_multistore_ptr_t :
     public multistore_ptr_t {
 public:
     real_multistore_ptr_t(
+            rockstore::store *rocks,
             const namespace_id_t &table_id,
             const serializer_filepath_t &path,
             scoped_ptr_t<real_branch_history_manager_t> &&bhm,
@@ -85,6 +87,7 @@ public:
 
             stores[ix].init(new store_t(
                 cpu_sharding_subspace(ix),
+                rocks,
                 multiplexer->proxies[ix],
                 cache_balancer,
                 strprintf("shard_%d", ix),
@@ -290,6 +293,7 @@ void real_table_persistence_interface_t::load_multistore(
     }
 
     multistore_ptr_out->init(new real_multistore_ptr_t(
+        io_backender->rocks(),
         table_id,
         file_name_for(table_id),
         std::move(bhm),
