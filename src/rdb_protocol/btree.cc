@@ -206,9 +206,23 @@ kv_location_set(keyvalue_location_t *kv_location,
     return ql::serialization_result_t::SUCCESS;
 }
 
+class one_replace_t {
+public:
+    one_replace_t(const btree_batched_replacer_t *_replacer, size_t _index)
+        : replacer(_replacer), index(_index) { }
+
+    ql::datum_t replace(const ql::datum_t &d) const {
+        return replacer->replace(d, index);
+    }
+    return_changes_t should_return_changes() const { return replacer->should_return_changes(); }
+private:
+    const btree_batched_replacer_t *const replacer;
+    const size_t index;
+};
+
 batched_replace_response_t rdb_replace_and_return_superblock(
     const btree_loc_info_t &info,
-    const btree_point_replacer_t *replacer,
+    const one_replace_t *replacer,
     const deletion_context_t *deletion_context,
     promise_t<superblock_t *> *superblock_promise,
     rdb_modification_info_t *mod_info_out,
@@ -371,20 +385,6 @@ ql::datum_t btree_batched_replacer_t::apply_write_hook(
     }
     return res;
 }
-
-class one_replace_t : public btree_point_replacer_t {
-public:
-    one_replace_t(const btree_batched_replacer_t *_replacer, size_t _index)
-        : replacer(_replacer), index(_index) { }
-
-    ql::datum_t replace(const ql::datum_t &d) const {
-        return replacer->replace(d, index);
-    }
-    return_changes_t should_return_changes() const { return replacer->should_return_changes(); }
-private:
-    const btree_batched_replacer_t *const replacer;
-    const size_t index;
-};
 
 void do_a_replace_from_batched_replace(
     auto_drainer_t::lock_t,

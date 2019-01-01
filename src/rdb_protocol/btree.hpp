@@ -104,12 +104,6 @@ struct btree_batched_replacer_t {
         const ql::datum_t &write_timestamp,
         const counted_t<const ql::func_t> &write_hook) const;
 };
-struct btree_point_replacer_t {
-    virtual ~btree_point_replacer_t() { }
-    virtual ql::datum_t replace(
-        const ql::datum_t &d) const = 0;
-    virtual return_changes_t should_return_changes() const = 0;
-};
 
 batched_replace_response_t rdb_batched_replace(
     const btree_info_t &info,
