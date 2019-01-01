@@ -41,6 +41,7 @@ class superblock_t;
 class txn_t;
 class cache_balancer_t;
 struct rdb_modification_report_t;
+namespace rockstore { class store; }
 
 class sindex_not_ready_exc_t : public std::exception {
 public:
@@ -78,6 +79,7 @@ class store_t final : public store_view_t {
 public:
     using home_thread_mixin_t::assert_thread;
 
+    // TODO: Implement or review rocks writing (and reading) in this constructor.
     store_t(const region_t &region,
             rockstore::store *rocks,
             serializer_t *serializer,
@@ -99,6 +101,7 @@ public:
     void new_read_token(read_token_t *token_out);
     void new_write_token(write_token_t *token_out);
 
+    // TODO implement rocks reading below.
     region_map_t<binary_blob_t> get_metainfo(
             order_token_t order_token,
             read_token_t *token,
@@ -135,6 +138,7 @@ public:
             signal_t *interruptor)
         THROWS_ONLY(interrupted_exc_t);
 
+    // TODO implement rocks writing below.
     void write(
             DEBUG_ONLY(const metainfo_checker_t& metainfo_checker, )
             const region_map_t<binary_blob_t>& new_metainfo,

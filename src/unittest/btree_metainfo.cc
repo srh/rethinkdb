@@ -60,6 +60,7 @@ TPTEST(BtreeMetainfo, MetainfoTest) {
     dummy_cache_balancer_t balancer(GIGABYTE);
     cache_t cache(&serializer, &balancer, &get_global_perfmon_collection());
     cache_conn_t cache_conn(&cache);
+    namespace_id_t table_id = str_to_uuid("12345678-1234-5678-abcd-12345678abcd");
 
     {
         txn_t txn(&cache_conn, write_durability_t::HARD, 1);
@@ -68,6 +69,8 @@ TPTEST(BtreeMetainfo, MetainfoTest) {
             real_superblock_t superblock(std::move(sb_lock));
             btree_slice_t::init_real_superblock(
                 &superblock,
+                io_backender.rocks(),
+                table_id,
                 std::vector<char>(), binary_blob_t());
         }
         txn.commit();
@@ -91,7 +94,7 @@ TPTEST(BtreeMetainfo, MetainfoTest) {
                     keys.push_back(string_to_vector(pair.first));
                     values.push_back(string_to_blob(pair.second));
                 }
-                set_superblock_metainfo(superblock.get(), keys, values,
+                set_superblock_metainfo(superblock.get(), io_backender.rocks(), table_id, keys, values,
                     cluster_version_t::v2_1);
             }
             txn->commit();

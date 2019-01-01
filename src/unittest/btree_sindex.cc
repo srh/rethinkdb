@@ -37,6 +37,7 @@ TPTEST(BTreeSindex, LowLevelOps) {
 
     cache_t cache(&serializer, &balancer, &get_global_perfmon_collection());
     cache_conn_t cache_conn(&cache);
+    namespace_id_t table_id = str_to_uuid("12345678-abcd-abcd-abcd-12345678abcd");
 
     {
         txn_t txn(&cache_conn, write_durability_t::HARD, 1);
@@ -44,7 +45,7 @@ TPTEST(BTreeSindex, LowLevelOps) {
             buf_lock_t sb_lock(&txn, SUPERBLOCK_ID, alt_create_t::create);
             real_superblock_t superblock(std::move(sb_lock));
             btree_slice_t::init_real_superblock(
-                &superblock, std::vector<char>(), binary_blob_t());
+                &superblock, io_backender.rocks(), table_id, std::vector<char>(), binary_blob_t());
         }
         txn.commit();
     }

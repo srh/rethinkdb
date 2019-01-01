@@ -1,9 +1,12 @@
 // Copyright 2010-2015 RethinkDB, all rights reserved.
 #include "btree/reql_specific.hpp"
 
+#include "rocksdb/write_batch.h"
+
 #include "btree/secondary_operations.hpp"
 #include "buffer_cache/blob.hpp"
 #include "containers/binary_blob.hpp"
+#include "rockstore/store.hpp"
 
 /* This is the actual structure stored on disk for the superblock of a table's primary or
 sindex B-tree. Both of them use the exact same format, but the sindex B-trees don't make
@@ -141,6 +144,8 @@ block_id_t sindex_superblock_t::get_sindex_block_id() {
 #define BACKFILL_CACHE_PRIORITY 10
 
 void btree_slice_t::init_real_superblock(real_superblock_t *superblock,
+                                         rockstore::store *rocks,
+                                         namespace_id_t table_id,
                                          const std::vector<char> &metainfo_key,
                                          const binary_blob_t &metainfo_value) {
     buf_write_t sb_write(superblock->get());
@@ -155,9 +160,10 @@ void btree_slice_t::init_real_superblock(real_superblock_t *superblock,
     sb->stat_block = create_stat_block(buf_parent_t(superblock->get()->txn()));
     sb->sindex_block = NULL_BLOCK_ID;
 
-    set_superblock_metainfo(superblock, metainfo_key, metainfo_value,
+    set_superblock_metainfo(superblock, rocks, table_id, metainfo_key, metainfo_value,
                             cluster_version_t::v2_1);
 
+    // TODO: There might be rocks-specific stuff about initializing secondary indexes.
     buf_lock_t sindex_block(superblock->get(), alt_create_t::create);
     initialize_secondary_indexes(&sindex_block);
     sb->sindex_block = sindex_block.block_id();
@@ -284,15 +290,19 @@ void get_superblock_metainfo(
 }
 
 void set_superblock_metainfo(real_superblock_t *superblock,
+                             rockstore::store *rocks,
+                             namespace_id_t table_id,
                              const std::vector<char> &key,
                              const binary_blob_t &value,
                              cluster_version_t version) {
     std::vector<std::vector<char> > keys = {key};
     std::vector<binary_blob_t> values = {value};
-    set_superblock_metainfo(superblock, keys, values, version);
+    set_superblock_metainfo(superblock, rocks, table_id, keys, values, version);
 }
 
 void set_superblock_metainfo(real_superblock_t *superblock,
+                             rockstore::store *rocks,
+                             namespace_id_t table_id,
                              const std::vector<std::vector<char> > &keys,
                              const std::vector<binary_blob_t> &values,
                              cluster_version_t version) {
@@ -350,6 +360,20 @@ void set_superblock_metainfo(real_superblock_t *superblock,
 
         buffer_group_copy_data(&write_group, const_view(&group_cpy));
     }
+
+    // Rocksdb metadata.
+    rocksdb::WriteBatch batch;
+    std::string meta_prefix = rockstore::table_metadata_prefix(table_id);
+    // TODO: Don't update version if it's already properly set.
+    rocksdb::Status status = batch.Put(
+        meta_prefix + rockstore::TABLE_METADATA_VERSION_KEY(),
+        rockstore::VERSION());
+    guarantee(status.ok());
+    status = batch.Put(
+        meta_prefix + rockstore::TABLE_METADATA_METAINFO_KEY(),
+        rocksdb::Slice(metainfo.data(), metainfo.size()));
+    guarantee(status.ok());
+    rocks->write_batch(std::move(batch), rockstore::write_options::TODO());
 }
 
 void get_btree_superblock(

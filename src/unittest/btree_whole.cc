@@ -44,7 +44,8 @@ public:
         : rocks(),
           io_backender(rocks.rocks(), file_direct_io_mode_t::buffered_desired),
           file_opener(temp_file.name(), &io_backender),
-          balancer(GIGABYTE) {
+          balancer(GIGABYTE),
+          table_id(str_to_uuid("12345678-4321-4321-4321-abcd12345678")) {
 
         log_serializer_t::create(&file_opener, log_serializer_t::static_config_t());
 
@@ -67,7 +68,7 @@ public:
                 buf_lock_t sb_lock(&txn, SUPERBLOCK_ID, alt_create_t::create);
                 real_superblock_t superblock(std::move(sb_lock));
                 btree_slice_t::init_real_superblock(
-                    &superblock, std::vector<char>(), binary_blob_t());
+                    &superblock, io_backender.rocks(), table_id, std::vector<char>(), binary_blob_t());
             }
             txn.commit();
         }
@@ -320,6 +321,7 @@ private:
     scoped_ptr_t<cache_t> cache;
     scoped_ptr_t<cache_conn_t> cache_conn;
     scoped_ptr_t<short_value_sizer_t> sizer;
+    namespace_id_t table_id;
 
     std::map<store_key_t, std::string> kv;
 };

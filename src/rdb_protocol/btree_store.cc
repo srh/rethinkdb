@@ -118,8 +118,10 @@ store_t::store_t(const region_t &_region,
         {
             buf_lock_t sb_lock(&txn, SUPERBLOCK_ID, alt_create_t::create);
             real_superblock_t superblock(std::move(sb_lock));
+            // TODO: Make sure store initialization logic doesn't miss out on
+            // lock ordering logic, when we go rocks-only.
             btree_slice_t::init_real_superblock(
-                &superblock, key.vector(), binary_blob_t());
+                &superblock, rocks, table_id, key.vector(), binary_blob_t());
         }
         txn.commit();
     }
@@ -225,7 +227,7 @@ void store_t::write(
                                  &txn, &real_superblock, interruptor);
     DEBUG_ONLY_CODE(metainfo->visit(
         real_superblock.get(), metainfo_checker.region, metainfo_checker.callback));
-    metainfo->update(real_superblock.get(), new_metainfo);
+    metainfo->update(real_superblock.get(), rocks, table_id, new_metainfo);
     try {
         protocol_write(_write, response, timestamp, &real_superblock, interruptor);
     } catch (const interrupted_exc_t &) {
@@ -292,6 +294,8 @@ void store_t::reset_data(
 
         region_t deleted_region(subregion.beg, subregion.end, deleted_range);
         metainfo->update(superblock.get(),
+                         rocks,
+                         table_id,
                          region_map_t<binary_blob_t>(deleted_region, zero_metainfo));
 
         superblock.reset();
@@ -1192,7 +1196,7 @@ void store_t::set_metainfo(const region_map_t<binary_blob_t> &new_metainfo,
             &txn,
             &superblock,
             interruptor);
-        metainfo->update(superblock.get(), new_metainfo);
+        metainfo->update(superblock.get(), rocks, table_id, new_metainfo);
     }
     txn->commit();
 }
@@ -1228,7 +1232,7 @@ void store_t::migrate_metainfo(
             &txn,
             &superblock,
             interruptor);
-        metainfo->migrate(superblock.get(), from, to, get_region(), cb);
+        metainfo->migrate(superblock.get(), rocks, table_id, from, to, get_region(), cb);
     }
     txn->commit();
 }

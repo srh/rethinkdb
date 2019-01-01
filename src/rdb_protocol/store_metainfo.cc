@@ -56,7 +56,10 @@ void store_metainfo_manager_t::visit(
 
 void store_metainfo_manager_t::update(
         real_superblock_t *superblock,
+        rockstore::store *rocks,
+        namespace_id_t table_id,
         const region_map_t<binary_blob_t> &new_values) {
+    // TODO: Strip out non-rocks writing (but keep superblock write acquisition waiting).
     guarantee(superblock != nullptr);
     superblock->get()->write_acq_signal()->wait_lazily_unordered();
 
@@ -77,11 +80,13 @@ void store_metainfo_manager_t::update(
             values.push_back(value);
         });
 
-    set_superblock_metainfo(superblock, keys, values, cache_version);
+    set_superblock_metainfo(superblock, rocks, table_id, keys, values, cache_version);
 }
 
 void store_metainfo_manager_t::migrate(
         real_superblock_t *superblock,
+        rockstore::store *rocks,
+        namespace_id_t table_id,
         cluster_version_t from,
         cluster_version_t to,
         const region_t &region, // This should be for all valid ranges for this hash shard
@@ -99,5 +104,5 @@ void store_metainfo_manager_t::migrate(
     }
 
     cache_version = to;
-    update(superblock, new_metainfo);
+    update(superblock, rocks, table_id, new_metainfo);
 }

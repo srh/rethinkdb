@@ -18,9 +18,9 @@
 #include "serializer/log/log_serializer.hpp"
 #include "serializer/merger.hpp"
 
+// See ROCKSDB_STORAGE_FORMAT documentation
 const std::string METADATA_PREFIX = "rethinkdb/metadata/";
 const std::string METADATA_VERSION_KEY = "rethinkdb/metadata/version";
-const std::string METADATA_VERSION_VALUE = "v2_4";
 
 metadata_file_t::read_txn_t::read_txn_t(
         metadata_file_t *f,
@@ -101,7 +101,7 @@ metadata_file_t::metadata_file_t(
 
     // TODO: Remove unused metadata migration logic.
     std::string metadata_version = rocks->read(METADATA_VERSION_KEY);
-    if (metadata_version != METADATA_VERSION_VALUE) {
+    if (metadata_version != rockstore::VERSION()) {
         // TODO
         throw std::runtime_error("Unsupported metadata version");
     }
@@ -120,7 +120,7 @@ metadata_file_t::metadata_file_t(
     // TODO: Make use of perfmon with rockstore, to track metadata writes.
     (void)perfmon_parent;
 
-    rocks->insert(METADATA_VERSION_KEY, METADATA_VERSION_VALUE, rocks_options);
+    rocks->insert(METADATA_VERSION_KEY, rockstore::VERSION(), rocks_options);
 
     {
         cond_t non_interruptor;

@@ -452,7 +452,7 @@ continue_bool_t store_t::receive_backfill(
             metainfo_threshold = progress;
 
             /* Actually apply the metainfo */
-            metainfo->update(superblock, item_producer->get_metainfo()->mask(mask));
+            metainfo->update(superblock, rocks, table_id, item_producer->get_metainfo()->mask(mask));
         };
 
         /* The `apply_*()` functions will call back to `commit_cb` when they're done

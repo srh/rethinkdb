@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "containers/scoped.hpp"
+#include "containers/uuid.hpp"
 
 namespace rocksdb {
 class DB;
@@ -20,6 +21,7 @@ struct write_options {
     write_options() {}
     explicit write_options(bool _sync) : sync(_sync) {}
     bool sync = false;
+    static write_options TODO() { return write_options(false); }
 };
 
 class store {
@@ -51,7 +53,40 @@ private:
 // directory.  Throws std::runtime_error.
 store create_rockstore(const base_path_t &base_path);
 
+// TODO: Not inline
+inline std::string table_prefix(namespace_id_t id) {
+    // TODO: Do we use a binary or non-binary UUID?
+    std::string ret = "tables/" + uuid_to_str(id) + "/";
+    return ret;
+}
+inline std::string table_metadata_prefix(namespace_id_t id) {
+    std::string ret = table_prefix(id);
+    ret += "metadata/";
+    return ret;
+}
+
+inline const char * VERSION() { return "v2_4"; }
+inline const char * TABLE_METADATA_VERSION_KEY() { return "version"; }
+inline const char * TABLE_METADATA_METAINFO_KEY() { return "metainfo"; }
 
 }  // namespace rockstore
+
+/*
+ROCKSDB_STORAGE_FORMAT
+
+Metadata (system metadata file):
+
+rethinkdb/metadata/version => "v2_4"
+rethinkdb/metadata/<key> => <value>
+
+Tables
+
+tables/<table id>/metadata/version => "v2_4"
+tables/<table id>/metadata/<key> => <value>
+
+
+
+
+*/
 
 #endif  // RETHINKDB_ROCKSTORE_STORE_HPP_

@@ -5,9 +5,11 @@
 #include <functional>
 
 #include "containers/binary_blob.hpp"
+#include "containers/uuid.hpp"
 #include "region/region_map.hpp"
 
 class real_superblock_t;
+namespace rockstore { class store; }
 
 class store_metainfo_manager_t {
 public:
@@ -24,9 +26,13 @@ public:
 
     void update(
         real_superblock_t *superblock,
+        rockstore::store *rocks,
+        namespace_id_t table_id,
         const region_map_t<binary_blob_t> &new_metainfo);
 
     void migrate(real_superblock_t *superblock,
+                 rockstore::store *rocks,
+                 namespace_id_t table_id,
                  cluster_version_t from,
                  cluster_version_t to,
                  const region_t &region,
