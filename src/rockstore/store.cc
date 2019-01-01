@@ -11,6 +11,7 @@ store::store(rocksdb::DB *db) : db_(db) {}
 store::store(store&& other) : db_(std::move(other.db_)) {}
 
 store create_rockstore(const base_path_t &base_path) {
+    // TODO: WAL recovery modes config.
     std::string rocks_path = base_path.path() + "/rockstore";
     rocksdb::DB *db;
     rocksdb::Status status;
