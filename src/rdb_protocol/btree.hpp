@@ -123,7 +123,7 @@ void rdb_set(const store_key_t &key, ql::datum_t data,
              point_write_response_t *response,
              rdb_modification_info_t *mod_info,
              profile::trace_t *trace,
-             promise_t<superblock_t *> *pass_back_superblock = nullptr);
+             promise_t<superblock_t *> *pass_back_superblock);
 
 void rdb_delete(const store_key_t &key, btree_slice_t *slice, repli_timestamp_t
                 timestamp, real_superblock_t *superblock,
@@ -132,7 +132,7 @@ void rdb_delete(const store_key_t &key, btree_slice_t *slice, repli_timestamp_t
                 point_delete_response_t *response,
                 rdb_modification_info_t *mod_info,
                 profile::trace_t *trace,
-                promise_t<superblock_t *> *pass_back_superblock = nullptr);
+                promise_t<superblock_t *> *pass_back_superblock);
 
 void rdb_rget_slice(
     btree_slice_t *slice,

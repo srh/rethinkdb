@@ -875,7 +875,7 @@ struct rdb_write_visitor_t : public boost::static_visitor<void> {
         rdb_live_deletion_context_t deletion_context;
         rdb_modification_report_t mod_report(w.key);
         rdb_set(w.key, w.data, w.overwrite, btree, timestamp, superblock->get(),
-                &deletion_context, res, &mod_report.info, trace);
+                &deletion_context, res, &mod_report.info, trace, superblock_t::no_passback);
 
         update_sindexes(mod_report);
     }
@@ -891,7 +891,7 @@ struct rdb_write_visitor_t : public boost::static_visitor<void> {
         rdb_live_deletion_context_t deletion_context;
         rdb_modification_report_t mod_report(d.key);
         rdb_delete(d.key, btree, timestamp, superblock->get(), &deletion_context,
-                delete_mode_t::REGULAR_QUERY, res, &mod_report.info, trace);
+                delete_mode_t::REGULAR_QUERY, res, &mod_report.info, trace, superblock_t::no_passback);
 
         update_sindexes(mod_report);
     }

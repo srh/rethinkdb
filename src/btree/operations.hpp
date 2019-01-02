@@ -36,6 +36,8 @@ the superblock, or about anything else that might be contained in the superblock
 the root block ID and the stat block ID. */
 class superblock_t {
 public:
+    static constexpr std::nullptr_t no_passback = nullptr;
+
     superblock_t() { }
     virtual ~superblock_t() { }
     // Release the superblock if possible (otherwise do nothing)
@@ -134,7 +136,7 @@ void find_keyvalue_location_for_write(
         const value_deleter_t *balancing_detacher,
         keyvalue_location_t *keyvalue_location_out,
         profile::trace_t *trace,
-        promise_t<superblock_t *> *pass_back_superblock = nullptr) THROWS_NOTHING;
+        promise_t<superblock_t *> *pass_back_superblock) THROWS_NOTHING;
 
 void find_keyvalue_location_for_read(
         value_sizer_t *sizer,

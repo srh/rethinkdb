@@ -269,7 +269,8 @@ TPTEST(BTreeSindex, BtreeStoreAPI) {
                 rdb_set(key, data, true, store.get_sindex_slice(sindex_uuid),
                     repli_timestamp_t::distant_past,
                     sindex_super_block.get(), &deletion_context, &response,
-                    &mod_info, static_cast<profile::trace_t *>(nullptr));
+                    &mod_info, static_cast<profile::trace_t *>(nullptr),
+                    superblock_t::no_passback);
             }
             txn->commit();
         }
