@@ -971,9 +971,10 @@ void store_t::protocol_write(const write_t &_write,
 
     {
         profile::sampler_t start_write("Perform write on shard.", trace);
+        txn_t *txn = superblock->expose_buf().txn();
         rdb_write_visitor_t v(btree.get(),
                               this,
-                              superblock->expose_buf().txn(),
+                              txn,
                               std::move(superblock),
                               timestamp.to_repli_timestamp(),
                               ctx,

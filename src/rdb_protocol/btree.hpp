@@ -81,12 +81,13 @@ struct btree_loc_info_t {
     btree_loc_info_t(const btree_info_t *_btree,
                      real_superblock_t *_superblock,
                      const store_key_t *_key)
-        : btree(_btree), superblock(_superblock), key(_key) {
-        guarantee(btree != NULL);
-        guarantee(superblock != NULL);
-        guarantee(key != NULL);
+        : btree(_btree), superblock(std::move(_superblock)), key(_key) {
+        guarantee(btree != nullptr);
+        guarantee(superblock != nullptr);
+        guarantee(key != nullptr);
     }
     const btree_info_t *const btree;
+    // Holds ownership of superblock pointer (must call delete on superblock).
     real_superblock_t *const superblock;
     const store_key_t *const key;
 };

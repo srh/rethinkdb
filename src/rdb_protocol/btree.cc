@@ -410,7 +410,7 @@ void do_a_replace_from_batched_replace(
     rdb_live_deletion_context_t deletion_context;
     rdb_modification_report_t mod_report(*info.key);
     ql::datum_t res = rdb_replace_and_return_superblock(
-        info, &one_replace, &deletion_context, superblock_promise, &mod_report.info,
+        std::move(info), &one_replace, &deletion_context, superblock_promise, &mod_report.info,
         trace);
     *stats_out = (*stats_out).merge(res, ql::stats_merge, limits, conditions);
 

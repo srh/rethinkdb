@@ -14,6 +14,12 @@ class promise_t : public home_thread_mixin_debug_only_t {
 public:
     promise_t() { }
 
+    void pulse(value_type &&v) {
+        assert_thread();
+        value.create(std::move(v));
+        cond.pulse();
+    }
+
     void pulse(const value_type &v) {
         assert_thread();
         value.create(v);
@@ -24,6 +30,12 @@ public:
         if (!is_pulsed()) {
             pulse(v);
         }
+    }
+
+    value_type &wait() {
+        assert_thread();
+        cond.wait_lazily_unordered();
+        return *value.get();
     }
 
     const value_type &wait() const {
