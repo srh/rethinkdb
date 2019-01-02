@@ -425,7 +425,7 @@ void do_a_replace_from_batched_replace(
 
 batched_replace_response_t rdb_batched_replace(
     const btree_info_t &info,
-    scoped_ptr_t<real_superblock_t> *superblock,
+    scoped_ptr_t<real_superblock_t> &&superblock,
     const std::vector<store_key_t> &keys,
     const btree_batched_replacer_t *replacer,
     rdb_modification_report_cb_t *sindex_cb,
@@ -464,7 +464,7 @@ batched_replace_response_t rdb_batched_replace(
             MAX_CONCURRENT_REPLACES, &coro_queue, &callback);
         // We release the superblock either before or after draining on all the
         // write operations depending on the presence of limit changefeeds.
-        scoped_ptr_t<real_superblock_t> current_superblock(superblock->release());
+        scoped_ptr_t<real_superblock_t> current_superblock(std::move(superblock));
         bool update_pkey_cfeeds = sindex_cb->has_pkey_cfeeds(keys);
         {
             auto_drainer_t drainer;

@@ -311,7 +311,7 @@ public:
     void protocol_write(const write_t &write,
                         write_response_t *response,
                         state_timestamp_t timestamp,
-                        scoped_ptr_t<real_superblock_t> *superblock,
+                        scoped_ptr_t<real_superblock_t> superblock,
                         signal_t *interruptor);
 
     void acquire_superblock_for_read(

@@ -229,17 +229,16 @@ void store_t::write(
         real_superblock.get(), metainfo_checker.region, metainfo_checker.callback));
     metainfo->update(real_superblock.get(), rocks, table_id, new_metainfo);
     try {
-        protocol_write(_write, response, timestamp, &real_superblock, interruptor);
+        scoped_ptr_t<real_superblock_t> real_supe = std::move(real_superblock);
+        protocol_write(_write, response, timestamp, std::move(real_supe), interruptor);
     } catch (const interrupted_exc_t &) {
         // We hope that the operation itself is interruption-safe (i.e. always
         // either completes all necessary changes that are part of the
         // transaction, or doesn't perform any changes at all).
         // Hence it should be save to commit here even when interrupted.
-        real_superblock.reset();
         txn->commit();
         throw;
     }
-    real_superblock.reset();
     txn->commit();
 }
 

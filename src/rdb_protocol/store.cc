@@ -826,7 +826,7 @@ struct rdb_write_visitor_t : public boost::static_visitor<void> {
         response->response =
             rdb_batched_replace(
                 btree_info_t(btree, timestamp, datum_string_t(br.pkey)),
-                superblock,
+                std::move(superblock),
                 br.keys,
                 &replacer,
                 &sindex_cb,
@@ -855,7 +855,7 @@ struct rdb_write_visitor_t : public boost::static_visitor<void> {
         response->response =
             rdb_batched_replace(
                 btree_info_t(btree, timestamp, datum_string_t(bi.pkey)),
-                superblock,
+                std::move(superblock),
                 keys,
                 &replacer,
                 &sindex_cb,
@@ -874,7 +874,7 @@ struct rdb_write_visitor_t : public boost::static_visitor<void> {
 
         rdb_live_deletion_context_t deletion_context;
         rdb_modification_report_t mod_report(w.key);
-        rdb_set(w.key, w.data, w.overwrite, btree, timestamp, superblock->get(),
+        rdb_set(w.key, w.data, w.overwrite, btree, timestamp, superblock.get(),
                 &deletion_context, res, &mod_report.info, trace, superblock_t::no_passback);
 
         update_sindexes(mod_report);
@@ -890,7 +890,7 @@ struct rdb_write_visitor_t : public boost::static_visitor<void> {
 
         rdb_live_deletion_context_t deletion_context;
         rdb_modification_report_t mod_report(d.key);
-        rdb_delete(d.key, btree, timestamp, superblock->get(), &deletion_context,
+        rdb_delete(d.key, btree, timestamp, superblock.get(), &deletion_context,
                 delete_mode_t::REGULAR_QUERY, res, &mod_report.info, trace, superblock_t::no_passback);
 
         update_sindexes(mod_report);
@@ -914,7 +914,7 @@ struct rdb_write_visitor_t : public boost::static_visitor<void> {
     rdb_write_visitor_t(btree_slice_t *_btree,
                         store_t *_store,
                         txn_t *_txn,
-                        scoped_ptr_t<real_superblock_t> *_superblock,
+                        scoped_ptr_t<real_superblock_t> &&_superblock,
                         repli_timestamp_t _timestamp,
                         rdb_context_t *_ctx,
                         profile::sampler_t *_sampler,
@@ -927,12 +927,12 @@ struct rdb_write_visitor_t : public boost::static_visitor<void> {
         response(_response),
         ctx(_ctx),
         interruptor(_interruptor),
-        superblock(_superblock),
+        superblock(std::move(_superblock)),
         timestamp(_timestamp),
         sampler(_sampler),
         trace(_trace),
-        sindex_block((*superblock)->expose_buf(),
-                     (*superblock)->get_sindex_block_id(),
+        sindex_block(superblock->expose_buf(),
+                     superblock->get_sindex_block_id(),
                      access_t::write) {
     }
 
@@ -952,7 +952,7 @@ private:
     write_response_t *const response;
     rdb_context_t *const ctx;
     signal_t *const interruptor;
-    scoped_ptr_t<real_superblock_t> *const superblock;
+    scoped_ptr_t<real_superblock_t> superblock;
     const repli_timestamp_t timestamp;
     profile::sampler_t *const sampler;
     profile::trace_t *const trace;
@@ -965,7 +965,7 @@ private:
 void store_t::protocol_write(const write_t &_write,
                              write_response_t *response,
                              state_timestamp_t timestamp,
-                             scoped_ptr_t<real_superblock_t> *superblock,
+                             scoped_ptr_t<real_superblock_t> superblock,
                              signal_t *interruptor) {
     scoped_ptr_t<profile::trace_t> trace = ql::maybe_make_profile_trace(_write.profile);
 
@@ -973,8 +973,8 @@ void store_t::protocol_write(const write_t &_write,
         profile::sampler_t start_write("Perform write on shard.", trace);
         rdb_write_visitor_t v(btree.get(),
                               this,
-                              (*superblock)->expose_buf().txn(),
-                              superblock,
+                              superblock->expose_buf().txn(),
+                              std::move(superblock),
                               timestamp.to_repli_timestamp(),
                               ctx,
                               &start_write,

@@ -107,7 +107,7 @@ struct btree_batched_replacer_t {
 
 batched_replace_response_t rdb_batched_replace(
     const btree_info_t &info,
-    scoped_ptr_t<real_superblock_t> *superblock,
+    scoped_ptr_t<real_superblock_t> &&superblock,
     const std::vector<store_key_t> &keys,
     const btree_batched_replacer_t *replacer,
     rdb_modification_report_cb_t *sindex_cb,
