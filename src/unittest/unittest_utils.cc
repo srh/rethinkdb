@@ -147,6 +147,10 @@ base_path_t temp_directory_t::path() const {
     return directory;
 }
 
+temp_rockstore::temp_rockstore()
+    : dir_(),
+      rocks_(new rockstore::store(rockstore::create_rockstore(dir_.path()))) { }
+
 void let_stuff_happen() {
 #ifdef VALGRIND
     nap(2000);

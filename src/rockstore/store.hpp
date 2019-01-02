@@ -6,6 +6,7 @@
 
 #include "containers/scoped.hpp"
 #include "containers/uuid.hpp"
+#include "rockstore/write_options.hpp"
 
 namespace rocksdb {
 class OptimisticTransactionDB;
@@ -16,13 +17,6 @@ class base_path_t;
 
 
 namespace rockstore {
-
-struct write_options {
-    write_options() {}
-    explicit write_options(bool _sync) : sync(_sync) {}
-    bool sync = false;
-    static write_options TODO() { return write_options(false); }
-};
 
 class store {
 public:

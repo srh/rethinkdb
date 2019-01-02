@@ -48,14 +48,14 @@ private:
 
 class temp_rockstore {
 public:
-    temp_rockstore() : dir_(), rocks_(rockstore::create_rockstore(dir_.path())) { }
+    temp_rockstore();
     DISABLE_COPYING(temp_rockstore);
 
-    rockstore::store *rocks() { return &rocks_; }
+    rockstore::store *rocks() { return rocks_.get(); }
 
 private:
     temp_directory_t dir_;
-    rockstore::store rocks_;
+    scoped_ptr_t<rockstore::store> rocks_;
 };
 
 void let_stuff_happen();

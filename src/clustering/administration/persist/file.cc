@@ -15,6 +15,7 @@
 #include "config/args.hpp"
 #include "logger.hpp"
 #include "paths.hpp"
+#include "rockstore/store.hpp"
 #include "serializer/log/log_serializer.hpp"
 #include "serializer/merger.hpp"
 
@@ -69,6 +70,10 @@ metadata_file_t::write_txn_t::write_txn_t(
         signal_t *interruptor) :
     read_txn_t(_file, write_access_t::write, interruptor)
     { }
+
+void metadata_file_t::write_txn_t::commit() {
+    file->rocks->write_batch(std::move(batch), file->rocks_options);
+}
 
 void metadata_file_t::write_txn_t::write_bin(
         const store_key_t &key,

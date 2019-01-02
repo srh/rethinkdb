@@ -10,7 +10,7 @@
 #include "buffer_cache/types.hpp"
 #include "concurrency/rwlock.hpp"
 #include "containers/archive/string_stream.hpp"
-#include "rockstore/store.hpp"
+#include "rockstore/write_options.hpp"
 #include "serializer/types.hpp"
 #include "utils.hpp"
 
@@ -176,9 +176,7 @@ public:
     // This acts as a safety check to make sure a transaction
     // is not interrupted in the middle, which could leave the
     // metadata in an inconsistent state.
-    void commit() {
-        file->rocks->write_batch(std::move(batch), file->rocks_options);
-    }
+    void commit();
 
 private:
     friend class metadata_file_t;
