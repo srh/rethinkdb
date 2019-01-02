@@ -566,7 +566,11 @@ void store_t::update_sindexes(
 
         rdb_live_deletion_context_t deletion_context;
         for (size_t i = 0; i < mod_reports.size(); ++i) {
-            rdb_update_sindexes(this,
+            // TODO: What rocksdb transaction is this with?
+            // TODO: Inspect all callers of rdb_update_sindexes for transactionality in rocks.
+            rdb_update_sindexes(this->rocks,
+                                this->table_id,
+                                this,
                                 sindexes,
                                 &mod_reports[i],
                                 txn,

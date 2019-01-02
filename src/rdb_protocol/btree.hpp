@@ -299,7 +299,9 @@ public:
     new_mutex_in_line_t get_in_line_for_sindex();
     rwlock_in_line_t get_in_line_for_cfeed_stamp();
 
-    void on_mod_report(const rdb_modification_report_t &mod_report,
+    void on_mod_report(rockstore::store *store,
+                       namespace_id_t table_id,
+                       const rdb_modification_report_t &mod_report,
                        bool update_pkey_cfeeds,
                        new_mutex_in_line_t *sindex_spot,
                        rwlock_in_line_t *stamp_spot);
@@ -308,6 +310,8 @@ public:
 
 private:
     void on_mod_report_sub(
+        rockstore::store *store,
+        namespace_id_t table_id,
         const rdb_modification_report_t &mod_report,
         new_mutex_in_line_t *spot,
         cond_t *keys_available_cond,
@@ -315,6 +319,7 @@ private:
         index_vals_t *old_keys_out,
         index_vals_t *new_keys_out);
 
+    // TODO: Check if we use store_ and sindex_block_ after rocks-only.
     /* Fields initialized by the constructor. */
     auto_drainer_t::lock_t lock_;
     store_t *store_;
@@ -325,6 +330,8 @@ private:
 };
 
 void rdb_update_sindexes(
+    rockstore::store *rocks,
+    namespace_id_t table_id,
     store_t *store,
     const store_t::sindex_access_vector_t &sindexes,
     const rdb_modification_report_t *modification,

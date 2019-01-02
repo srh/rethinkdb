@@ -310,7 +310,9 @@ void post_construct_and_drain_queue(
                 // If it's in the range that is still to be constructed we ignore it.
                 if (!construction_range_inout->contains_key(mod_report.primary_key)) {
                     rdb_post_construction_deletion_context_t deletion_context;
-                    rdb_update_sindexes(store,
+                    rdb_update_sindexes(store->rocks,
+                                        store->get_table_id(),
+                                        store,
                                         sindexes,
                                         &mod_report,
                                         queue_txn.get(),

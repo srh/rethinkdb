@@ -66,6 +66,8 @@ void insert_rows(int start, int finish, store_t *store) {
             store_t::sindex_access_vector_t sindexes;
             store->acquire_all_sindex_superblocks_for_write(&sindex_block, &sindexes);
             rdb_update_sindexes(
+                store->rocks,
+                store->get_table_id(),
                 store,
                 sindexes,
                 &mod_report,

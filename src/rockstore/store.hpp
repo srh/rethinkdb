@@ -18,6 +18,9 @@ class base_path_t;
 
 namespace rockstore {
 
+// TODO: Check all callers for gratuitous std::string construction, use rocksdb::Slice.
+// TODO: All the callers of these methods need to be on a transaction (except for metadata).
+
 class store {
 public:
     // Throws std::runtime_error.
@@ -66,6 +69,9 @@ inline std::string table_metadata_prefix(namespace_id_t id) {
     ret += "metadata/";
     return ret;
 }
+
+// TODO: Remove primary key length limitation at some point.
+// TODO: table_secondary_key is still using gnarly 250-byte sindex keys.
 
 inline std::string table_secondary_key(namespace_id_t id, const std::string &index_name,
                                        const std::string &key) {

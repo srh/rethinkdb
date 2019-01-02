@@ -212,6 +212,7 @@ inline bool operator>=(const store_key_t &k1, const store_key_t &k2) {
 
 bool unescaped_str_to_key(const char *str, int len, store_key_t *buf);
 std::string key_to_unescaped_str(const store_key_t &key);
+std::string key_to_unescaped_str(const btree_key_t *key);
 
 std::string key_to_debug_str(const store_key_t &key);
 

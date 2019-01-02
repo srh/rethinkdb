@@ -104,6 +104,7 @@ void rdb_get(const store_key_t &store_key, btree_slice_t *slice,
     }
 }
 
+// TODO: Remove after rocks switching done, no callers.
 void kv_location_delete(keyvalue_location_t *kv_location,
                         const store_key_t &key,
                         repli_timestamp_t timestamp,
@@ -133,6 +134,43 @@ void kv_location_delete(keyvalue_location_t *kv_location,
     rdb_value_sizer_t sizer(block_size);
     apply_keyvalue_change(&sizer, kv_location, key.btree_key(), timestamp,
             deletion_context->balancing_detacher(), delete_mode);
+}
+
+void kv_location_delete(rockstore::store *rocks,
+                        const std::string &rocks_kv_location,
+                        keyvalue_location_t *kv_location,
+                        const store_key_t &key,
+                        repli_timestamp_t timestamp,
+                        const deletion_context_t *deletion_context,
+                        delete_mode_t delete_mode,
+                        rdb_modification_info_t *mod_info_out) {
+    // Notice this also implies that buf is valid.
+    guarantee(kv_location->value.has());
+
+    // As noted above, we can be sure that buf is valid.
+    const max_block_size_t block_size = kv_location->buf.cache()->max_block_size();
+
+    if (mod_info_out != nullptr) {
+        guarantee(mod_info_out->deleted.second.empty());
+
+        mod_info_out->deleted.second.assign(
+                kv_location->value_as<rdb_value_t>()->value_ref(),
+                kv_location->value_as<rdb_value_t>()->value_ref()
+                + kv_location->value_as<rdb_value_t>()->inline_size(block_size));
+    }
+
+    // Detach/Delete
+    deletion_context->in_tree_deleter()->delete_value(buf_parent_t(&kv_location->buf),
+                                                      kv_location->value.get());
+
+    kv_location->value.reset();
+    rdb_value_sizer_t sizer(block_size);
+    null_key_modification_callback_t null_cb;
+    apply_keyvalue_change(&sizer, kv_location, key.btree_key(), timestamp,
+            deletion_context->balancing_detacher(), &null_cb, delete_mode);
+
+    // TODO: We need to update the rocks secondary indexes (after primary key deletion), _transactionally_.
+    rocks->remove(rocks_kv_location, rockstore::write_options::TODO());
 }
 
 // TODO: Remove this when rdb_set is done using it.
@@ -183,10 +221,25 @@ kv_location_set(keyvalue_location_t *kv_location,
     return ql::serialization_result_t::SUCCESS;
 }
 
+ql::serialization_result_t datum_serialize_to_string(const ql::datum_t &datum, std::string *out) {
+    // TODO: We can avoid double-copying or something, because the write_message_t does
+    // get preallocated to one buffer, we can use a rocksdb::Slice.
+    write_message_t wm;
+    ql::serialization_result_t res =
+        datum_serialize(&wm, datum, ql::check_datum_serialization_errors_t::YES);
+    if (bad(res)) {
+        return res;
+    }
+    string_stream_t stream;
+    int write_res = send_write_message(&stream, &wm);
+    guarantee(write_res == 0);
+    *out = std::move(stream.str());
+    return res;
+}
 
 MUST_USE ql::serialization_result_t
 kv_location_set(rockstore::store *rocks,
-                namespace_id_t table_id,
+                const std::string &rocks_kv_location,
                 keyvalue_location_t *kv_location,
                 const store_key_t &key,
                 ql::datum_t data,
@@ -233,31 +286,64 @@ kv_location_set(rockstore::store *rocks,
                           delete_mode_t::REGULAR_QUERY);
 
     {
-        // TODO: We can avoid this duplicate serialization, because the write_message_t does
-        // get preallocated to one buffer, I think.
-        write_message_t wm;
+        std::string str;
         ql::serialization_result_t res =
-            datum_serialize(&wm, data, ql::check_datum_serialization_errors_t::YES);
+            datum_serialize_to_string(data, &str);
         // TODO: Remove this guarantee when we delete the identical check when
         // we serialize previously.
         guarantee(!bad(res));
         if (bad(res)) {
             return res;
         }
-        string_stream_t stream;
-        int write_res = send_write_message(&stream, &wm);
-        guarantee(write_res == 0);
         // TODO: Apply this write to secondary indexes transactionally, too (just
         // like after the primary key remove call).
-        rocks->put(
-            rockstore::table_primary_key(table_id, key_to_unescaped_str(key)),
-            stream.str(),
-            rockstore::write_options::TODO());
+        rocks->put(rocks_kv_location, str, rockstore::write_options::TODO());
     }
 
     return ql::serialization_result_t::SUCCESS;
 }
 
+MUST_USE ql::serialization_result_t
+kv_location_set_secondary(
+        rockstore::store *rocks,
+        const std::string &rocks_kv_location,
+        const ql::datum_t &value_datum,
+        keyvalue_location_t *kv_location,
+        const store_key_t &key,
+        const std::vector<char> &value_ref,
+        repli_timestamp_t timestamp,
+        const deletion_context_t *deletion_context) {
+    // Detach/Delete the old value.
+    if (kv_location->value.has()) {
+        deletion_context->in_tree_deleter()->delete_value(
+                buf_parent_t(&kv_location->buf), kv_location->value.get());
+    }
+
+    scoped_malloc_t<rdb_value_t> new_value(
+            value_ref.data(), value_ref.size());
+
+    // Update the leaf, if needed.
+    kv_location->value = std::move(new_value);
+
+    null_key_modification_callback_t null_cb;
+    rdb_value_sizer_t sizer(kv_location->buf.cache()->max_block_size());
+    apply_keyvalue_change(&sizer, kv_location, key.btree_key(), timestamp,
+                          deletion_context->balancing_detacher(), &null_cb,
+                          delete_mode_t::REGULAR_QUERY);
+
+    {
+        // TODO: Avoid having to reserialize the value again (for each secondary index on top of the primary).
+        std::string str;
+        ql::serialization_result_t res =
+            datum_serialize_to_string(value_datum, &str);
+        guarantee(!bad(res));
+        rocks->put(rocks_kv_location, str, rockstore::write_options::TODO());
+    }
+
+    return ql::serialization_result_t::SUCCESS;
+}
+
+// TODO: Remove if no callers.
 MUST_USE ql::serialization_result_t
 kv_location_set(keyvalue_location_t *kv_location,
                 const store_key_t &key,
@@ -280,6 +366,7 @@ kv_location_set(keyvalue_location_t *kv_location,
     apply_keyvalue_change(&sizer, kv_location, key.btree_key(), timestamp,
                           deletion_context->balancing_detacher(),
                           delete_mode_t::REGULAR_QUERY);
+
     return ql::serialization_result_t::SUCCESS;
 }
 
@@ -353,20 +440,18 @@ batched_replace_response_t rdb_replace_and_return_superblock(
                 return resp;
             }
 
+            std::string rocks_kv_location = rockstore::table_primary_key(table_id, key_to_unescaped_str(*info.key));
             /* Now that the change has passed validation, write it to disk */
             if (new_val.get_type() == ql::datum_t::R_NULL) {
-                kv_location_delete(&kv_location, *info.key, info.btree->timestamp,
+                kv_location_delete(rocks, rocks_kv_location,
+                                   &kv_location, *info.key, info.btree->timestamp,
                                    deletion_context, delete_mode_t::REGULAR_QUERY,
                                    mod_info_out);
-
-                // TODO: We need to update the rocks secondary indexes, _transactionally_.
-                rocks->remove(
-                    rockstore::table_primary_key(table_id, key_to_unescaped_str(*info.key)),
-                    rockstore::write_options::TODO());
             } else {
                 r_sanity_check(new_val.get_field(primary_key, ql::NOTHROW).has());
                 ql::serialization_result_t res =
-                    kv_location_set(rocks, table_id, &kv_location, *info.key, new_val,
+                    kv_location_set(rocks, rocks_kv_location,
+                                    &kv_location, *info.key, new_val,
                                     info.btree->timestamp, deletion_context,
                                     mod_info_out);
                 if (res & ql::serialization_result_t::ARRAY_TOO_BIG) {
@@ -507,6 +592,7 @@ void do_a_replace_from_batched_replace(
     new_mutex_in_line_t sindex_spot = mod_cb->get_in_line_for_sindex();
 
     mod_cb->on_mod_report(
+        store, table_id,
         mod_report, update_pkey_cfeeds, &sindex_spot, &stamp_spot);
 }
 
@@ -1491,6 +1577,8 @@ rwlock_in_line_t rdb_modification_report_cb_t::get_in_line_for_cfeed_stamp() {
 }
 
 void rdb_modification_report_cb_t::on_mod_report(
+    rockstore::store *store,
+    namespace_id_t table_id,
     const rdb_modification_report_t &report,
     bool update_pkey_cfeeds,
     new_mutex_in_line_t *sindex_spot,
@@ -1504,6 +1592,8 @@ void rdb_modification_report_cb_t::on_mod_report(
         coro_t::spawn_now_dangerously(
             std::bind(&rdb_modification_report_cb_t::on_mod_report_sub,
                       this,
+                      store,
+                      table_id,
                       report,
                       sindex_spot,
                       &keys_available_cond,
@@ -1555,6 +1645,8 @@ void rdb_modification_report_cb_t::on_mod_report(
 }
 
 void rdb_modification_report_cb_t::on_mod_report_sub(
+    rockstore::store *rocks,
+    namespace_id_t table_id,
     const rdb_modification_report_t &mod_report,
     new_mutex_in_line_t *spot,
     cond_t *keys_available_cond,
@@ -1563,7 +1655,9 @@ void rdb_modification_report_cb_t::on_mod_report_sub(
     index_vals_t *cfeed_new_keys_out) {
     store_->sindex_queue_push(mod_report, spot);
     rdb_live_deletion_context_t deletion_context;
-    rdb_update_sindexes(store_,
+    rdb_update_sindexes(rocks,
+                        table_id,
+                        store_,
                         sindexes_,
                         &mod_report,
                         sindex_block_->txn(),
@@ -1837,6 +1931,8 @@ void deserialize_sindex_info_or_crash(
 
 /* Used below by rdb_update_sindexes. */
 void rdb_update_single_sindex(
+        rockstore::store *rocks,
+        namespace_id_t table_id,
         store_t *store,
         const store_t::sindex_access_t *sindex,
         const deletion_context_t *deletion_context,
@@ -1913,6 +2009,8 @@ void rdb_update_single_sindex(
 
                     if (kv_location.value.has()) {
                         kv_location_delete(
+                            rocks,
+                            rockstore::table_secondary_key(table_id, sindex->name.name, key_to_unescaped_str(it->first.btree_key())),
                             &kv_location,
                             it->first,
                             repli_timestamp_t::distant_past,
@@ -1920,6 +2018,7 @@ void rdb_update_single_sindex(
                             delete_mode_t::REGULAR_QUERY,
                             nullptr);
                     }
+
                     // The keyvalue location gets destroyed here.
                 }
                 superblock =
@@ -1988,11 +2087,18 @@ void rdb_update_single_sindex(
                         trace,
                         &return_superblock_local);
 
+                    // NOTE: We generally need a copy of the value to be available in the secondary index
+                    // because the secondary index key can get truncated.  TODO: Make it not get truncated,
+                    // so that we can have a reference to the primary key instead.
                     ql::serialization_result_t res =
-                        kv_location_set(&kv_location, it->first,
-                                        modification->info.added.second,
-                                        repli_timestamp_t::distant_past,
-                                        deletion_context);
+                        kv_location_set_secondary(
+                            rocks,
+                            rockstore::table_secondary_key(table_id, sindex->name.name, key_to_unescaped_str(it->first.btree_key())),
+                            modification->info.added.first /* copy of the value here */,
+                            &kv_location, it->first,
+                            modification->info.added.second,
+                            repli_timestamp_t::distant_past,
+                            deletion_context);
                     // this particular context cannot fail AT THE MOMENT.
                     guarantee(!bad(res));
                     // The keyvalue location gets destroyed here.
@@ -2045,6 +2151,8 @@ void rdb_update_single_sindex(
 }
 
 void rdb_update_sindexes(
+    rockstore::store *rocks,
+    namespace_id_t table_id,
     store_t *store,
     const store_t::sindex_access_vector_t &sindexes,
     const rdb_modification_report_t *modification,
@@ -2083,6 +2191,8 @@ void rdb_update_sindexes(
                 coro_t::spawn_sometime(
                     std::bind(
                         &rdb_update_single_sindex,
+                        rocks,
+                        table_id,
                         store,
                         sindex.get(),
                         actual_deletion_context,
@@ -2176,7 +2286,9 @@ public:
             new_mutex_acq_t wtxn_acq(&wtxn_lock_, interruptor_);
             guarantee(wtxn_.has());
             const rdb_post_construction_deletion_context_t deletion_context;
-            rdb_update_sindexes(store_,
+            rdb_update_sindexes(store_->rocks,
+                                store_->get_table_id(),
+                                store_,
                                 sindexes_,
                                 &mod_report,
                                 wtxn_.get(),

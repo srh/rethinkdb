@@ -37,6 +37,10 @@ std::string key_to_unescaped_str(const store_key_t &key) {
     return std::string(reinterpret_cast<const char *>(key.contents()), key.size());
 }
 
+std::string key_to_unescaped_str(const btree_key_t *key) {
+    return std::string(reinterpret_cast<const char *>(key->contents), key->size);
+}
+
 std::string key_to_debug_str(const store_key_t &key) {
     std::string s;
     s.push_back('"');
