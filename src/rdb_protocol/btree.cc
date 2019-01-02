@@ -390,7 +390,7 @@ void do_a_replace_from_batched_replace(
     auto_drainer_t::lock_t,
     fifo_enforcer_sink_t *batched_replaces_fifo_sink,
     const fifo_enforcer_write_token_t &batched_replaces_fifo_token,
-    const btree_loc_info_t &info,
+    btree_loc_info_t &&info,
     const one_replace_t one_replace,
     const ql::configured_limits_t &limits,
     promise_t<superblock_t *> *superblock_promise,
@@ -471,20 +471,32 @@ batched_replace_response_t rdb_batched_replace(
             for (size_t i = 0; i < keys.size(); ++i) {
                 promise_t<superblock_t *> superblock_promise;
                 coro_queue.push(
-                    std::bind(
-                        &do_a_replace_from_batched_replace,
-                        auto_drainer_t::lock_t(&drainer),
-                        &sink,
-                        source.enter_write(),
-                        btree_loc_info_t(&info, current_superblock.release(), &keys[i]),
-                        one_replace_t(replacer, i),
-                        limits,
-                        &superblock_promise,
-                        sindex_cb,
-                        update_pkey_cfeeds,
-                        &stats,
-                        trace,
-                        &conditions));
+                    [lock = auto_drainer_t::lock_t(&drainer),
+                     &sink,
+                     source_token = source.enter_write(),
+                     info = btree_loc_info_t(&info, current_superblock.release(), &keys[i]),
+                     one_replace = one_replace_t(replacer, i),
+                     limits,
+                     &superblock_promise,
+                     sindex_cb,
+                     update_pkey_cfeeds,
+                     &stats,
+                     trace,
+                     &conditions]() mutable {
+                        do_a_replace_from_batched_replace(
+                            lock,
+                            &sink,
+                            source_token,
+                            std::move(info),
+                            one_replace,
+                            limits,
+                            &superblock_promise,
+                            sindex_cb,
+                            update_pkey_cfeeds,
+                            &stats,
+                            trace,
+                            &conditions);
+                     });
                 current_superblock.init(
                     static_cast<real_superblock_t *>(superblock_promise.wait()));
             }
