@@ -8,7 +8,7 @@
 #include "containers/uuid.hpp"
 
 namespace rocksdb {
-class DB;
+class OptimisticTransactionDB;
 class WriteBatch;
 }
 
@@ -44,9 +44,9 @@ public:
     store& operator=(store&&) = delete;
 
 private:
-    explicit store(rocksdb::DB *db);
+    explicit store(rocksdb::OptimisticTransactionDB *db);
     friend store create_rockstore(const base_path_t &base_path);
-    scoped_ptr_t<rocksdb::DB> db_;
+    scoped_ptr_t<rocksdb::OptimisticTransactionDB> db_;
 };
 
 // Creates the db's sole global rocksdb store.  Called once in the lifetime of the data

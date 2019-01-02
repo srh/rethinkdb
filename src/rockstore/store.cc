@@ -1,24 +1,25 @@
 #include "rockstore/store.hpp"
 
 #include "rocksdb/db.h"
+#include "rocksdb/utilities/optimistic_transaction_db.h"
 
 #include "arch/runtime/thread_pool.hpp"
 #include "paths.hpp"
 
 namespace rockstore {
 
-store::store(rocksdb::DB *db) : db_(db) {}
+store::store(rocksdb::OptimisticTransactionDB *db) : db_(db) {}
 store::store(store&& other) : db_(std::move(other.db_)) {}
 
 store create_rockstore(const base_path_t &base_path) {
     // TODO: WAL recovery modes config.
     std::string rocks_path = base_path.path() + "/rockstore";
-    rocksdb::DB *db;
+    rocksdb::OptimisticTransactionDB *db;
     rocksdb::Status status;
     linux_thread_pool_t::run_in_blocker_pool([&]() {
         rocksdb::Options options;
         options.create_if_missing = true;
-        status = rocksdb::DB::Open(options, rocks_path, &db);
+        status = rocksdb::OptimisticTransactionDB::Open(options, rocks_path, &db);
     });
     if (!status.ok()) {
         // TODO
