@@ -100,6 +100,19 @@ rocksdb::WriteOptions to_rocks(const write_options &opts) {
     return ret;
 }
 
+void store::put(const std::string &key, const std::string &value,
+                const write_options &opts) {
+    rocksdb::Status status;
+    linux_thread_pool_t::run_in_blocker_pool([&]() {
+        status = db_->Put(to_rocks(opts), key, value);
+    });
+    if (!status.ok()) {
+        // TODO
+        throw std::runtime_error("store::put failed");
+    }
+    return;
+}
+
 void store::insert(const std::string &key, const std::string &value,
                    const write_options &opts) {
     rocksdb::Status status;
@@ -137,6 +150,17 @@ void store::write_batch(rocksdb::WriteBatch&& batch, const write_options &opts) 
     return;
 }
 
+void store::remove(const std::string &key, const write_options &opts) {
+    rocksdb::Status status;
+    linux_thread_pool_t::run_in_blocker_pool([&]() {
+        status = db_->Delete(to_rocks(opts), key);
+    });
+    if (!status.ok()) {
+        // TODO
+        throw std::runtime_error("store::remove failed");
+    }
+    return;
+}
 
 
 }  // namespace rockstore

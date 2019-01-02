@@ -825,6 +825,8 @@ struct rdb_write_visitor_t : public boost::static_visitor<void> {
 
         response->response =
             rdb_batched_replace(
+                store->rocks,
+                store->get_table_id(),
                 btree_info_t(btree, timestamp, datum_string_t(br.pkey)),
                 std::move(superblock),
                 br.keys,
@@ -854,6 +856,8 @@ struct rdb_write_visitor_t : public boost::static_visitor<void> {
         }
         response->response =
             rdb_batched_replace(
+                store->rocks,
+                store->get_table_id(),
                 btree_info_t(btree, timestamp, datum_string_t(bi.pkey)),
                 std::move(superblock),
                 keys,
@@ -864,6 +868,7 @@ struct rdb_write_visitor_t : public boost::static_visitor<void> {
                 trace);
     }
 
+    // TODO: Use rockstore for these writes too.
     void operator()(const point_write_t &w) {
         sampler->new_sample();
         response->response = point_write_response_t();

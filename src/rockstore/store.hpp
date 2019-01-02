@@ -27,8 +27,16 @@ public:
 
     std::vector<std::pair<std::string, std::string>> read_all_prefixed(std::string prefix);
 
+    // Overwrites what's there.
     // Throws std::runtime_error.
+    void put(const std::string &key, const std::string &value, const write_options &opts);
+
+    // Throws std::runtime_error.
+    // TODO: This isn't an atomic op, is it?  Rename this?  Suitable for metadata?
     void insert(const std::string &key, const std::string &value, const write_options &opts);
+
+    // Throws std::runtime_error.
+    void remove(const std::string &key, const write_options &opts);
 
     // Throws std::runtime_error.
     void write_batch(rocksdb::WriteBatch&& batch, const write_options &opts);
@@ -57,6 +65,17 @@ inline std::string table_metadata_prefix(namespace_id_t id) {
     std::string ret = table_prefix(id);
     ret += "metadata/";
     return ret;
+}
+
+inline std::string table_secondary_key(namespace_id_t id, const std::string &index_name,
+                                       const std::string &key) {
+    std::string ret = "tables/" + uuid_to_str(id) + "/" + index_name + "/" + key;
+    return ret;
+}
+
+inline std::string table_primary_key(namespace_id_t id, const std::string &key) {
+    // We use the empty index name for primary index.
+    return table_secondary_key(id, "", key);
 }
 
 inline const char * VERSION() { return "v2_4"; }

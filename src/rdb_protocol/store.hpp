@@ -139,6 +139,7 @@ public:
         THROWS_ONLY(interrupted_exc_t);
 
     // TODO implement rocks writing below.
+    // TODO: Make write, in rdb_replace_and_return_superblock (and any other) read from rocksdb.
     void write(
             DEBUG_ONLY(const metainfo_checker_t& metainfo_checker, )
             const region_map_t<binary_blob_t>& new_metainfo,

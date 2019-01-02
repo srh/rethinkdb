@@ -107,6 +107,8 @@ struct btree_batched_replacer_t {
 };
 
 batched_replace_response_t rdb_batched_replace(
+    rockstore::store *rocks,
+    namespace_id_t table_id,
     const btree_info_t &info,
     scoped_ptr_t<real_superblock_t> &&superblock,
     const std::vector<store_key_t> &keys,
@@ -286,7 +288,7 @@ void deserialize_sindex_info_or_crash(
 /* An rdb_modification_cb_t is passed to BTree operations and allows them to
  * modify the secondary while they perform an operation. */
 class superblock_queue_t;
-class rdb_modification_report_cb_t {
+class rdb_modification_report_cb_t final {
 public:
     rdb_modification_report_cb_t(
             store_t *store,

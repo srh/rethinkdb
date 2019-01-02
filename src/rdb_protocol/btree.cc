@@ -20,6 +20,7 @@
 #include "containers/archive/boost_types.hpp"
 #include "containers/archive/buffer_group_stream.hpp"
 #include "containers/archive/buffer_stream.hpp"
+#include "containers/archive/string_stream.hpp"
 #include "containers/scoped.hpp"
 #include "rdb_protocol/geo/exceptions.hpp"
 #include "rdb_protocol/geo/indexing.hpp"
@@ -134,6 +135,7 @@ void kv_location_delete(keyvalue_location_t *kv_location,
             deletion_context->balancing_detacher(), delete_mode);
 }
 
+// TODO: Remove this when rdb_set is done using it.
 MUST_USE ql::serialization_result_t
 kv_location_set(keyvalue_location_t *kv_location,
                 const store_key_t &key,
@@ -181,6 +183,81 @@ kv_location_set(keyvalue_location_t *kv_location,
     return ql::serialization_result_t::SUCCESS;
 }
 
+
+MUST_USE ql::serialization_result_t
+kv_location_set(rockstore::store *rocks,
+                namespace_id_t table_id,
+                keyvalue_location_t *kv_location,
+                const store_key_t &key,
+                ql::datum_t data,
+                repli_timestamp_t timestamp,
+                const deletion_context_t *deletion_context,
+                rdb_modification_info_t *mod_info_out) THROWS_NOTHING {
+    scoped_malloc_t<rdb_value_t> new_value(blob::btree_maxreflen);
+    memset(new_value.get(), 0, blob::btree_maxreflen);
+
+    const max_block_size_t block_size = kv_location->buf.cache()->max_block_size();
+    {
+        blob_t blob(block_size, new_value->value_ref(), blob::btree_maxreflen);
+        ql::serialization_result_t res
+            = datum_serialize_onto_blob(buf_parent_t(&kv_location->buf),
+                                        &blob, data);
+        if (bad(res)) return res;
+    }
+
+    if (mod_info_out) {
+        guarantee(mod_info_out->added.second.empty());
+        mod_info_out->added.second.assign(new_value->value_ref(),
+            new_value->value_ref() + new_value->inline_size(block_size));
+    }
+
+    if (kv_location->value.has()) {
+        deletion_context->in_tree_deleter()->delete_value(
+                buf_parent_t(&kv_location->buf), kv_location->value.get());
+        if (mod_info_out != nullptr) {
+            guarantee(mod_info_out->deleted.second.empty());
+            mod_info_out->deleted.second.assign(
+                    kv_location->value_as<rdb_value_t>()->value_ref(),
+                    kv_location->value_as<rdb_value_t>()->value_ref()
+                    + kv_location->value_as<rdb_value_t>()->inline_size(block_size));
+        }
+    }
+
+    // Actually update the leaf, if needed.
+    kv_location->value = std::move(new_value);
+    null_key_modification_callback_t null_cb;
+    rdb_value_sizer_t sizer(block_size);
+    apply_keyvalue_change(&sizer, kv_location, key.btree_key(),
+                          timestamp,
+                          deletion_context->balancing_detacher(), &null_cb,
+                          delete_mode_t::REGULAR_QUERY);
+
+    {
+        // TODO: We can avoid this duplicate serialization, because the write_message_t does
+        // get preallocated to one buffer, I think.
+        write_message_t wm;
+        ql::serialization_result_t res =
+            datum_serialize(&wm, data, ql::check_datum_serialization_errors_t::YES);
+        // TODO: Remove this guarantee when we delete the identical check when
+        // we serialize previously.
+        guarantee(!bad(res));
+        if (bad(res)) {
+            return res;
+        }
+        string_stream_t stream;
+        int write_res = send_write_message(&stream, &wm);
+        guarantee(write_res == 0);
+        // TODO: Apply this write to secondary indexes transactionally, too (just
+        // like after the primary key remove call).
+        rocks->put(
+            rockstore::table_primary_key(table_id, key_to_unescaped_str(key)),
+            stream.str(),
+            rockstore::write_options::TODO());
+    }
+
+    return ql::serialization_result_t::SUCCESS;
+}
+
 MUST_USE ql::serialization_result_t
 kv_location_set(keyvalue_location_t *kv_location,
                 const store_key_t &key,
@@ -221,6 +298,8 @@ private:
 };
 
 batched_replace_response_t rdb_replace_and_return_superblock(
+    rockstore::store *rocks,
+    namespace_id_t table_id,
     const btree_loc_info_t &info,
     const one_replace_t *replacer,
     const deletion_context_t *deletion_context,
@@ -244,6 +323,7 @@ batched_replace_response_t rdb_replace_and_return_superblock(
         info.btree->slice->stats.pm_keys_set.record();
         info.btree->slice->stats.pm_total_keys_set += 1;
 
+        // TODO: Read the old val from rocksdb.
         ql::datum_t old_val;
         if (!kv_location.value.has()) {
             // If there's no entry with this key, pass NULL to the function.
@@ -278,10 +358,15 @@ batched_replace_response_t rdb_replace_and_return_superblock(
                 kv_location_delete(&kv_location, *info.key, info.btree->timestamp,
                                    deletion_context, delete_mode_t::REGULAR_QUERY,
                                    mod_info_out);
+
+                // TODO: We need to update the rocks secondary indexes, _transactionally_.
+                rocks->remove(
+                    rockstore::table_primary_key(table_id, key_to_unescaped_str(*info.key)),
+                    rockstore::write_options::TODO());
             } else {
                 r_sanity_check(new_val.get_field(primary_key, ql::NOTHROW).has());
                 ql::serialization_result_t res =
-                    kv_location_set(&kv_location, *info.key, new_val,
+                    kv_location_set(rocks, table_id, &kv_location, *info.key, new_val,
                                     info.btree->timestamp, deletion_context,
                                     mod_info_out);
                 if (res & ql::serialization_result_t::ARRAY_TOO_BIG) {
@@ -388,6 +473,8 @@ ql::datum_t btree_batched_replacer_t::apply_write_hook(
 
 void do_a_replace_from_batched_replace(
     auto_drainer_t::lock_t,
+    rockstore::store *store,
+    namespace_id_t table_id,
     fifo_enforcer_sink_t *batched_replaces_fifo_sink,
     const fifo_enforcer_write_token_t &batched_replaces_fifo_token,
     btree_loc_info_t &&info,
@@ -410,7 +497,7 @@ void do_a_replace_from_batched_replace(
     rdb_live_deletion_context_t deletion_context;
     rdb_modification_report_t mod_report(*info.key);
     ql::datum_t res = rdb_replace_and_return_superblock(
-        std::move(info), &one_replace, &deletion_context, superblock_promise, &mod_report.info,
+        store, table_id, std::move(info), &one_replace, &deletion_context, superblock_promise, &mod_report.info,
         trace);
     *stats_out = (*stats_out).merge(res, ql::stats_merge, limits, conditions);
 
@@ -424,6 +511,8 @@ void do_a_replace_from_batched_replace(
 }
 
 batched_replace_response_t rdb_batched_replace(
+    rockstore::store *rocks,
+    namespace_id_t table_id,
     const btree_info_t &info,
     scoped_ptr_t<real_superblock_t> &&superblock,
     const std::vector<store_key_t> &keys,
@@ -472,6 +561,8 @@ batched_replace_response_t rdb_batched_replace(
                 promise_t<superblock_t *> superblock_promise;
                 coro_queue.push(
                     [lock = auto_drainer_t::lock_t(&drainer),
+                     rocks,
+                     table_id,
                      &sink,
                      source_token = source.enter_write(),
                      info = btree_loc_info_t(&info, current_superblock.release(), &keys[i]),
@@ -485,6 +576,8 @@ batched_replace_response_t rdb_batched_replace(
                      &conditions]() mutable {
                         do_a_replace_from_batched_replace(
                             lock,
+                            rocks,
+                            table_id,
                             &sink,
                             source_token,
                             std::move(info),
