@@ -352,7 +352,6 @@ private:
     // through `clear_sindex_data()`.
     void drop_sindex(uuid_u sindex_id) THROWS_NOTHING;
 
-    // TODO implement rocks writing below.
     // Resumes post construction for partially constructed indexes.  Resumes deleting
     // deleted indexes.  Also migrates the secondary index block to the current version.
     void help_construct_bring_sindexes_up_to_date();
