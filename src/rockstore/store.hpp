@@ -80,15 +80,17 @@ inline std::string table_sindex_map(namespace_id_t id) {
 // TODO: Remove primary key length limitation at some point.
 // TODO: table_secondary_key is still using gnarly 250-byte sindex keys.
 
-inline std::string table_secondary_key(namespace_id_t id, const std::string &index_name,
+inline std::string table_secondary_key(namespace_id_t id, uuid_u index_id,
                                        const std::string &key) {
-    std::string ret = "tables/" + uuid_to_str(id) + "/" + index_name + "/" + key;
+    // TODO: a non-binary uuid?  okay.
+    std::string ret = "tables/" + uuid_to_str(id) + "/" + uuid_to_str(index_id) + "/" + key;
     return ret;
 }
 
 inline std::string table_primary_key(namespace_id_t id, const std::string &key) {
     // We use the empty index name for primary index.
-    return table_secondary_key(id, "", key);
+    std::string ret = "tables/" + uuid_to_str(id) + "//" + key;
+    return ret;
 }
 
 inline const char * VERSION() { return "v2_4"; }
@@ -114,7 +116,7 @@ Primary keys:
 tables/<table id>//<btree_key> => <value>
 
 Secondary indexes:
-tables/<table id>/<index name>/<btree_key> => <value>
+tables/<table id>/<index id>/<btree_key> => <value>
 
 Secondary index map:
 tables/<table id>/metadata/sindex_map => std::map<sindex_name_t, secondary_index_t>

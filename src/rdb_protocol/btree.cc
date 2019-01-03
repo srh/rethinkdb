@@ -2099,7 +2099,7 @@ void rdb_update_single_sindex(
                     if (kv_location.value.has()) {
                         kv_location_delete(
                             rocks,
-                            rockstore::table_secondary_key(table_id, sindex->name.name, key_to_unescaped_str(it->first.btree_key())),
+                            rockstore::table_secondary_key(table_id, sindex->sindex.id, key_to_unescaped_str(it->first.btree_key())),
                             &kv_location,
                             it->first,
                             repli_timestamp_t::distant_past,
@@ -2182,7 +2182,7 @@ void rdb_update_single_sindex(
                     ql::serialization_result_t res =
                         kv_location_set_secondary(
                             rocks,
-                            rockstore::table_secondary_key(table_id, sindex->name.name, key_to_unescaped_str(it->first.btree_key())),
+                            rockstore::table_secondary_key(table_id, sindex->sindex.id, key_to_unescaped_str(it->first.btree_key())),
                             modification->info.added.first /* copy of the value here */,
                             &kv_location, it->first,
                             modification->info.added.second,
