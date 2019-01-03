@@ -2525,6 +2525,7 @@ void post_construct_secondary_index_range(
         const std::function<bool(int64_t)> &check_should_abort,
         signal_t *interruptor)
     THROWS_ONLY(interrupted_exc_t) {
+    // TODO: Do read operations with rockstore.
 
     // In case the index gets deleted in the middle of the construction, this gets
     // triggered.

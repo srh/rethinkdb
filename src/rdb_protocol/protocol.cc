@@ -48,6 +48,7 @@ void resume_construct_sindex(
         store_t *store,
         auto_drainer_t::lock_t store_keepalive) THROWS_NOTHING {
     with_priority_t p(CORO_PRIORITY_SINDEX_CONSTRUCTION);
+    // TODO: Implement rockstore reading below.
 
     // Block out backfills to improve performance.
     // A very useful side-effect of this is that if a server is added as a new replica
@@ -93,6 +94,7 @@ void resume_construct_sindex(
         return;
     }
 
+    // TODO: Implement rockstore writing below.
     uuid_u post_construct_id = generate_uuid();
 
     /* Secondary indexes are constructed in multiple passes, moving through the primary
@@ -188,6 +190,7 @@ void post_construct_and_drain_queue(
         scoped_ptr_t<disk_backed_queue_wrapper_t<rdb_modification_report_t> >
             &&mod_queue)
     THROWS_NOTHING {
+    // TODO: rockstore reading in this function
 
     // `post_construct_secondary_index_range` can post-construct multiple secondary
     // indexes at the same time. We don't currently make use of that functionality

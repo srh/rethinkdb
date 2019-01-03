@@ -186,7 +186,6 @@ public:
             signal_t *interruptor)
             THROWS_ONLY(interrupted_exc_t);
 
-    // TODO implement rocks writing below.
     /* Warning: If the index already exists, this function will crash. Make sure that
     you don't run multiple instances of this for the same index at the same time. */
     void sindex_create(
@@ -353,6 +352,7 @@ private:
     // through `clear_sindex_data()`.
     void drop_sindex(uuid_u sindex_id) THROWS_NOTHING;
 
+    // TODO implement rocks writing below.
     // Resumes post construction for partially constructed indexes.  Resumes deleting
     // deleted indexes.  Also migrates the secondary index block to the current version.
     void help_construct_bring_sindexes_up_to_date();

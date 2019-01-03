@@ -723,10 +723,10 @@ void store_t::clear_sindex_data(
         const key_range_t &pkey_range_to_clear,
         signal_t *interruptor)
         THROWS_ONLY(interrupted_exc_t) {
+    // TODO: Do the rockstore reading for this operation too.
     /* Delete one piece of the secondary index at a time */
     key_range_t remaining_range = key_range_t::universe();
-    for (bool reached_end = false; !reached_end;)
-    {
+    for (bool reached_end = false; !reached_end; ) {
         coro_t::yield();
 
         /* Start a write transaction. */
@@ -820,6 +820,9 @@ void store_t::clear_sindex_data(
                         keys[i].btree_key(),
                         deletion_context->balancing_detacher());
 
+                std::string rocks_kv_location =
+                    rockstore::table_secondary_key(table_id, sindex_id, key_to_unescaped_str(keys[i]));
+                rocks->remove(rocks_kv_location, rockstore::write_options::TODO());
                 /* Here kv_location is destructed, which returns the superblock */
             }
 
@@ -834,6 +837,9 @@ void store_t::clear_sindex_data(
 }
 
 void store_t::drop_sindex(uuid_u sindex_id) THROWS_NOTHING {
+    // TODO: Rocks note: We use the locks to make sure nothing is still using the sindex when
+    // we delete the locks... (the bufs, actually).
+
     /* Start a transaction. */
     write_token_t token;
     new_write_token(&token);
