@@ -71,6 +71,11 @@ inline std::string table_metadata_prefix(namespace_id_t id) {
     ret += "metadata/";
     return ret;
 }
+inline std::string table_sindex_map(namespace_id_t id) {
+    std::string ret = table_metadata_prefix(id);
+    ret += "sindex_map";
+    return ret;
+}
 
 // TODO: Remove primary key length limitation at some point.
 // TODO: table_secondary_key is still using gnarly 250-byte sindex keys.
@@ -105,7 +110,14 @@ Tables
 tables/<table id>/metadata/version => "v2_4"
 tables/<table id>/metadata/<key> => <value>
 
+Primary keys:
+tables/<table id>//<btree_key> => <value>
 
+Secondary indexes:
+tables/<table id>/<index name>/<btree_key> => <value>
+
+Secondary index map:
+tables/<table id>/metadata/sindex_map => std::map<sindex_name_t, secondary_index_t>
 
 
 */

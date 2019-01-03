@@ -5,8 +5,10 @@
 #include "buffer_cache/alt.hpp"
 #include "buffer_cache/blob.hpp"
 #include "buffer_cache/serialize_onto_blob.hpp"
+#include "containers/archive/string_stream.hpp"
 #include "containers/archive/vector_stream.hpp"
 #include "containers/archive/versioned.hpp"
+#include "rockstore/store.hpp"
 
 RDB_IMPL_SERIALIZABLE_5_SINCE_v2_2(
         secondary_index_t, superblock, opaque_definition,
@@ -158,6 +160,8 @@ void get_secondary_indexes_internal(
 }
 
 void set_secondary_indexes_internal(
+        rockstore::store *rocks,
+        namespace_id_t table_id,
         buf_lock_t *sindex_block,
         const std::map<sindex_name_t, secondary_index_t> &sindexes) {
     buf_write_t write(sindex_block);
@@ -172,16 +176,21 @@ void set_secondary_indexes_internal(
     data->magic = btree_sindex_block_magic_t<cluster_version_t::LATEST_DISK>::value;
     serialize_onto_blob<cluster_version_t::LATEST_DISK>(
             buf_parent_t(sindex_block), &sindex_blob, sindexes);
+
+    // TODO: rocksdb transactionality
+    std::string sindex_rocks_blob = serialize_to_string<cluster_version_t::LATEST_DISK>(sindexes);
+    rocks->put(rockstore::table_sindex_map(table_id), sindex_rocks_blob, rockstore::write_options::TODO());
 }
 
-void initialize_secondary_indexes(buf_lock_t *sindex_block) {
+void initialize_secondary_indexes(rockstore::store *rocks, namespace_id_t table_id,
+                                  buf_lock_t *sindex_block) {
     buf_write_t write(sindex_block);
     btree_sindex_block_t *data
         = static_cast<btree_sindex_block_t *>(write.get_data_write());
     data->magic = btree_sindex_block_magic_t<cluster_version_t::LATEST_DISK>::value;
     memset(data->sindex_blob, 0, btree_sindex_block_t::SINDEX_BLOB_MAXREFLEN);
 
-    set_secondary_indexes_internal(sindex_block,
+    set_secondary_indexes_internal(rocks, table_id, sindex_block,
                                    std::map<sindex_name_t, secondary_index_t>());
 }
 
@@ -219,7 +228,9 @@ void get_secondary_indexes(buf_lock_t *sindex_block,
     get_secondary_indexes_internal(sindex_block, sindexes_out);
 }
 
-void migrate_secondary_index_block(buf_lock_t *sindex_block) {
+void migrate_secondary_index_block(
+        rockstore::store *rocks, namespace_id_t table_id,
+        buf_lock_t *sindex_block) {
     cluster_version_t block_version;
     {
         buf_read_t read(sindex_block);
@@ -231,21 +242,23 @@ void migrate_secondary_index_block(buf_lock_t *sindex_block) {
     std::map<sindex_name_t, secondary_index_t> sindexes;
     get_secondary_indexes_internal(sindex_block, &sindexes);
     if (block_version != cluster_version_t::LATEST_DISK) {
-        set_secondary_indexes_internal(sindex_block, sindexes);
+        set_secondary_indexes_internal(rocks, table_id, sindex_block, sindexes);
     }
 }
 
-void set_secondary_index(buf_lock_t *sindex_block, const sindex_name_t &name,
+void set_secondary_index(rockstore::store *rocks, namespace_id_t table_id,
+                         buf_lock_t *sindex_block, const sindex_name_t &name,
                          const secondary_index_t &sindex) {
     std::map<sindex_name_t, secondary_index_t> sindex_map;
     get_secondary_indexes_internal(sindex_block, &sindex_map);
 
     /* We insert even if it already exists overwriting the old value. */
     sindex_map[name] = sindex;
-    set_secondary_indexes_internal(sindex_block, sindex_map);
+    set_secondary_indexes_internal(rocks, table_id, sindex_block, sindex_map);
 }
 
-void set_secondary_index(buf_lock_t *sindex_block, uuid_u id,
+void set_secondary_index(rockstore::store *rocks, namespace_id_t table_id,
+                         buf_lock_t *sindex_block, uuid_u id,
                          const secondary_index_t &sindex) {
     std::map<sindex_name_t, secondary_index_t> sindex_map;
     get_secondary_indexes_internal(sindex_block, &sindex_map);
@@ -256,15 +269,16 @@ void set_secondary_index(buf_lock_t *sindex_block, uuid_u id,
             it->second = sindex;
         }
     }
-    set_secondary_indexes_internal(sindex_block, sindex_map);
+    set_secondary_indexes_internal(rocks, table_id, sindex_block, sindex_map);
 }
 
-bool delete_secondary_index(buf_lock_t *sindex_block, const sindex_name_t &name) {
+bool delete_secondary_index(rockstore::store *rocks, namespace_id_t table_id,
+                            buf_lock_t *sindex_block, const sindex_name_t &name) {
     std::map<sindex_name_t, secondary_index_t> sindex_map;
     get_secondary_indexes_internal(sindex_block, &sindex_map);
 
     if (sindex_map.erase(name) == 1) {
-        set_secondary_indexes_internal(sindex_block, sindex_map);
+        set_secondary_indexes_internal(rocks, table_id, sindex_block, sindex_map);
         return true;
     } else {
         return false;

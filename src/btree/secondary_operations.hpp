@@ -13,6 +13,8 @@
 #include "rpc/serialize_macros.hpp"
 #include "serializer/types.hpp"
 
+namespace rockstore { class store; }
+
 /* This file contains code for working with the sindex block, which is a child of the
 table's primary superblock.
 
@@ -97,7 +99,8 @@ RDB_DECLARE_SERIALIZABLE(sindex_name_t);
 /* Note if this function is called after secondary indexes have been added it
  * will leak blocks (and also make those secondary indexes unusable.) There's
  * no reason to ever do this. */
-void initialize_secondary_indexes(buf_lock_t *superblock);
+void initialize_secondary_indexes(
+    rockstore::store *rocks, namespace_id_t table_id, buf_lock_t *superblock);
 
 bool get_secondary_index(buf_lock_t *sindex_block,
                          const sindex_name_t &name,
@@ -110,18 +113,21 @@ void get_secondary_indexes(buf_lock_t *sindex_block,
                            std::map<sindex_name_t, secondary_index_t> *sindexes_out);
 
 /* Rewrites the secondary index block with up-to-date serialization */
-void migrate_secondary_index_block(buf_lock_t *sindex_block);
+void migrate_secondary_index_block(rockstore::store *rocks, namespace_id_t table_id,
+                                   buf_lock_t *sindex_block);
 
 /* Overwrites existing values with the same id. */
-void set_secondary_index(buf_lock_t *sindex_block,
+void set_secondary_index(rockstore::store *rocks, namespace_id_t table_id, buf_lock_t *sindex_block,
                          const sindex_name_t &name, const secondary_index_t &sindex);
 
 /* Must be used to overwrite an already existing sindex. */
-void set_secondary_index(buf_lock_t *sindex_block, uuid_u id,
+// TODO: Unclear why we have redundant id/sindex.id parameters.
+void set_secondary_index(rockstore::store *rocks, namespace_id_t table_id, buf_lock_t *sindex_block, uuid_u id,
                          const secondary_index_t &sindex);
 
 // XXX note this just drops the entry. It doesn't cleanup the btree that it points
 // to. `drop_sindex` Does both and should be used publicly.
-bool delete_secondary_index(buf_lock_t *sindex_block, const sindex_name_t &name);
+bool delete_secondary_index(rockstore::store *rocks, namespace_id_t table_id,
+                            buf_lock_t *sindex_block, const sindex_name_t &name);
 
 #endif /* BTREE_SECONDARY_OPERATIONS_HPP_ */

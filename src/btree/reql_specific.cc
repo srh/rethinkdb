@@ -163,9 +163,8 @@ void btree_slice_t::init_real_superblock(real_superblock_t *superblock,
     set_superblock_metainfo(superblock, rocks, table_id, metainfo_key, metainfo_value,
                             cluster_version_t::v2_1);
 
-    // TODO: There might be rocks-specific stuff about initializing secondary indexes.
     buf_lock_t sindex_block(superblock->get(), alt_create_t::create);
-    initialize_secondary_indexes(&sindex_block);
+    initialize_secondary_indexes(rocks, table_id, &sindex_block);
     sb->sindex_block = sindex_block.block_id();
 }
 

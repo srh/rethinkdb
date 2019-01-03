@@ -5,6 +5,7 @@
 #include <string>
 
 #include "containers/archive/archive.hpp"
+#include "version.hpp"
 
 class string_stream_t : public write_stream_t {
 public:
@@ -20,6 +21,20 @@ private:
 
     DISABLE_COPYING(string_stream_t);
 };
+
+// TODO: Consider serialize_to_vector with vector_stream.
+template <cluster_version_t W, class T>
+std::string serialize_to_string(const T &value) {
+    static_assert(W == cluster_version_t::LATEST_DISK,
+                  "Serializing to earlier version.");
+    // We still make a second copy when serializing.
+    write_message_t wm;
+    serialize<W>(&wm, value);
+    string_stream_t stream;
+    DEBUG_VAR int res = send_write_message(&stream, &wm);
+    rassert(res == 0);
+    return std::move(stream.str());
+}
 
 class string_read_stream_t : public read_stream_t {
 public:

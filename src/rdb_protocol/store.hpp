@@ -182,11 +182,11 @@ public:
 
     /* End of `store_view_t` interface */
 
-    // TODO implement rocks writing below.
     std::map<std::string, std::pair<sindex_config_t, sindex_status_t> > sindex_list(
             signal_t *interruptor)
             THROWS_ONLY(interrupted_exc_t);
 
+    // TODO implement rocks writing below.
     /* Warning: If the index already exists, this function will crash. Make sure that
     you don't run multiple instances of this for the same index at the same time. */
     void sindex_create(

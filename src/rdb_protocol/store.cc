@@ -42,8 +42,11 @@ void store_t::note_reshard(const region_t &shard_region) {
     // block.
 }
 
-reql_version_t update_sindex_last_compatible_version(secondary_index_t *sindex,
-                                                     buf_lock_t *sindex_block) {
+reql_version_t update_sindex_last_compatible_version(
+        rockstore::store *rocks,
+        namespace_id_t table_id,
+        secondary_index_t *sindex,
+        buf_lock_t *sindex_block) {
     sindex_disk_info_t sindex_info;
     deserialize_sindex_info_or_crash(sindex->opaque_definition, &sindex_info);
 
@@ -66,7 +69,7 @@ reql_version_t update_sindex_last_compatible_version(secondary_index_t *sindex,
 
         sindex->opaque_definition = stream.vector();
 
-        ::set_secondary_index(sindex_block, sindex->id, *sindex);
+        ::set_secondary_index(rocks, table_id, sindex_block, sindex->id, *sindex);
     }
 
     return res;
@@ -98,7 +101,7 @@ void store_t::help_construct_bring_sindexes_up_to_date() {
     superblock.reset();
 
     // Migrate the secondary index block
-    migrate_secondary_index_block(&sindex_block);
+    migrate_secondary_index_block(rocks, table_id, &sindex_block);
 
     auto clear_sindex = [this](uuid_u sindex_id,
                                auto_drainer_t::lock_t store_keepalive) {

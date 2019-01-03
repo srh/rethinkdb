@@ -439,7 +439,7 @@ void store_t::sindex_rename_multi(
         bool success = get_secondary_index(
             &sindex_block, sindex_name_t(pair.first), &definition);
         guarantee(success);
-        success = delete_secondary_index(&sindex_block, sindex_name_t(pair.first));
+        success = delete_secondary_index(rocks, table_id, &sindex_block, sindex_name_t(pair.first));
         guarantee(success);
 
         auto slice_it = secondary_index_slices.find(definition.id);
@@ -454,7 +454,7 @@ void store_t::sindex_rename_multi(
     }
 
     for (const auto &pair : to_put_back) {
-        set_secondary_index(&sindex_block, sindex_name_t(pair.first), pair.second.first);
+        set_secondary_index(rocks, table_id, &sindex_block, sindex_name_t(pair.first), pair.second.first);
         pair.second.second->rename(&perfmon_collection, "index-" + pair.first);
     }
 
@@ -660,7 +660,7 @@ optional<uuid_u> store_t::add_sindex_internal(
 
         sindex.needs_post_construction_range = key_range_t::universe();
 
-        ::set_secondary_index(sindex_block, name, sindex);
+        ::set_secondary_index(rocks, table_id, sindex_block, name, sindex);
         return make_optional(sindex.id);
     }
 }
@@ -921,7 +921,7 @@ void store_t::drop_sindex(uuid_u sindex_id) THROWS_NOTHING {
                                       sindex.superblock, access_t::write);
     sindex_superblock_lock.write_acq_signal()->wait_lazily_unordered();
     sindex_superblock_lock.mark_deleted();
-    ::delete_secondary_index(&sindex_block, compute_sindex_deletion_name(sindex.id));
+    ::delete_secondary_index(rocks, table_id, &sindex_block, compute_sindex_deletion_name(sindex.id));
     size_t num_erased = secondary_index_slices.erase(sindex.id);
     guarantee(num_erased == 1);
 
@@ -991,7 +991,7 @@ bool store_t::mark_index_up_to_date(uuid_u id,
     if (found) {
         sindex.needs_post_construction_range = except_for_remaining_range;
 
-        ::set_secondary_index(sindex_block, id, sindex);
+        ::set_secondary_index(rocks, table_id, sindex_block, id, sindex);
     }
 
     return found;
@@ -1007,13 +1007,13 @@ MUST_USE bool store_t::mark_secondary_index_deleted(
     }
 
     // Delete the current entry
-    success = delete_secondary_index(sindex_block, name);
+    success = delete_secondary_index(rocks, table_id, sindex_block, name);
     guarantee(success);
 
     // Insert the new entry under a different name
     const sindex_name_t sindex_del_name = compute_sindex_deletion_name(sindex.id);
     sindex.being_deleted = true;
-    set_secondary_index(sindex_block, sindex_del_name, sindex);
+    set_secondary_index(rocks, table_id, sindex_block, sindex_del_name, sindex);
 
     // Hide the index from the perfmon collection
     auto slice_it = secondary_index_slices.find(sindex.id);
