@@ -138,7 +138,6 @@ public:
             signal_t *interruptor)
         THROWS_ONLY(interrupted_exc_t);
 
-    // TODO implement rocks writing below.
     // TODO: Make write, in rdb_replace_and_return_superblock (and any other) read from rocksdb.
     void write(
             DEBUG_ONLY(const metainfo_checker_t& metainfo_checker, )
@@ -152,6 +151,7 @@ public:
             signal_t *interruptor)
         THROWS_ONLY(interrupted_exc_t);
 
+    // TODO implement rocks writing below.
     continue_bool_t send_backfill_pre(
             const region_map_t<state_timestamp_t> &start_point,
             backfill_pre_item_consumer_t *pre_item_consumer,
