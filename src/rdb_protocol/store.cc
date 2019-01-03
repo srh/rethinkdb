@@ -868,7 +868,6 @@ struct rdb_write_visitor_t : public boost::static_visitor<void> {
                 trace);
     }
 
-    // TODO: Use rockstore for these writes too.
     void operator()(const point_write_t &w) {
         sampler->new_sample();
         response->response = point_write_response_t();
@@ -879,7 +878,8 @@ struct rdb_write_visitor_t : public boost::static_visitor<void> {
 
         rdb_live_deletion_context_t deletion_context;
         rdb_modification_report_t mod_report(w.key);
-        rdb_set(w.key, w.data, w.overwrite, btree, timestamp, superblock.get(),
+        rdb_set(store->rocks, store->get_table_id(),
+                w.key, w.data, w.overwrite, btree, timestamp, superblock.get(),
                 &deletion_context, res, &mod_report.info, trace, superblock_t::no_passback);
 
         update_sindexes(mod_report);
@@ -895,12 +895,14 @@ struct rdb_write_visitor_t : public boost::static_visitor<void> {
 
         rdb_live_deletion_context_t deletion_context;
         rdb_modification_report_t mod_report(d.key);
-        rdb_delete(d.key, btree, timestamp, superblock.get(), &deletion_context,
+        rdb_delete(store->rocks, store->get_table_id(),
+                d.key, btree, timestamp, superblock.get(), &deletion_context,
                 delete_mode_t::REGULAR_QUERY, res, &mod_report.info, trace, superblock_t::no_passback);
 
         update_sindexes(mod_report);
     }
 
+    // TODO: Use rockstore for these writes too.
     void operator()(const sync_t &) {
         sampler->new_sample();
         response->response = sync_response_t();

@@ -696,6 +696,60 @@ batched_replace_response_t rdb_batched_replace(
     return std::move(out).to_datum();
 }
 
+void rdb_set(rockstore::store *rocks,
+             namespace_id_t table_id,
+             const store_key_t &key,
+             ql::datum_t data,
+             bool overwrite,  /* TODO: Who calls this with and without overwrite? */
+             btree_slice_t *slice,
+             repli_timestamp_t timestamp,
+             superblock_t *superblock,
+             const deletion_context_t *deletion_context,
+             point_write_response_t *response_out,
+             rdb_modification_info_t *mod_info,
+             profile::trace_t *trace,
+             promise_t<superblock_t *> *pass_back_superblock) {
+    keyvalue_location_t kv_location;
+    rdb_value_sizer_t sizer(superblock->cache()->max_block_size());
+    find_keyvalue_location_for_write(&sizer, superblock, key.btree_key(), timestamp,
+                                     deletion_context->balancing_detacher(),
+                                     &kv_location, trace, pass_back_superblock);
+    slice->stats.pm_keys_set.record();
+    slice->stats.pm_total_keys_set += 1;
+    const bool had_value = kv_location.value.has();
+
+    /* update the modification report */
+    if (kv_location.value.has()) {
+        // TODO: Make the reading use rockstore.
+        mod_info->deleted.first = get_data(kv_location.value_as<rdb_value_t>(),
+                                           buf_parent_t(&kv_location.buf));
+    }
+
+    mod_info->added.first = data;
+
+    if (overwrite || !had_value) {
+        std::string rocks_kv_location = rockstore::table_primary_key(table_id, key_to_unescaped_str(key));
+        // TODO: We don't do kv_location_delete in case of null value?
+        ql::serialization_result_t res =
+            kv_location_set(rocks, rocks_kv_location,
+                            &kv_location, key, data, timestamp, deletion_context,
+                            mod_info);
+        if (res & ql::serialization_result_t::ARRAY_TOO_BIG) {
+            rfail_typed_target(&data, "Array too large for disk writes "
+                               "(limit 100,000 elements).");
+        } else if (res & ql::serialization_result_t::EXTREMA_PRESENT) {
+            rfail_typed_target(&data, "`r.minval` and `r.maxval` cannot be "
+                               "written to disk.");
+        }
+        r_sanity_check(!ql::bad(res));
+        guarantee(mod_info->deleted.second.empty() == !had_value &&
+                  !mod_info->added.second.empty());
+    }
+    response_out->result =
+        (had_value ? point_write_result_t::DUPLICATE : point_write_result_t::STORED);
+}
+
+// TODO: Remove this if nothing is using it.
 void rdb_set(const store_key_t &key,
              ql::datum_t data,
              bool overwrite,
@@ -743,6 +797,41 @@ void rdb_set(const store_key_t &key,
         (had_value ? point_write_result_t::DUPLICATE : point_write_result_t::STORED);
 }
 
+void rdb_delete(rockstore::store *rocks,
+                namespace_id_t table_id,
+                const store_key_t &key,
+                btree_slice_t *slice,
+                repli_timestamp_t timestamp,
+                real_superblock_t *superblock,
+                const deletion_context_t *deletion_context,
+                delete_mode_t delete_mode,
+                point_delete_response_t *response,
+                rdb_modification_info_t *mod_info,
+                profile::trace_t *trace,
+                promise_t<superblock_t *> *pass_back_superblock) {
+    keyvalue_location_t kv_location;
+    rdb_value_sizer_t sizer(superblock->cache()->max_block_size());
+    find_keyvalue_location_for_write(&sizer, superblock, key.btree_key(), timestamp,
+            deletion_context->balancing_detacher(), &kv_location, trace,
+            pass_back_superblock);
+    slice->stats.pm_keys_set.record();
+    slice->stats.pm_total_keys_set += 1;
+    bool exists = kv_location.value.has();
+
+    /* Update the modification report. */
+    if (exists) {
+        // TODO: Make the reading use rockstore.
+        mod_info->deleted.first = get_data(kv_location.value_as<rdb_value_t>(),
+                                           buf_parent_t(&kv_location.buf));
+        std::string rocks_kv_location = rockstore::table_primary_key(table_id, key_to_unescaped_str(key));
+        kv_location_delete(rocks, rocks_kv_location, &kv_location, key, timestamp, deletion_context,
+            delete_mode, mod_info);
+        guarantee(!mod_info->deleted.second.empty() && mod_info->added.second.empty());
+    }
+    response->result = (exists ? point_delete_result_t::DELETED : point_delete_result_t::MISSING);
+}
+
+// TODO: Remove if no callers.
 void rdb_delete(const store_key_t &key, btree_slice_t *slice,
                 repli_timestamp_t timestamp,
                 real_superblock_t *superblock,
