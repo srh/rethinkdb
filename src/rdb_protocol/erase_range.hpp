@@ -8,7 +8,9 @@
 #include "btree/keys.hpp"
 #include "btree/types.hpp"
 #include "buffer_cache/types.hpp"
+#include "containers/uuid.hpp"
 
+namespace rockstore { class store; }
 class btree_slice_t;
 struct btree_key_t;
 class deletion_context_t;
@@ -45,6 +47,20 @@ modification reports to store_t::update_sindexes() takes care of that).
 Returns `CONTINUE` if it stopped because it collected `max_keys_to_erase` and `ABORT` if
 it stopped because it hit the end of the range. */
 continue_bool_t rdb_erase_small_range(
+    btree_slice_t *btree_slice,
+    key_tester_t *tester,
+    const key_range_t &keys,
+    superblock_t *superblock,
+    const deletion_context_t *deletion_context,
+    signal_t *interruptor,
+    uint64_t max_keys_to_erase /* 0 = unlimited */,
+    std::vector<rdb_modification_report_t> *mod_reports_out,
+    key_range_t *deleted_out);
+
+
+continue_bool_t rdb_erase_small_range(
+    rockstore::store *rocks,
+    namespace_id_t table_id,
     btree_slice_t *btree_slice,
     key_tester_t *tester,
     const key_range_t &keys,

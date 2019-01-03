@@ -186,6 +186,8 @@ void apply_empty_range(
 `apply_multi_key_item()`. It applies a single `backfill_item_t::pair_t` to the B-tree.
 It doesn't call `on_commit()` or modify the metainfo. */
 void apply_item_pair(
+        rockstore::store *rocks,
+        namespace_id_t table_id,
         btree_slice_t *slice,
         real_superblock_t *superblock,
         backfill_item_t::pair_t &&pair,
@@ -200,13 +202,15 @@ void apply_item_pair(
         archive_result_t res = datum_deserialize(&read_stream, &datum);
         guarantee(res == archive_result_t::SUCCESS);
 
+        // TODO: For rocks there's transactionality to pass around (related to updating metainfo)
         point_write_response_t dummy_response;
-        rdb_set(pair.key, datum, true, slice, pair.recency, superblock,
+        rdb_set(rocks, table_id, pair.key, datum, true, slice, pair.recency, superblock,
             &deletion_context, &dummy_response, &mod_reports_out->back().info, nullptr,
             pass_back_superblock);
     } else {
+        // TODO: For rocks there's transactionality to pass around (related to updating metainfo)
         point_delete_response_t dummy_response;
-        rdb_delete(pair.key, slice, pair.recency, superblock,
+        rdb_delete(rocks, table_id, pair.key, slice, pair.recency, superblock,
             &deletion_context, delete_mode_t::MAKE_TOMBSTONE, &dummy_response,
             &mod_reports_out->back().info, nullptr, pass_back_superblock);
     }
@@ -219,6 +223,8 @@ the previous contents of the range.
 Note that multiple calls to `apply_single_key_item()` can be pipelined efficiently,
 because it releases the superblock as soon as it acquires the next node in the B-tree. */
 void apply_single_key_item(
+        rockstore::store *rocks,
+        namespace_id_t table_id,
         const receive_backfill_tokens_t &tokens,
         /* `item` is conceptually passed by move, but `std::bind()` isn't smart enough to
         handle that. */
@@ -247,12 +253,13 @@ void apply_single_key_item(
             release the superblock soon */
             sindex_block = buf_lock_t(superblock->expose_buf(),
                 superblock->get_sindex_block_id(), access_t::write);
+            // TODO: This definitely needs to be in a rocksdb transaction, and possibly should be in opposite order.
             tokens.update_metainfo_cb(item.range.right, superblock.get());
         }
 
         /* Actually apply the change, releasing the superblock in the process. */
         std::vector<rdb_modification_report_t> mod_reports;
-        apply_item_pair(tokens.info->slice, superblock.get(),
+        apply_item_pair(rocks, table_id, tokens.info->slice, superblock.get(),
             std::move(item.pairs[0]), &mod_reports, nullptr);
 
         /* Notify that we're done and update the sindexes */
@@ -273,6 +280,8 @@ void apply_single_key_item(
 delete any existing values or deletion entries in that range, and then apply the contents
 of `item.pairs`. */
 void apply_multi_key_item(
+        rockstore::store *rocks,
+        namespace_id_t table_id,
         const receive_backfill_tokens_t &tokens,
         /* `item` is conceptually passed by move, but `std::bind()` isn't smart enough to
         handle that. */
@@ -346,7 +355,10 @@ void apply_multi_key_item(
             always_true_key_tester_t key_tester;
             key_range_t range_deleted;
             rdb_live_deletion_context_t deletion_context;
-            continue_bool_t res = rdb_erase_small_range(tokens.info->slice, &key_tester,
+            // TODO: We need to manage rocks transactionality
+            // between erasing range, applying writes, and updating sindex.
+            continue_bool_t res = rdb_erase_small_range(
+                rocks, table_id, tokens.info->slice, &key_tester,
                 range_to_delete, superblock.get(), &deletion_context,
                 &non_interruptor, MAX_CHANGES_PER_TXN / 2,
                 &mod_reports, &range_deleted);
@@ -357,7 +369,7 @@ void apply_multi_key_item(
             while (next_pair < item.pairs.size() &&
                     range_deleted.contains_key(item.pairs[next_pair].key)) {
                 promise_t<superblock_t *> pass_back_superblock;
-                apply_item_pair(tokens.info->slice, superblock.get(),
+                apply_item_pair(rocks, table_id, tokens.info->slice, superblock.get(),
                     std::move(item.pairs[next_pair]), &mod_reports,
                     &pass_back_superblock);
                 guarantee(superblock.get() == pass_back_superblock.assert_get_value());
@@ -465,12 +477,14 @@ continue_bool_t store_t::receive_backfill(
                 std::vector<rdb_modification_report_t> &&mod_reports) {
             /* Apply the modifications */
             if (!mod_reports.empty()) {
+                // TODO: We have transactionality to pass in here.
                 update_sindexes(txn.get(), &sindex_block, mod_reports, true);
             } else {
                 sindex_block.reset_buf_lock();
             }
 
             /* End the transaction and notify that we've made progress */
+            // TODO: We probably have to sync to disk at some point?
             txn->commit();
             txn.reset();
             guarantee(progress >= commit_threshold);
@@ -489,10 +503,10 @@ continue_bool_t store_t::receive_backfill(
                 &apply_empty_range, std::move(tokens), empty_range));
         } else if (item.is_single_key()) {
             coro_t::spawn_sometime(std::bind(
-                &apply_single_key_item, std::move(tokens), std::move(item)));
+                &apply_single_key_item, rocks, table_id, std::move(tokens), std::move(item)));
         } else {
             coro_t::spawn_sometime(std::bind(
-                &apply_multi_key_item, std::move(tokens), std::move(item)));
+                &apply_multi_key_item, rocks, table_id, std::move(tokens), std::move(item)));
         }
     }
 
@@ -515,6 +529,7 @@ continue_bool_t store_t::receive_backfill(
     use increasingly large amounts of the unsaved data limit if `receive_backfill()` is
     called repeatedly. */
     flush_cache(general_cache_conn.get(), interruptor);
+    rocks->sync(rockstore::write_options::TODO());
 
     return result;
 }
