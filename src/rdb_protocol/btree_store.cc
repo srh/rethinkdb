@@ -281,7 +281,9 @@ void store_t::reset_data(
         rdb_live_deletion_context_t deletion_context;
         std::vector<rdb_modification_report_t> mod_reports;
         key_range_t deleted_range;
-        done_erasing = rdb_erase_small_range(btree.get(),
+        done_erasing = rdb_erase_small_range(rocks,
+                                             table_id,
+                                             btree.get(),
                                              &key_tester,
                                              subregion.inner,
                                              superblock.get(),
@@ -299,6 +301,7 @@ void store_t::reset_data(
 
         superblock.reset();
         if (!mod_reports.empty()) {
+            // TODO: Pass along the transactionality from rdb_erase_small_range for rocksdb.
             update_sindexes(txn.get(), &sindex_block, mod_reports, true);
         }
 

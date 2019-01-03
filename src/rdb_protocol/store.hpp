@@ -163,7 +163,6 @@ public:
             backfill_item_memory_tracker_t *memory_tracker,
             signal_t *interruptor)
         THROWS_ONLY(interrupted_exc_t);
-    // TODO implement rocks writing below.
     continue_bool_t receive_backfill(
             const region_t &region,
             backfill_item_producer_t *item_producer,
@@ -183,6 +182,7 @@ public:
 
     /* End of `store_view_t` interface */
 
+    // TODO implement rocks writing below.
     std::map<std::string, std::pair<sindex_config_t, sindex_status_t> > sindex_list(
             signal_t *interruptor)
             THROWS_ONLY(interrupted_exc_t);

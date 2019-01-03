@@ -359,6 +359,8 @@ TPTEST(RDBBtree, SindexEraseRange) {
             std::vector<rdb_modification_report_t> mod_reports;
             key_range_t deleted_range;
             rdb_erase_small_range(
+                store.rocks,
+                store.get_table_id(),
                 store.btree.get(),
                 &tester,
                 key_range_t::universe(),
