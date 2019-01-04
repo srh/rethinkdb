@@ -15,17 +15,10 @@ namespace unittest {
 
 const char *const DBQ_TEST_PATH = "test_disk_backed_queue";
 
-serializer_filepath_t dbq_serializer_path() {
-    return manual_serializer_filepath(DBQ_TEST_PATH, std::string(DBQ_TEST_PATH) + ".create");
-}
-
 void run_many_ints_test() {
     static const int NUM_ELTS_IN_QUEUE = 1000;
-    io_backender_t io_backender(file_direct_io_mode_t::buffered_desired);
 
-    const serializer_filepath_t serializer_path = dbq_serializer_path();
-
-    disk_backed_queue_t<int> queue(&io_backender, serializer_path, &get_global_perfmon_collection());
+    disk_backed_queue_t<int> queue(DBQ_TEST_PATH, &get_global_perfmon_collection());
     std::queue<int> ref_queue;
 
     for (int i = 0; i < NUM_ELTS_IN_QUEUE; ++i) {
@@ -48,15 +41,11 @@ TEST(DiskBackedQueue, ManyInts) {
 
 void run_big_values_test() {
     static const int NUM_BIG_ELTS_IN_QUEUE = 100;
-    io_backender_t io_backender(file_direct_io_mode_t::buffered_desired);
-
-    const serializer_filepath_t serializer_path = dbq_serializer_path();
-
-    disk_backed_queue_t<std::string> queue(&io_backender, serializer_path, &get_global_perfmon_collection());
+    disk_backed_queue_t<std::string> queue(DBQ_TEST_PATH, &get_global_perfmon_collection());
     std::queue<std::string> ref_queue;
 
     std::string val;
-    val.resize(MEGABYTE, 'a');
+    val.resize(MEGABYTE * 16 + 234, 'a');
     for (int i = 0; i < NUM_BIG_ELTS_IN_QUEUE; ++i) {
         queue.push(val);
         ref_queue.push(val);
@@ -68,7 +57,7 @@ void run_big_values_test() {
         queue.pop(&x);
         EXPECT_EQ(ref_queue.front(), x);
         ref_queue.pop();
-    }
+    }\
 }
 
 TEST(DiskBackedQueue, BigVals) {
@@ -80,15 +69,10 @@ static void randomly_delay(int, signal_t *) {
 }
 
 void run_concurrent_test() {
-    io_backender_t io_backender(file_direct_io_mode_t::buffered_desired);
-
-    const serializer_filepath_t serializer_path = dbq_serializer_path();
-
     // Make half of the entries fit into RAM.
     const int64_t max_memory_queue_bytes = sizeof(int) * 500;
     disk_backed_queue_wrapper_t<int> queue(
-        &io_backender,
-        serializer_path,
+        DBQ_TEST_PATH,
         &get_global_perfmon_collection(),
         max_memory_queue_bytes);
     std_function_callback_t<int> callback(&randomly_delay);

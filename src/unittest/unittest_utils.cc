@@ -63,13 +63,6 @@ read_t make_sindex_read(
     return make_sindex_read_t::make_sindex_read(key, id);
 }
 
-serializer_filepath_t manual_serializer_filepath(const std::string &permanent_path,
-                                                 const std::string &temporary_path) {
-
-    return serializer_filepath_t(permanent_path, temporary_path);
-}
-
-
 static const char *const temp_file_create_suffix = ".create";
 
 temp_file_t::temp_file_t() {
@@ -107,7 +100,7 @@ temp_file_t::~temp_file_t() {
 }
 
 serializer_filepath_t temp_file_t::name() const {
-    return manual_serializer_filepath(filename, filename + temp_file_create_suffix);
+    return serializer_filepath_t::manual_path(filename, filename + temp_file_create_suffix);
 }
 
 temp_directory_t::temp_directory_t() {

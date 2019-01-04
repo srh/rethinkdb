@@ -139,10 +139,8 @@ void resume_construct_sindex(
             const int64_t MAX_MOD_QUEUE_MEMORY_BYTES = 8 * MEGABYTE;
             mod_queue.init(
                     new disk_backed_queue_wrapper_t<rdb_modification_report_t>(
-                        store->io_backender_,
-                        serializer_filepath_t(
-                            store->base_path_,
-                            "post_construction_" + uuid_to_str(post_construct_id)),
+                        store->base_path_.path() + PATH_SEPARATOR +
+                            "post_construction_" + uuid_to_str(post_construct_id),
                         &store->perfmon_collection,
                         MAX_MOD_QUEUE_MEMORY_BYTES));
 

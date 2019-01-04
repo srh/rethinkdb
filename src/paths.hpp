@@ -28,13 +28,6 @@ private:
 
 static const char *TEMPORARY_DIRECTORY_NAME = "tmp";
 
-class serializer_filepath_t;
-
-namespace unittest {
-serializer_filepath_t manual_serializer_filepath(const std::string& permanent_path,
-                                                 const std::string& temporary_path);
-}  // namespace unittest
-
 // Contains the name of a serializer file.
 class serializer_filepath_t {
 public:
@@ -50,9 +43,11 @@ public:
     std::string permanent_path() const { return permanent_path_; }
     std::string temporary_path() const { return temporary_path_; }
 
+    static serializer_filepath_t manual_path(const std::string &permanent, const std::string &temporary) {
+        return serializer_filepath_t(permanent, temporary);
+    }
+
 private:
-    friend serializer_filepath_t unittest::manual_serializer_filepath(const std::string& permanent_path,
-                                                                      const std::string& temporary_path);
     serializer_filepath_t(const std::string& _permanent_path, const std::string& _temporary_path)
         : permanent_path_(_permanent_path), temporary_path_(_temporary_path) { }
 

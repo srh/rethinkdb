@@ -14,21 +14,7 @@
 #include "perfmon/core.hpp"
 #include "serializer/types.hpp"
 
-class cache_balancer_t;
-class cache_conn_t;
-class cache_t;
-class txn_t;
-class io_backender_t;
 class perfmon_collection_t;
-class serializer_filepath_t;
-
-ATTR_PACKED(struct queue_block_t {
-    block_id_t next;
-    int32_t data_size, live_data_offset;
-    char data[0];
-});
-
-class value_acquisition_object_t;
 
 class buffer_group_viewer_t {
 public:
@@ -43,7 +29,9 @@ protected:
 
 class internal_disk_backed_queue_t {
 public:
-    internal_disk_backed_queue_t(io_backender_t *io_backender, const serializer_filepath_t& filename, perfmon_collection_t *stats_parent);
+    internal_disk_backed_queue_t(
+        const std::string &dirname,
+        perfmon_collection_t *stats_parent);
     ~internal_disk_backed_queue_t();
 
     void push(const write_message_t &value);
@@ -55,30 +43,40 @@ public:
 
     int64_t size();
 
+    static constexpr int64_t file_block_size = 4 * MEGABYTE;
 private:
-    void add_block_to_head(txn_t *txn);
-    void remove_block_from_tail(txn_t *txn);
-    void push_single(txn_t *txn, const write_message_t &value);
+    void push_single(const write_message_t &value);
+
+    std::string block_filepath(int64_t block_id) const;
+
+    void pop_bytes(std::vector<char> *onto, size_t length);
 
     mutex_t mutex;
 
-    // Serves more as sanity-checking for the cache than this type's ordering.
-    order_source_t cache_order_source;
-    perfmon_collection_t perfmon_collection;
-    perfmon_membership_t perfmon_membership;
+    const std::string dirname_;
+    bool created_directory_;
 
-    int64_t queue_size;
+    perfmon_collection_t perfmon_collection_;
+    perfmon_membership_t perfmon_membership_;
+
+    // Number of elements in queue.
+    int64_t queue_size_;
+
+    // We always have a "tail block" in memory.  We read from it, and possibly
+    // we write to it.
+
+    // The end we pop from.  Always <= head_block_id_.
+    int64_t tail_block_id_;
+    size_t tail_buf_offset_;
+    std::vector<char> tail_buf_;
 
     // The end we push onto.
-    block_id_t head_block_id;
-    // The end we pop from.
-    block_id_t tail_block_id;
+    int64_t head_block_id_;
+    // Only used if head_block_id_ > tail_block_id_.
+    std::vector<char> head_buf_;
 
-    scoped_ptr_t<serializer_file_opener_t> file_opener;
-    scoped_ptr_t<log_serializer_t> serializer;
-    scoped_ptr_t<cache_balancer_t> balancer;
-    scoped_ptr_t<cache_t> cache;
-    scoped_ptr_t<cache_conn_t> cache_conn;
+    // Precisely all the blocks with id less than tail_block_id_ and greater
+    // than head_block_id_ are stored in files on disk.
 
     DISABLE_COPYING(internal_disk_backed_queue_t);
 };
@@ -128,8 +126,10 @@ private:
 template <class T>
 class disk_backed_queue_t {
 public:
-    disk_backed_queue_t(io_backender_t *io_backender, const serializer_filepath_t& filename, perfmon_collection_t *stats_parent)
-        : internal_(io_backender, filename, stats_parent) { }
+    disk_backed_queue_t(
+            const std::string &dirname,
+            perfmon_collection_t *stats_parent)
+        : internal_(dirname, stats_parent) { }
 
     void push(const T &t) {
         // TODO: There's an unnecessary copying of data here (which would require a

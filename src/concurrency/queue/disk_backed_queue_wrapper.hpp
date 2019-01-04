@@ -29,18 +29,17 @@ we have loaded the data into memory. */
 template<class T>
 class disk_backed_queue_wrapper_t : public passive_producer_t<T> {
 public:
-    disk_backed_queue_wrapper_t(io_backender_t *_io_backender,
-            const serializer_filepath_t &_filename, perfmon_collection_t *_stats_parent,
+    disk_backed_queue_wrapper_t(
+            const std::string &_filename, perfmon_collection_t *_stats_parent,
             int64_t memory_queue_bytes) :
         passive_producer_t<T>(&available_control),
         memory_queue_free_space(memory_queue_bytes),
         notify_when_room_in_memory_queue(nullptr),
         items_in_queue(0),
-        io_backender(_io_backender),
         filename(_filename),
         stats_parent(_stats_parent),
         restart_copy_coro(false)
-        { }
+        {}
 
     void push(const T &value) {
         write_message_t wm;
@@ -64,7 +63,7 @@ public:
         } else {
             if (memory_queue_free_space <= 0) {
                 disk_queue.init(new internal_disk_backed_queue_t(
-                    io_backender, filename, stats_parent));
+                    filename, stats_parent));
                 disk_queue->push(wm);
                 coro_t::spawn_sometime(std::bind(
                     &disk_backed_queue_wrapper_t<T>::copy_from_disk_queue_to_memory_queue,
@@ -152,8 +151,7 @@ private:
     size_t items_in_queue;
     auto_drainer_t drainer;
 
-    io_backender_t *io_backender;
-    const serializer_filepath_t filename;
+    const std::string filename;
     perfmon_collection_t *stats_parent;
 
     // This is used to tell a push operation to restart the copy_from_disk_queue_to_memory_queue

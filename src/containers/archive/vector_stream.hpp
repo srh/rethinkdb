@@ -13,7 +13,7 @@ public:
 
     virtual MUST_USE int64_t write(const void *p, int64_t n);
 
-    const std::vector<char> &vector() { return vec_; }
+    std::vector<char> &vector() { return vec_; }
 
     void swap(std::vector<char> *other);
 

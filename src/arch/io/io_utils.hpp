@@ -3,6 +3,7 @@
 #define ARCH_IO_IO_UTILS_HPP_
 
 #include <utility>
+#include <vector>
 
 #include "arch/runtime/runtime_utils.hpp"
 
@@ -64,6 +65,8 @@ namespace io_utils {
 scoped_fd_t create_file(const char *filepath);
 scoped_fd_t open_file_for_read(const char *filepath, std::string *error_out) noexcept;
 bool write_all(fd_t fd, const void *data, size_t count, std::string *error_out) noexcept;
+std::vector<char> read_file(const char *filepath);
+void delete_file(const char *filepath);
 }
 
 #endif /* ARCH_IO_IO_UTILS_HPP_ */

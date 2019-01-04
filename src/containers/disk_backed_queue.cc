@@ -2,227 +2,232 @@
 #include "containers/disk_backed_queue.hpp"
 
 #include "arch/io/disk.hpp"
+#include "arch/runtime/thread_pool.hpp"
 #include "buffer_cache/alt.hpp"
 #include "buffer_cache/blob.hpp"
 #include "buffer_cache/cache_balancer.hpp"
 #include "buffer_cache/serialize_onto_blob.hpp"
+#include "paths.hpp"
 #include "serializer/log/log_serializer.hpp"
 
+void create_directory(const std::string &dirname) {
+    linux_thread_pool_t::run_in_blocker_pool([&]() {
+        int res = ::mkdir(dirname.c_str(), 0755);
+        guarantee_err(
+            res == 0,
+            "Disk backed queue could not make directory '%s'",
+            dirname.c_str());
+    });
+}
 
-#define DBQ_MAX_REF_SIZE 251
+void remove_directory(const std::string &dirname) {
+    linux_thread_pool_t::run_in_blocker_pool([&]() {
+        remove_directory_recursive(dirname.c_str());
+    });
+}
 
-internal_disk_backed_queue_t::internal_disk_backed_queue_t(io_backender_t *io_backender,
-                                                           const serializer_filepath_t &filename,
-                                                           perfmon_collection_t *stats_parent)
-    : perfmon_membership(stats_parent, &perfmon_collection,
-                         filename.permanent_path().c_str()),
-      queue_size(0),
-      head_block_id(NULL_BLOCK_ID),
-      tail_block_id(NULL_BLOCK_ID),
-      file_opener(new filepath_file_opener_t(filename, io_backender)) {
-    log_serializer_t::create(file_opener.get(),
-                                  log_serializer_t::static_config_t());
-
-    serializer.init(new log_serializer_t(log_serializer_t::dynamic_config_t(),
-                                              file_opener.get(),
-                                              &perfmon_collection));
-
-    balancer.init(new dummy_cache_balancer_t(2 * MEGABYTE));
-    cache.init(new cache_t(serializer.get(), balancer.get(), &perfmon_collection));
-    cache_conn.init(new cache_conn_t(cache.get()));
-    // Emulate cache_t::create behavior by zeroing the block with id SUPERBLOCK_ID.
-    txn_t txn(cache_conn.get(), write_durability_t::HARD, 1);
-    {
-        buf_lock_t block(&txn, SUPERBLOCK_ID, alt_create_t::create);
-        buf_write_t write(&block);
-        const block_size_t block_size = cache->max_block_size();
-        void *buf = write.get_data_write(block_size.value());
-        memset(buf, 0, block_size.value());
-    }
-    txn.commit();
+internal_disk_backed_queue_t::internal_disk_backed_queue_t(
+        const std::string &dirname,
+        perfmon_collection_t *stats_parent)
+    : dirname_(dirname),
+      created_directory_(false),
+      perfmon_membership_(stats_parent, &perfmon_collection_,
+                          dirname_.c_str()),
+      queue_size_(0),
+      tail_block_id_(0),
+      tail_buf_offset_(0),
+      head_block_id_(0) {
 }
 
 internal_disk_backed_queue_t::~internal_disk_backed_queue_t() {
-    /* First destroy the serializer, then remove the temporary file.
-    This avoids issues with certain file systems (specifically VirtualBox
-    shared folders), see https://github.com/rethinkdb/rethinkdb/issues/3791. */
-    cache_conn.reset();
-    cache.reset();
-    balancer.reset();
-    serializer.reset();
-
-    file_opener->unlink_serializer_file();
+    if (created_directory_) {
+        remove_directory(dirname_);
+    }
 }
 
 void internal_disk_backed_queue_t::push(const write_message_t &wm) {
     mutex_t::acq_t mutex_acq(&mutex);
-
-    // There's no need for hard durability with an unlinked dbq file.
-    txn_t txn(cache_conn.get(), write_durability_t::SOFT, 2);
-
-    push_single(&txn, wm);
-
-    txn.commit();
+    push_single(wm);
 }
 
 void internal_disk_backed_queue_t::push(const scoped_array_t<write_message_t> &wms) {
     mutex_t::acq_t mutex_acq(&mutex);
 
-    // There's no need for hard durability with an unlinked dbq file.
-    txn_t txn(cache_conn.get(), write_durability_t::SOFT, 2);
-
     for (size_t i = 0; i < wms.size(); ++i) {
-        push_single(&txn, wms[i]);
+        push_single(wms[i]);
     }
-
-    txn.commit();
 }
 
-void internal_disk_backed_queue_t::push_single(txn_t *txn, const write_message_t &wm) {
-    if (head_block_id == NULL_BLOCK_ID) {
-        add_block_to_head(txn);
+bool append_upto_max(
+        std::vector<char> *onto, const std::vector<char> &msg,
+        size_t *msg_offset, size_t max_onto_size) {
+    size_t to_append = std::min<size_t>(max_onto_size - onto->size(), msg.size() - *msg_offset);
+    onto->insert(onto->end(), &msg[*msg_offset], &msg[*msg_offset + to_append]);
+    *msg_offset += to_append;
+    return *msg_offset == msg.size();
+}
+
+// Returns number of bytes read.
+size_t read_upto_count(
+        std::vector<char> *onto, const std::vector<char> &from,
+        size_t *from_offset, size_t count) {
+    size_t to_read = std::min<size_t>(from.size() - *from_offset, count);
+    onto->insert(onto->end(), &from[*from_offset], &from[*from_offset + to_read]);
+    *from_offset += to_read;
+    return to_read;
+}
+
+void write_file(const std::string &path, const std::vector<char> &buf) {
+    scoped_fd_t fd = io_utils::create_file(path.c_str());
+    std::string error_msg;
+    if (!io_utils::write_all(fd.get(), buf.data(), buf.size(), &error_msg)) {
+        throw std::runtime_error(
+            strprintf("Writing disk backed queue file '%s' failed: %s",
+                path.c_str(), error_msg.c_str()));
+    }
+}
+
+std::vector<char> read_file(const std::string &path) {
+    std::string error_msg;
+    scoped_fd_t fd = io_utils::open_file_for_read(path.c_str(), &error_msg);
+    if (fd.get() == INVALID_FD) {
+        throw std::runtime_error(
+            strprintf("Opening disk backed queue file '%s' failed: %s",
+                path.c_str(), error_msg.c_str()));
     }
 
-    auto _head = make_scoped<buf_lock_t>(buf_parent_t(txn), head_block_id,
-                                         access_t::write);
-    auto write = make_scoped<buf_write_t>(_head.get());
-    queue_block_t *head = static_cast<queue_block_t *>(write->get_data_write());
-
-    char buffer[DBQ_MAX_REF_SIZE];
-    memset(buffer, 0, DBQ_MAX_REF_SIZE);
-
-    blob_t blob(cache->max_block_size(), buffer, DBQ_MAX_REF_SIZE);
-
-    write_onto_blob(buf_parent_t(_head.get()), &blob, wm);
-
-    if (static_cast<size_t>((head->data + head->data_size) - reinterpret_cast<char *>(head)) + blob.refsize(cache->max_block_size()) > cache->max_block_size().value()) {
-        // The data won't fit in our current head block, so it's time to make a new one.
-        head = nullptr;
-        write.reset();
-        _head.reset();
-        add_block_to_head(txn);
-        _head.init(new buf_lock_t(buf_parent_t(txn), head_block_id,
-                                  access_t::write));
-        write.init(new buf_write_t(_head.get()));
-        head = static_cast<queue_block_t *>(write->get_data_write());
+    std::vector<char> buf;
+    scoped_array_t<char> array(internal_disk_backed_queue_t::file_block_size);
+    while (buf.size() < internal_disk_backed_queue_t::file_block_size) {
+        ssize_t res;
+        do {
+            res = ::pread(fd.get(), array.data(), array.size(), buf.size());
+        } while (res == -1 && get_errno() == EINTR);
+        if (res == -1) {
+            throw std::runtime_error(
+                strprintf("Opening disk backed queue file '%s' failed: %s",
+                    path.c_str(), errno_string(get_errno()).c_str()));
+        }
+        guarantee(res != 0, "File should have size file_block_size.");
+        buf.insert(buf.end(), array.data(), array.data() + res);
     }
 
-    memcpy(head->data + head->data_size, buffer,
-           blob.refsize(cache->max_block_size()));
-    head->data_size += blob.refsize(cache->max_block_size());
+    return buf;
+}
 
-    queue_size++;
+std::vector<char> read_and_delete_file(const std::string &path) {
+    std::vector<char> contents = io_utils::read_file(path.c_str());
+    guarantee(contents.size() == internal_disk_backed_queue_t::file_block_size);
+    io_utils::delete_file(path.c_str());
+    return contents;
+}
+
+std::string internal_disk_backed_queue_t::block_filepath(int64_t block_id) const {
+    return dirname_ + strprintf(PATH_SEPARATOR "%" PRIi64 ".dbq", block_id);
+}
+
+void internal_disk_backed_queue_t::push_single(const write_message_t &wm) {
+    // This runs in the blocker pool.
+    vector_stream_t vecs;
+    size_t wm_size = wm.size();
+    DEBUG_VAR int64_t res = vecs.write(&wm_size, sizeof(wm_size));
+    rassert(res >= 0);
+    DEBUG_VAR int res2 = send_write_message(&vecs, &wm);
+    rassert(res2 == 0);
+
+    std::vector<char> msg = std::move(vecs.vector());
+    size_t msg_offset = 0;
+
+    if (head_block_id_ == tail_block_id_) {
+        if (append_upto_max(&tail_buf_, msg, &msg_offset, file_block_size)) {
+            goto done;
+        }
+        ++head_block_id_;
+        rassert(head_buf_.empty());
+        head_buf_.reserve(file_block_size);
+    }
+    for (;;) {
+        if (append_upto_max(&head_buf_, msg, &msg_offset, file_block_size)) {
+            goto done;
+        }
+
+        linux_thread_pool_t::run_in_blocker_pool([&]() {
+            // Write head file.
+            if (!created_directory_) {
+                create_directory(dirname_);
+                created_directory_ = true;
+            }
+            std::string path = block_filepath(head_block_id_);
+            write_file(path, head_buf_);
+
+            ++head_block_id_;
+            head_buf_.clear();
+            head_buf_.reserve(file_block_size);
+        });
+    }
+
+done:
+    ++queue_size_;
 }
 
 void internal_disk_backed_queue_t::pop(buffer_group_viewer_t *viewer) {
     guarantee(size() != 0);
     mutex_t::acq_t mutex_acq(&mutex);
+    std::vector<char> message;
+    linux_thread_pool_t::run_in_blocker_pool([&]() {
+        std::vector<char> size;
+        pop_bytes(&size, sizeof(size_t));
+        size_t wm_size = *reinterpret_cast<size_t *>(size.data());
+        pop_bytes(&message, wm_size);
+    });
 
-    char buffer[DBQ_MAX_REF_SIZE];
-    // No need for hard durability with an unlinked dbq file.
-    txn_t txn(cache_conn.get(), write_durability_t::SOFT, 2);
+    const_buffer_group_t group;
+    group.add_buffer(message.size(), message.data());
 
-    buf_lock_t _tail(buf_parent_t(&txn), tail_block_id, access_t::write);
+    viewer->view_buffer_group(&group);
+    --queue_size_;
+}
 
-    /* Grab the data from the blob and delete it. */
-    {
-        buf_read_t read(&_tail);
-        const queue_block_t *tail
-            = static_cast<const queue_block_t *>(read.get_data_read());
-        rassert(tail->data_size != tail->live_data_offset);
-        memcpy(buffer, tail->data + tail->live_data_offset,
-               blob::ref_size(cache->max_block_size(),
-                              tail->data + tail->live_data_offset,
-                              DBQ_MAX_REF_SIZE));
+void internal_disk_backed_queue_t::pop_bytes(std::vector<char> *onto, size_t length) {
+    // Runs in blocker pool.
+    for (;;) {
+        size_t n = read_upto_count(onto, tail_buf_, &tail_buf_offset_, length);
+        if (tail_buf_offset_ == file_block_size) {
+            tail_buf_offset_ = 0;
+            if (tail_block_id_ == head_block_id_) {
+                ++tail_block_id_;
+                ++head_block_id_;
+                tail_buf_.clear();
+                rassert(empty());
+            } else if (tail_block_id_ + 1 == head_block_id_) {
+                ++tail_block_id_;
+                tail_buf_.clear();
+                // Use swap in place of tail_buf_ = std::move(head_buf_), to avoid
+                // deallocating buffers.
+                std::swap(tail_buf_, head_buf_);
+            } else {
+                ++tail_block_id_;
+                std::string path = block_filepath(tail_block_id_);
+                linux_thread_pool_t::run_in_blocker_pool([&]() {
+                    tail_buf_ = read_and_delete_file(path);
+                });
+            }
+        }
+
+        length -= n;
+        if (length == 0) {
+            --queue_size_;
+            return;
+        }
     }
-
-    /* Grab the data from the blob and delete it. */
-
-    std::vector<char> data_vec;
-
-    blob_t blob(cache->max_block_size(), buffer, DBQ_MAX_REF_SIZE);
-    {
-        blob_acq_t acq_group;
-        buffer_group_t blob_group;
-        blob.expose_all(buf_parent_t(&_tail), access_t::read,
-                        &blob_group, &acq_group);
-
-        viewer->view_buffer_group(const_view(&blob_group));
-    }
-
-    int32_t data_size;
-    int32_t live_data_offset;
-    {
-        buf_write_t write(&_tail);
-        queue_block_t *tail = static_cast<queue_block_t *>(write.get_data_write());
-        /* Record how far along in the blob we are. */
-        tail->live_data_offset += blob.refsize(cache->max_block_size());
-        data_size = tail->data_size;
-        live_data_offset = tail->live_data_offset;
-    }
-
-    blob.clear(buf_parent_t(&_tail));
-
-    queue_size--;
-
-    _tail.reset_buf_lock();
-
-    /* If that was the last blob in this block move on to the next one. */
-    if (live_data_offset == data_size) {
-        remove_block_from_tail(&txn);
-    }
-
-    txn.commit();
 }
 
 bool internal_disk_backed_queue_t::empty() {
-    return queue_size == 0;
+    return queue_size_ == 0;
 }
 
 int64_t internal_disk_backed_queue_t::size() {
-    return queue_size;
+    return queue_size_;
 }
 
-void internal_disk_backed_queue_t::add_block_to_head(txn_t *txn) {
-    buf_lock_t _new_head(buf_parent_t(txn), alt_create_t::create);
-    buf_write_t write(&_new_head);
-    queue_block_t *new_head = static_cast<queue_block_t *>(write.get_data_write());
-    if (head_block_id == NULL_BLOCK_ID) {
-        rassert(tail_block_id == NULL_BLOCK_ID);
-        head_block_id = tail_block_id = _new_head.block_id();
-    } else {
-        buf_lock_t _old_head(buf_parent_t(txn), head_block_id,
-                             access_t::write);
-        buf_write_t old_write(&_old_head);
-        queue_block_t *old_head
-            = static_cast<queue_block_t *>(old_write.get_data_write());
-        rassert(old_head->next == NULL_BLOCK_ID);
-        old_head->next = _new_head.block_id();
-        head_block_id = _new_head.block_id();
-    }
-
-    new_head->next = NULL_BLOCK_ID;
-    new_head->data_size = 0;
-    new_head->live_data_offset = 0;
-}
-
-void internal_disk_backed_queue_t::remove_block_from_tail(txn_t *txn) {
-    rassert(tail_block_id != NULL_BLOCK_ID);
-    buf_lock_t _old_tail(buf_parent_t(txn), tail_block_id,
-                         access_t::write);
-
-    {
-        buf_write_t old_write(&_old_tail);
-        queue_block_t *old_tail = static_cast<queue_block_t *>(old_write.get_data_write());
-
-        if (old_tail->next == NULL_BLOCK_ID) {
-            rassert(head_block_id == _old_tail.block_id());
-            tail_block_id = head_block_id = NULL_BLOCK_ID;
-        } else {
-            tail_block_id = old_tail->next;
-        }
-    }
-
-    _old_tail.mark_deleted();
-}
 

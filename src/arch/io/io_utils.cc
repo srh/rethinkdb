@@ -16,6 +16,7 @@
 
 #include <algorithm>
 
+#include "containers/scoped.hpp"
 #include "logger.hpp"
 #include "utils.hpp"
 
@@ -115,7 +116,7 @@ scoped_fd_t create_file(const char *filepath) {
     if (fd.get() == INVALID_FD) {
         throw std::runtime_error(strprintf("Failed to open file '%s': %s",
                                            filepath,
-                                           errno_string(errno).c_str()).c_str());
+                                           errno_string(get_errno()).c_str()).c_str());
     }
 #endif
     return fd;
@@ -167,6 +168,49 @@ bool write_all(fd_t fd, const void *data, size_t count, std::string *error_out) 
             return true;
         }
     }
+#endif
+}
+
+std::vector<char> read_file(const char *filepath) {
+    std::string error_msg;
+    scoped_fd_t fd = io_utils::open_file_for_read(filepath, &error_msg);
+    if (fd.get() == INVALID_FD) {
+        throw std::runtime_error(
+            strprintf("Opening file '%s' failed: %s",
+                filepath, error_msg.c_str()));
+    }
+
+    constexpr size_t bufsize = 8 * MEGABYTE;
+    std::vector<char> ret;
+    scoped_array_t<char> array(bufsize);
+    for (;;) {
+        ssize_t res;
+        do {
+            res = ::pread(fd.get(), array.data(), array.size(), ret.size());
+        } while (res == -1 && get_errno() == EINTR);
+        if (res == -1) {
+            throw std::runtime_error(
+                strprintf("Opening file '%s' failed: %s",
+                    filepath, errno_string(get_errno()).c_str()));
+        }
+        if (res == 0) {
+            break;
+        }
+        ret.insert(ret.end(), array.data(), array.data() + res);
+    }
+
+    return ret;
+}
+
+void delete_file(const char *filepath) {
+#ifdef _WIN32
+    BOOL res = DeleteFile(filepath);
+    guarantee_winerr(
+        res, "Failed to delete file '%s'", filepath,
+        winerr_string(GetLastError()).c_str());
+#else
+    int res = ::remove(filepath);
+    guarantee_err(res == 0, "Failed to delete file '%s'", filepath);
 #endif
 }
 
