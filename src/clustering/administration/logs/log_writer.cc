@@ -15,6 +15,7 @@
 #include "arch/runtime/thread_pool.hpp"
 #include "arch/io/disk/filestat.hpp"
 #include "arch/io/disk.hpp"
+#include "arch/io/io_utils.hpp"
 #include "concurrency/promise.hpp"
 #include "containers/scoped.hpp"
 #include "paths.hpp"
@@ -369,29 +370,7 @@ void fallback_log_writer_t::install(const std::string &logfile_name) {
     guarantee(filename.path() == "-", "Attempted to install a fallback_log_writer_t that was already installed.");
     filename = base_path_t(logfile_name);
 
-#ifdef _WIN32
-    HANDLE h = CreateFile(filename.path().c_str(), FILE_APPEND_DATA, FILE_SHARE_READ, NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
-    fd.reset(h);
-
-    if (fd.get() == INVALID_FD) {
-        throw std::runtime_error(strprintf("Failed to open log file '%s': %s",
-                                           logfile_name.c_str(),
-                                           winerr_string(GetLastError()).c_str()).c_str());
-    }
-#else
-    int res;
-    do {
-        res = open(filename.path().c_str(), O_WRONLY|O_APPEND|O_CREAT, 0644);
-    } while (res == INVALID_FD && get_errno() == EINTR);
-
-    fd.reset(res);
-
-    if (fd.get() == INVALID_FD) {
-        throw std::runtime_error(strprintf("Failed to open log file '%s': %s",
-                                           logfile_name.c_str(),
-                                           errno_string(errno).c_str()).c_str());
-    }
-#endif
+    fd = io_utils::create_file(filename.path().c_str());
 
     // Get the absolute path for the log file, so it will still be valid if
     //  the working directory changes
@@ -502,20 +481,11 @@ bool fallback_log_writer_t::write(const log_message_t &msg, std::string *error_o
     }
 #endif
 
-#ifdef _WIN32
-    DWORD bytes_written;
-    BOOL res = WriteFile(fd.get(), formatted.data(), formatted.length(), &bytes_written, nullptr);
-    if (!res) {
-        error_out->assign("cannot write to log file: " + winerr_string(GetLastError()));
+    std::string write_error;
+    if (!io_utils::write_all(fd.get(), formatted.data(), formatted.size(), &write_error)) {
+        error_out->assign("cannot write to log file: " + write_error);
         return false;
     }
-#else
-    ssize_t write_res = ::write(fd.get(), formatted.data(), formatted.length());
-    if (write_res != static_cast<ssize_t>(formatted.length())) {
-        error_out->assign("cannot write to log file: " + errno_string(get_errno()));
-        return false;
-    }
-#endif
 
 #ifndef _WIN32
     fcntl_res = fcntl(fd.get(), F_SETLK, &fileunlock);
@@ -643,21 +613,11 @@ void thread_pool_log_writer_t::tail_blocking(
         std::string *error_out,
         bool *ok_out) {
     try {
-        scoped_fd_t fd;
-#ifdef _WIN32
-        fd.reset(CreateFile(fallback_log_writer.filename.path().c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL));
-        if (fd.get() == INVALID_FD) {
-            logWRN("CreateFile failed: %s", winerr_string(GetLastError()).c_str());
-            set_errno(EIO);
-        }
-#else
-        do {
-            fd.reset(open(fallback_log_writer.filename.path().c_str(), O_RDONLY));
-        } while (fd.get() == INVALID_FD && get_errno() == EINTR);
-#endif
+        std::string open_error;
+        scoped_fd_t fd = io_utils::open_file_for_read(fallback_log_writer.filename.path().c_str(), &open_error);
         throw_unless(fd.get() != INVALID_FD,
-            strprintf("could not open '%s' for reading.",
-                fallback_log_writer.filename.path().c_str()));
+            strprintf("could not open '%s' for reading: %s",
+                fallback_log_writer.filename.path().c_str(), open_error.c_str()));
 
         file_reverse_reader_t reader(std::move(fd));
         std::string line;

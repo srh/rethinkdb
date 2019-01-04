@@ -59,5 +59,11 @@ void fill_bufs_from_source(iovec *dest_vecs, const size_t dest_size,
                            iovec *source_vecs, const size_t source_size,
                            const size_t offset_into_source);
 
+namespace io_utils {
+// For use on worker pool threads.
+scoped_fd_t create_file(const char *filepath);
+scoped_fd_t open_file_for_read(const char *filepath, std::string *error_out) noexcept;
+bool write_all(fd_t fd, const void *data, size_t count, std::string *error_out) noexcept;
+}
 
 #endif /* ARCH_IO_IO_UTILS_HPP_ */

@@ -4,7 +4,10 @@
 #ifdef _WIN32
 #include "windows.hpp"
 #else
+#include <fcntl.h>
 #include <sys/syscall.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 #endif
 
 #include <sys/uio.h>
@@ -14,6 +17,7 @@
 #include <algorithm>
 
 #include "logger.hpp"
+#include "utils.hpp"
 
 #ifndef _WIN32
 int _gettid() {
@@ -86,3 +90,84 @@ void fill_bufs_from_source(iovec *dest_vecs, const size_t dest_size,
         }
     }
 }
+
+namespace io_utils {
+
+scoped_fd_t create_file(const char *filepath) {
+    scoped_fd_t fd;
+#ifdef _WIN32
+    HANDLE h = CreateFile(filename.path().c_str(), FILE_APPEND_DATA, FILE_SHARE_READ, NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+    fd.reset(h);
+
+    if (fd.get() == INVALID_FD) {
+        throw std::runtime_error(strprintf("Failed to open file '%s': %s",
+                                           filepath,
+                                           winerr_string(GetLastError()).c_str()).c_str());
+    }
+#else
+    int res;
+    do {
+        res = ::open(filepath, O_WRONLY|O_APPEND|O_CREAT, 0644);
+    } while (res == INVALID_FD && get_errno() == EINTR);
+
+    fd.reset(res);
+
+    if (fd.get() == INVALID_FD) {
+        throw std::runtime_error(strprintf("Failed to open file '%s': %s",
+                                           filepath,
+                                           errno_string(errno).c_str()).c_str());
+    }
+#endif
+    return fd;
+}
+
+scoped_fd_t open_file_for_read(const char *filepath, std::string *error_out) noexcept {
+    scoped_fd_t fd;
+#ifdef _WIN32
+    fd.reset(CreateFile(filepath, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL));
+    if (fd.get() == INVALID_FD) {
+        *error_out = winerr_string(GetLastError());
+    }
+#else
+    do {
+        fd.reset(open(filepath, O_RDONLY));
+    } while (fd.get() == INVALID_FD && get_errno() == EINTR);
+    if (fd.get() == INVALID_FD) {
+        *error_out = errno_string(get_errno());
+    }
+#endif
+    return fd;
+}
+
+bool write_all(fd_t fd, const void *data, size_t count, std::string *error_out) noexcept {
+#ifdef _WIN32
+    DWORD bytes_written;
+    BOOL res = WriteFile(fd, data, count, &bytes_written, nullptr);
+    if (!res) {
+        *error_out = winerr_string(GetLastError()));
+        return false;
+    }
+    return true;
+#else
+    const char *cdata = static_cast<const char *>(data);
+    for (;;) {
+        ssize_t write_res = ::write(fd, cdata, count);
+        if (write_res < 0) {
+            int errsv = get_errno();
+            if (errsv == EINTR) {
+                continue;
+            }
+            *error_out = errno_string(errsv);
+            return false;
+        }
+
+        cdata += write_res;
+        count -= write_res;
+        if (count == 0) {
+            return true;
+        }
+    }
+#endif
+}
+
+}  // io_utils
