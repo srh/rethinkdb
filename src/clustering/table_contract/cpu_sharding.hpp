@@ -8,9 +8,6 @@
 
 class store_t;
 
-/* Changing this number would break backwards compatibility in the disk format. */
-#define CPU_SHARDING_FACTOR 8
-
 /* `cpu_sharding_subspace()` returns a `region_t` that contains the full key-range space
 but only 1/CPU_SHARDING_FACTOR of the shard space. */
 region_t cpu_sharding_subspace(int subregion_number);
