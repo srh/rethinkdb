@@ -6,6 +6,7 @@
 
 #include "containers/scoped.hpp"
 #include "containers/uuid.hpp"
+#include "rockstore/rockshard.hpp"
 #include "rockstore/write_options.hpp"
 
 namespace rocksdb {
@@ -14,7 +15,6 @@ class WriteBatch;
 }
 
 class base_path_t;
-
 
 namespace rockstore {
 
@@ -60,38 +60,13 @@ private:
 // directory.  Throws std::runtime_error.
 store create_rockstore(const base_path_t &base_path);
 
-// TODO: Not inline
-inline std::string table_prefix(namespace_id_t id) {
-    // TODO: Do we use a binary or non-binary UUID?
-    std::string ret = "tables/" + uuid_to_str(id) + "/";
-    return ret;
-}
-inline std::string table_metadata_prefix(namespace_id_t id) {
-    std::string ret = table_prefix(id);
-    ret += "metadata/";
-    return ret;
-}
-inline std::string table_sindex_map(namespace_id_t id) {
-    std::string ret = table_metadata_prefix(id);
-    ret += "sindex_map";
-    return ret;
-}
-
-// TODO: Remove primary key length limitation at some point.
-// TODO: table_secondary_key is still using gnarly 250-byte sindex keys.
-
-inline std::string table_secondary_key(namespace_id_t id, uuid_u index_id,
-                                       const std::string &key) {
-    // TODO: a non-binary uuid?  okay.
-    std::string ret = "tables/" + uuid_to_str(id) + "/" + uuid_to_str(index_id) + "/" + key;
-    return ret;
-}
-
-inline std::string table_primary_key(namespace_id_t id, const std::string &key) {
-    // We use the empty index name for primary index.
-    std::string ret = "tables/" + uuid_to_str(id) + "//" + key;
-    return ret;
-}
+std::string table_prefix(namespace_id_t id, int shard_no);
+std::string table_metadata_prefix(namespace_id_t id, int shard_no);
+std::string table_sindex_map(namespace_id_t id, int shard_no);
+std::string table_secondary_key(
+    namespace_id_t id, int shard_no, uuid_u index_id,
+    const std::string &key);
+std::string table_primary_key(namespace_id_t id, int shard_no, const std::string &key);
 
 inline const char * VERSION() { return "v2_4"; }
 inline const char * TABLE_METADATA_VERSION_KEY() { return "version"; }

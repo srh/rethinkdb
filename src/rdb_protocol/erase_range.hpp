@@ -10,7 +10,7 @@
 #include "buffer_cache/types.hpp"
 #include "containers/uuid.hpp"
 
-namespace rockstore { class store; }
+class rockshard;
 class btree_slice_t;
 struct btree_key_t;
 class deletion_context_t;
@@ -47,8 +47,7 @@ modification reports to store_t::update_sindexes() takes care of that).
 Returns `CONTINUE` if it stopped because it collected `max_keys_to_erase` and `ABORT` if
 it stopped because it hit the end of the range. */
 continue_bool_t rdb_erase_small_range(
-    rockstore::store *rocks,
-    namespace_id_t table_id,
+    rockshard rocksh,
     btree_slice_t *btree_slice,
     key_tester_t *tester,
     const key_range_t &keys,

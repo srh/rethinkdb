@@ -5,6 +5,7 @@
 
 #include "arch/runtime/thread_pool.hpp"
 #include "paths.hpp"
+#include "utils.hpp"
 
 namespace rockstore {
 
@@ -176,5 +177,43 @@ void store::remove(const std::string &key, const write_options &opts) {
     return;
 }
 
+std::string table_prefix(namespace_id_t id, int shard_no) {
+    // TODO: Do we use a binary or non-binary UUID?
+    std::string ret = "tables/";
+    ret += uuid_to_str(id);
+    ret += strprintf("/%d/", shard_no);
+    return ret;
+}
+std::string table_metadata_prefix(namespace_id_t id, int shard_no) {
+    std::string ret = table_prefix(id, shard_no);
+    ret += "metadata/";
+    return ret;
+}
+std::string table_sindex_map(namespace_id_t id, int shard_no) {
+    std::string ret = table_metadata_prefix(id, shard_no);
+    ret += "sindex_map";
+    return ret;
+}
+
+// TODO: Remove primary key length limitation at some point.
+// TODO: table_secondary_key is still using gnarly 250-byte sindex keys.
+
+std::string table_secondary_key(
+        namespace_id_t id, int shard_no, uuid_u index_id,
+        const std::string &key) {
+    std::string ret = table_prefix(id, shard_no);
+    ret += uuid_to_str(index_id);
+    ret += '/';
+    ret += key;
+    return ret;
+}
+
+std::string table_primary_key(namespace_id_t id, int shard_no, const std::string &key) {
+    // We use the empty index name for primary index.
+    std::string ret = table_prefix(id, shard_no);
+    ret += '/';
+    ret += key;
+    return ret;
+}
 
 }  // namespace rockstore

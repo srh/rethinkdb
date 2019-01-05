@@ -5,7 +5,7 @@
 #include "btree/operations.hpp"
 #include "containers/uuid.hpp"
 
-namespace rockstore { class store; }
+class rockshard;
 
 /* Most of the code in the `btree/` directory doesn't "know" about the format of the
 superblock; instead it manipulates the superblock using the abstract `superblock_t`. This
@@ -86,9 +86,9 @@ public:
     // Initializes a superblock (presumably, a buf_lock_t constructed with
     // alt_create_t::create) for use with btrees, setting the initial value of the
     // metainfo (with a single key/value pair). Not for use with sindex superblocks.
-    static void init_real_superblock(real_superblock_t *superblock,
-            rockstore::store *rocks,
-            namespace_id_t table_id,
+    static void init_real_superblock(
+            real_superblock_t *superblock,
+            rockshard rocksh,
             const std::vector<char> &metainfo_key,
             const binary_blob_t &metainfo_value);
     static void init_sindex_superblock(sindex_superblock_t *superblock);
@@ -168,15 +168,13 @@ void get_superblock_metainfo(
     cluster_version_t *version_out);
 
 void set_superblock_metainfo(real_superblock_t *superblock,
-                             rockstore::store *rocks,
-                             namespace_id_t table_id,
+                             rockshard rocksh,
                              const std::vector<char> &key,
                              const binary_blob_t &value,
                              cluster_version_t version);
 
 void set_superblock_metainfo(real_superblock_t *superblock,
-                             rockstore::store *rocks,
-                             namespace_id_t table_id,
+                             rockshard rocksh,
                              const std::vector<std::vector<char> > &keys,
                              const std::vector<binary_blob_t> &values,
                              cluster_version_t version);

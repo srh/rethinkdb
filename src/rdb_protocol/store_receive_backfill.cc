@@ -186,8 +186,7 @@ void apply_empty_range(
 `apply_multi_key_item()`. It applies a single `backfill_item_t::pair_t` to the B-tree.
 It doesn't call `on_commit()` or modify the metainfo. */
 void apply_item_pair(
-        rockstore::store *rocks,
-        namespace_id_t table_id,
+        rockshard rocksh,
         btree_slice_t *slice,
         real_superblock_t *superblock,
         backfill_item_t::pair_t &&pair,
@@ -204,13 +203,13 @@ void apply_item_pair(
 
         // TODO: For rocks there's transactionality to pass around (related to updating metainfo)
         point_write_response_t dummy_response;
-        rdb_set(rocks, table_id, pair.key, datum, true, slice, pair.recency, superblock,
+        rdb_set(rocksh, pair.key, datum, true, slice, pair.recency, superblock,
             &deletion_context, &dummy_response, &mod_reports_out->back().info, nullptr,
             pass_back_superblock);
     } else {
         // TODO: For rocks there's transactionality to pass around (related to updating metainfo)
         point_delete_response_t dummy_response;
-        rdb_delete(rocks, table_id, pair.key, slice, pair.recency, superblock,
+        rdb_delete(rocksh, pair.key, slice, pair.recency, superblock,
             &deletion_context, delete_mode_t::MAKE_TOMBSTONE, &dummy_response,
             &mod_reports_out->back().info, nullptr, pass_back_superblock);
     }
@@ -223,8 +222,7 @@ the previous contents of the range.
 Note that multiple calls to `apply_single_key_item()` can be pipelined efficiently,
 because it releases the superblock as soon as it acquires the next node in the B-tree. */
 void apply_single_key_item(
-        rockstore::store *rocks,
-        namespace_id_t table_id,
+        rockshard rocksh,
         const receive_backfill_tokens_t &tokens,
         /* `item` is conceptually passed by move, but `std::bind()` isn't smart enough to
         handle that. */
@@ -259,7 +257,7 @@ void apply_single_key_item(
 
         /* Actually apply the change, releasing the superblock in the process. */
         std::vector<rdb_modification_report_t> mod_reports;
-        apply_item_pair(rocks, table_id, tokens.info->slice, superblock.get(),
+        apply_item_pair(rocksh, tokens.info->slice, superblock.get(),
             std::move(item.pairs[0]), &mod_reports, nullptr);
 
         /* Notify that we're done and update the sindexes */
@@ -280,8 +278,7 @@ void apply_single_key_item(
 delete any existing values or deletion entries in that range, and then apply the contents
 of `item.pairs`. */
 void apply_multi_key_item(
-        rockstore::store *rocks,
-        namespace_id_t table_id,
+        rockshard rocksh,
         const receive_backfill_tokens_t &tokens,
         /* `item` is conceptually passed by move, but `std::bind()` isn't smart enough to
         handle that. */
@@ -358,7 +355,7 @@ void apply_multi_key_item(
             // TODO: We need to manage rocks transactionality
             // between erasing range, applying writes, and updating sindex.
             continue_bool_t res = rdb_erase_small_range(
-                rocks, table_id, tokens.info->slice, &key_tester,
+                rocksh, tokens.info->slice, &key_tester,
                 range_to_delete, superblock.get(), &deletion_context,
                 &non_interruptor, MAX_CHANGES_PER_TXN / 2,
                 &mod_reports, &range_deleted);
@@ -369,7 +366,7 @@ void apply_multi_key_item(
             while (next_pair < item.pairs.size() &&
                     range_deleted.contains_key(item.pairs[next_pair].key)) {
                 promise_t<superblock_t *> pass_back_superblock;
-                apply_item_pair(rocks, table_id, tokens.info->slice, superblock.get(),
+                apply_item_pair(rocksh, tokens.info->slice, superblock.get(),
                     std::move(item.pairs[next_pair]), &mod_reports,
                     &pass_back_superblock);
                 guarantee(superblock.get() == pass_back_superblock.assert_get_value());
@@ -464,7 +461,7 @@ continue_bool_t store_t::receive_backfill(
             metainfo_threshold = progress;
 
             /* Actually apply the metainfo */
-            metainfo->update(superblock, rocks, table_id, item_producer->get_metainfo()->mask(mask));
+            metainfo->update(superblock, rocksh(), item_producer->get_metainfo()->mask(mask));
         };
 
         /* The `apply_*()` functions will call back to `commit_cb` when they're done
@@ -503,10 +500,10 @@ continue_bool_t store_t::receive_backfill(
                 &apply_empty_range, std::move(tokens), empty_range));
         } else if (item.is_single_key()) {
             coro_t::spawn_sometime(std::bind(
-                &apply_single_key_item, rocks, table_id, std::move(tokens), std::move(item)));
+                &apply_single_key_item, rocksh(), std::move(tokens), std::move(item)));
         } else {
             coro_t::spawn_sometime(std::bind(
-                &apply_multi_key_item, rocks, table_id, std::move(tokens), std::move(item)));
+                &apply_multi_key_item, rocksh(), std::move(tokens), std::move(item)));
         }
     }
 

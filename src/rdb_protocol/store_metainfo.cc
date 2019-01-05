@@ -4,6 +4,7 @@
 #include "btree/reql_specific.hpp"
 #include "containers/archive/buffer_stream.hpp"
 #include "containers/archive/vector_stream.hpp"
+#include "rockstore/rockshard.hpp"
 
 store_metainfo_manager_t::store_metainfo_manager_t(real_superblock_t *superblock) {
     std::vector<std::pair<std::vector<char>, std::vector<char> > > kv_pairs;
@@ -56,8 +57,7 @@ void store_metainfo_manager_t::visit(
 
 void store_metainfo_manager_t::update(
         real_superblock_t *superblock,
-        rockstore::store *rocks,
-        namespace_id_t table_id,
+        rockshard rocksh,
         const region_map_t<binary_blob_t> &new_values) {
     // TODO: Strip out non-rocks writing (but keep superblock write acquisition waiting).
     guarantee(superblock != nullptr);
@@ -80,13 +80,12 @@ void store_metainfo_manager_t::update(
             values.push_back(value);
         });
 
-    set_superblock_metainfo(superblock, rocks, table_id, keys, values, cache_version);
+    set_superblock_metainfo(superblock, rocksh, keys, values, cache_version);
 }
 
 void store_metainfo_manager_t::migrate(
         real_superblock_t *superblock,
-        rockstore::store *rocks,
-        namespace_id_t table_id,
+        rockshard rocksh,
         cluster_version_t from,
         cluster_version_t to,
         const region_t &region, // This should be for all valid ranges for this hash shard
@@ -104,5 +103,5 @@ void store_metainfo_manager_t::migrate(
     }
 
     cache_version = to;
-    update(superblock, rocks, table_id, new_metainfo);
+    update(superblock, rocksh, new_metainfo);
 }

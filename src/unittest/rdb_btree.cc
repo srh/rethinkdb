@@ -57,8 +57,7 @@ void insert_rows(int start, int finish, store_t *store) {
             rapidjson::Document doc;
             doc.Parse(data.c_str());
             rdb_set(
-                store->rocks,
-                store->get_table_id(),
+                store->rocksh(),
                 pk,
                 ql::to_datum(doc, limits, reql_version_t::LATEST),
                 false, store->btree.get(), repli_timestamp_t::distant_past,
@@ -68,8 +67,7 @@ void insert_rows(int start, int finish, store_t *store) {
             store_t::sindex_access_vector_t sindexes;
             store->acquire_all_sindex_superblocks_for_write(&sindex_block, &sindexes);
             rdb_update_sindexes(
-                store->rocks,
-                store->get_table_id(),
+                store->rocksh(),
                 store,
                 sindexes,
                 &mod_report,
@@ -363,8 +361,7 @@ TPTEST(RDBBtree, SindexEraseRange) {
             std::vector<rdb_modification_report_t> mod_reports;
             key_range_t deleted_range;
             rdb_erase_small_range(
-                store.rocks,
-                store.get_table_id(),
+                store.rocksh(),
                 store.btree.get(),
                 &tester,
                 key_range_t::universe(),

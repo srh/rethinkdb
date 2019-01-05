@@ -68,7 +68,7 @@ public:
                 buf_lock_t sb_lock(&txn, SUPERBLOCK_ID, alt_create_t::create);
                 real_superblock_t superblock(std::move(sb_lock));
                 btree_slice_t::init_real_superblock(
-                    &superblock, io_backender.rocks(), table_id, std::vector<char>(), binary_blob_t());
+                    &superblock, rockshard(io_backender.rocks(), table_id, 0), std::vector<char>(), binary_blob_t());
             }
             txn.commit();
         }

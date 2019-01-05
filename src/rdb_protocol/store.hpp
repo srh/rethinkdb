@@ -342,6 +342,10 @@ public:
             signal_t *interruptor)
             THROWS_ONLY(interrupted_exc_t);
 
+    rockshard rocksh() const {
+        return rockshard(rocks, table_id, shard_no);
+    }
+
 private:
     // Helper function to clear out a secondary index that has been
     // marked as deleted and drop it at the end. To be run in a coroutine.
@@ -435,6 +439,7 @@ public:
 
 private:
     namespace_id_t table_id;
+    int shard_no;
 
     sindex_context_map_t sindex_context;
 

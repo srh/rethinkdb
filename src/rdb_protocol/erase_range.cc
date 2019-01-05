@@ -69,8 +69,7 @@ private:
 };
 
 continue_bool_t rdb_erase_small_range(
-        rockstore::store *rocks,
-        namespace_id_t table_id,
+        rockshard rocksh,
         btree_slice_t *btree_slice,
         key_tester_t *tester,
         const key_range_t &key_range,
@@ -153,8 +152,8 @@ continue_bool_t rdb_erase_small_range(
                                   delete_mode_t::ERASE);
 
             // Erase the entry from rocksdb.
-            std::string rocks_kv_location = rockstore::table_primary_key(table_id, key_to_unescaped_str(key));
-            rocks->remove(rocks_kv_location, rockstore::write_options::TODO());
+            std::string rocks_kv_location = rockstore::table_primary_key(rocksh.table_id, rocksh.shard_no, key_to_unescaped_str(key));
+            rocksh->remove(rocks_kv_location, rockstore::write_options::TODO());
         } // kv_location is destroyed here. That's important because sometimes
           // pass_back_superblock_promise isn't pulsed before the kv_location
           // gets deleted.

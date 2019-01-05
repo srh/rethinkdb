@@ -45,7 +45,7 @@ TPTEST(BTreeSindex, LowLevelOps) {
             buf_lock_t sb_lock(&txn, SUPERBLOCK_ID, alt_create_t::create);
             real_superblock_t superblock(std::move(sb_lock));
             btree_slice_t::init_real_superblock(
-                &superblock, io_backender.rocks(), table_id, std::vector<char>(), binary_blob_t());
+                &superblock, rockshard(io_backender.rocks(), table_id, 0), std::vector<char>(), binary_blob_t());
         }
         txn.commit();
     }
@@ -67,7 +67,7 @@ TPTEST(BTreeSindex, LowLevelOps) {
                 superblock->get_sindex_block_id(),
                 access_t::write);
 
-            initialize_secondary_indexes(io_backender.rocks(), table_id, &sindex_block);
+            initialize_secondary_indexes(rockshard(io_backender.rocks(), table_id, 0), &sindex_block);
         }
         txn->commit();
     }
@@ -99,7 +99,7 @@ TPTEST(BTreeSindex, LowLevelOps) {
                 superblock->get_sindex_block_id(),
                 access_t::write);
 
-            set_secondary_index(io_backender.rocks(), table_id, &sindex_block, name, s);
+            set_secondary_index(rockshard(io_backender.rocks(), table_id, 0), &sindex_block, name, s);
         }
         txn->commit();
     }
@@ -267,7 +267,7 @@ TPTEST(BTreeSindex, BtreeStoreAPI) {
                 rdb_modification_info_t mod_info;
 
                 rdb_live_deletion_context_t deletion_context;
-                rdb_set(io_backender.rocks(), table_id, key, data, true,
+                rdb_set(rockshard(io_backender.rocks(), table_id, 0), key, data, true,
                     store.get_sindex_slice(sindex_uuid),
                     repli_timestamp_t::distant_past,
                     sindex_super_block.get(), &deletion_context, &response,

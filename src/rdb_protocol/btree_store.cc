@@ -77,9 +77,9 @@ const char* sindex_not_ready_exc_t::what() const throw() {
 
 sindex_not_ready_exc_t::~sindex_not_ready_exc_t() throw() { }
 
-// TODO: Remove region parameter.
+// TODO: Remove region parameter (if we drop hash sharding).  It's always some cpu sharding subspace or universe.
 store_t::store_t(const region_t &_region,
-                 int shard_no,
+                 int _shard_no,
                  rockstore::store *_rocks,
                  serializer_t *serializer,
                  cache_balancer_t *balancer,
@@ -97,9 +97,10 @@ store_t::store_t(const region_t &_region,
       io_backender_(io_backender), base_path_(base_path),
       perfmon_collection_membership(
           parent_perfmon_collection, &perfmon_collection,
-          strprintf("%s_%d", perfmon_prefix, shard_no)),
+          strprintf("%s_%d", perfmon_prefix, _shard_no)),
       ctx(_ctx),
       table_id(_table_id),
+      shard_no(_shard_no),
       write_superblock_acq_semaphore(WRITE_SUPERBLOCK_ACQ_WAITERS_LIMIT)
 {
     cache.init(new cache_t(serializer, balancer, &perfmon_collection));
@@ -125,7 +126,7 @@ store_t::store_t(const region_t &_region,
             // TODO: Make sure store initialization logic doesn't miss out on
             // lock ordering logic, when we go rocks-only.
             btree_slice_t::init_real_superblock(
-                &superblock, rocks, table_id, key.vector(), binary_blob_t());
+                &superblock, rocksh(), key.vector(), binary_blob_t());
         }
         txn.commit();
     }
@@ -231,7 +232,7 @@ void store_t::write(
                                  &txn, &real_superblock, interruptor);
     DEBUG_ONLY_CODE(metainfo->visit(
         real_superblock.get(), metainfo_checker.region, metainfo_checker.callback));
-    metainfo->update(real_superblock.get(), rocks, table_id, new_metainfo);
+    metainfo->update(real_superblock.get(), rocksh(), new_metainfo);
     try {
         scoped_ptr_t<real_superblock_t> real_supe = std::move(real_superblock);
         protocol_write(_write, response, timestamp, std::move(real_supe), interruptor);
@@ -285,8 +286,7 @@ void store_t::reset_data(
         rdb_live_deletion_context_t deletion_context;
         std::vector<rdb_modification_report_t> mod_reports;
         key_range_t deleted_range;
-        done_erasing = rdb_erase_small_range(rocks,
-                                             table_id,
+        done_erasing = rdb_erase_small_range(rocksh(),
                                              btree.get(),
                                              &key_tester,
                                              subregion.inner,
@@ -299,8 +299,7 @@ void store_t::reset_data(
 
         region_t deleted_region(subregion.beg, subregion.end, deleted_range);
         metainfo->update(superblock.get(),
-                         rocks,
-                         table_id,
+                         rocksh(),
                          region_map_t<binary_blob_t>(deleted_region, zero_metainfo));
 
         superblock.reset();
@@ -443,7 +442,7 @@ void store_t::sindex_rename_multi(
         bool success = get_secondary_index(
             &sindex_block, sindex_name_t(pair.first), &definition);
         guarantee(success);
-        success = delete_secondary_index(rocks, table_id, &sindex_block, sindex_name_t(pair.first));
+        success = delete_secondary_index(rocksh(), &sindex_block, sindex_name_t(pair.first));
         guarantee(success);
 
         auto slice_it = secondary_index_slices.find(definition.id);
@@ -458,7 +457,7 @@ void store_t::sindex_rename_multi(
     }
 
     for (const auto &pair : to_put_back) {
-        set_secondary_index(rocks, table_id, &sindex_block, sindex_name_t(pair.first), pair.second.first);
+        set_secondary_index(rocksh(), &sindex_block, sindex_name_t(pair.first), pair.second.first);
         pair.second.second->rename(&perfmon_collection, "index-" + pair.first);
     }
 
@@ -575,8 +574,7 @@ void store_t::update_sindexes(
         for (size_t i = 0; i < mod_reports.size(); ++i) {
             // TODO: What rocksdb transaction is this with?
             // TODO: Inspect all callers of rdb_update_sindexes for transactionality in rocks.
-            rdb_update_sindexes(this->rocks,
-                                this->table_id,
+            rdb_update_sindexes(rocksh(),
                                 this,
                                 sindexes,
                                 &mod_reports[i],
@@ -664,7 +662,7 @@ optional<uuid_u> store_t::add_sindex_internal(
 
         sindex.needs_post_construction_range = key_range_t::universe();
 
-        ::set_secondary_index(rocks, table_id, sindex_block, name, sindex);
+        ::set_secondary_index(rocksh(), sindex_block, name, sindex);
         return make_optional(sindex.id);
     }
 }
@@ -825,7 +823,7 @@ void store_t::clear_sindex_data(
                         deletion_context->balancing_detacher());
 
                 std::string rocks_kv_location =
-                    rockstore::table_secondary_key(table_id, sindex_id, key_to_unescaped_str(keys[i]));
+                    rockstore::table_secondary_key(table_id, shard_no, sindex_id, key_to_unescaped_str(keys[i]));
                 rocks->remove(rocks_kv_location, rockstore::write_options::TODO());
                 /* Here kv_location is destructed, which returns the superblock */
             }
@@ -931,7 +929,7 @@ void store_t::drop_sindex(uuid_u sindex_id) THROWS_NOTHING {
                                       sindex.superblock, access_t::write);
     sindex_superblock_lock.write_acq_signal()->wait_lazily_unordered();
     sindex_superblock_lock.mark_deleted();
-    ::delete_secondary_index(rocks, table_id, &sindex_block, compute_sindex_deletion_name(sindex.id));
+    ::delete_secondary_index(rocksh(), &sindex_block, compute_sindex_deletion_name(sindex.id));
     size_t num_erased = secondary_index_slices.erase(sindex.id);
     guarantee(num_erased == 1);
 
@@ -1001,7 +999,7 @@ bool store_t::mark_index_up_to_date(uuid_u id,
     if (found) {
         sindex.needs_post_construction_range = except_for_remaining_range;
 
-        ::set_secondary_index(rocks, table_id, sindex_block, id, sindex);
+        ::set_secondary_index(rocksh(), sindex_block, id, sindex);
     }
 
     return found;
@@ -1017,13 +1015,13 @@ MUST_USE bool store_t::mark_secondary_index_deleted(
     }
 
     // Delete the current entry
-    success = delete_secondary_index(rocks, table_id, sindex_block, name);
+    success = delete_secondary_index(rocksh(), sindex_block, name);
     guarantee(success);
 
     // Insert the new entry under a different name
     const sindex_name_t sindex_del_name = compute_sindex_deletion_name(sindex.id);
     sindex.being_deleted = true;
-    set_secondary_index(rocks, table_id, sindex_block, sindex_del_name, sindex);
+    set_secondary_index(rocksh(), sindex_block, sindex_del_name, sindex);
 
     // Hide the index from the perfmon collection
     auto slice_it = secondary_index_slices.find(sindex.id);
@@ -1212,7 +1210,7 @@ void store_t::set_metainfo(const region_map_t<binary_blob_t> &new_metainfo,
             &txn,
             &superblock,
             interruptor);
-        metainfo->update(superblock.get(), rocks, table_id, new_metainfo);
+        metainfo->update(superblock.get(), rocksh(), new_metainfo);
     }
     txn->commit();
 }
@@ -1248,7 +1246,7 @@ void store_t::migrate_metainfo(
             &txn,
             &superblock,
             interruptor);
-        metainfo->migrate(superblock.get(), rocks, table_id, from, to, get_region(), cb);
+        metainfo->migrate(superblock.get(), rocksh(), from, to, get_region(), cb);
     }
     txn->commit();
 }

@@ -107,8 +107,7 @@ struct btree_batched_replacer_t {
 };
 
 batched_replace_response_t rdb_batched_replace(
-    rockstore::store *rocks,
-    namespace_id_t table_id,
+    rockshard rocksh,
     const btree_info_t &info,
     scoped_ptr_t<real_superblock_t> &&superblock,
     const std::vector<store_key_t> &keys,
@@ -118,7 +117,7 @@ batched_replace_response_t rdb_batched_replace(
     profile::sampler_t *sampler,
     profile::trace_t *trace);
 
-void rdb_set(rockstore::store *rocks, namespace_id_t table_id,
+void rdb_set(rockshard rocksh,
              const store_key_t &key, ql::datum_t data,
              bool overwrite,
              btree_slice_t *slice, repli_timestamp_t timestamp,
@@ -129,8 +128,7 @@ void rdb_set(rockstore::store *rocks, namespace_id_t table_id,
              profile::trace_t *trace,
              promise_t<superblock_t *> *pass_back_superblock);
 
-void rdb_delete(rockstore::store *rocks,
-                namespace_id_t table_id,
+void rdb_delete(rockshard rocksh,
                 const store_key_t &key,
                 btree_slice_t *slice,
                 repli_timestamp_t timestamp,
@@ -304,8 +302,7 @@ public:
     new_mutex_in_line_t get_in_line_for_sindex();
     rwlock_in_line_t get_in_line_for_cfeed_stamp();
 
-    void on_mod_report(rockstore::store *store,
-                       namespace_id_t table_id,
+    void on_mod_report(rockshard rocksh,
                        const rdb_modification_report_t &mod_report,
                        bool update_pkey_cfeeds,
                        new_mutex_in_line_t *sindex_spot,
@@ -315,8 +312,7 @@ public:
 
 private:
     void on_mod_report_sub(
-        rockstore::store *store,
-        namespace_id_t table_id,
+        rockshard rocksh,
         const rdb_modification_report_t &mod_report,
         new_mutex_in_line_t *spot,
         cond_t *keys_available_cond,
@@ -335,8 +331,7 @@ private:
 };
 
 void rdb_update_sindexes(
-    rockstore::store *rocks,
-    namespace_id_t table_id,
+    rockshard rocksh,
     store_t *store,
     const store_t::sindex_access_vector_t &sindexes,
     const rdb_modification_report_t *modification,

@@ -9,7 +9,7 @@
 #include "region/region_map.hpp"
 
 class real_superblock_t;
-namespace rockstore { class store; }
+class rockshard;
 
 class store_metainfo_manager_t {
 public:
@@ -26,13 +26,11 @@ public:
 
     void update(
         real_superblock_t *superblock,
-        rockstore::store *rocks,
-        namespace_id_t table_id,
+        rockshard rocksh,
         const region_map_t<binary_blob_t> &new_metainfo);
 
     void migrate(real_superblock_t *superblock,
-                 rockstore::store *rocks,
-                 namespace_id_t table_id,
+                 rockshard rocksh,
                  cluster_version_t from,
                  cluster_version_t to,
                  const region_t &region,
