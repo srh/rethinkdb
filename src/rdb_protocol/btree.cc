@@ -1121,7 +1121,7 @@ void rdb_rget_slice(
                    require_sindexes_t::NO),
         r_nullopt);
 
-    direction_t direction = reversed(sorting) ? BACKWARD : FORWARD;
+    direction_t direction = reversed(sorting) ? direction_t::backward : direction_t::forward;
     continue_bool_t cont = continue_bool_t::CONTINUE;
     if (primary_keys.has_value()) {
         auto cb = [&](const std::pair<store_key_t, uint64_t> &pair, bool is_last) {
@@ -1207,7 +1207,7 @@ void rdb_rget_secondary_slice(
             sindex_info.mapping,
             sindex_info.multi)));
 
-    direction_t direction = reversed(sorting) ? BACKWARD : FORWARD;
+    direction_t direction = reversed(sorting) ? direction_t::backward : direction_t::forward;
     auto cb = [&](const std::pair<ql::datum_range_t, uint64_t> &pair, bool is_last) {
         key_range_t sindex_keyrange =
             pair.first.to_sindex_keyrange(sindex_func_reql_version);
@@ -1269,7 +1269,7 @@ void rdb_get_intersecting_slice(
         response);
     continue_bool_t cont = btree_concurrent_traversal(
         superblock, sindex_range, &callback,
-        direction_t::FORWARD,
+        direction_t::forward,
         release_superblock_t::RELEASE);
     callback.finish(cont);
 }
@@ -1311,7 +1311,7 @@ void rdb_get_nearest_slice(
                 &state);
             btree_concurrent_traversal(
                 superblock, key_range_t::universe(), &callback,
-                direction_t::FORWARD,
+                direction_t::forward,
                 release_superblock_t::KEEP);
             callback.finish(&partial_response);
         } catch (const geo_exception_t &e) {
@@ -2364,7 +2364,7 @@ void post_construct_secondary_index_range(
         superblock.get(),
         *construction_range_inout,
         &traversal_cb,
-        direction_t::FORWARD,
+        direction_t::forward,
         release_superblock_t::RELEASE);
     if (cont == continue_bool_t::ABORT
         && (interruptor->is_pulsed() || on_index_deleted_interruptor.is_pulsed())) {

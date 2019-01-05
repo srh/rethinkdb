@@ -131,12 +131,12 @@ protected:
     virtual ~depth_first_traversal_callback_t() { }
 };
 
-enum direction_t {
-    FORWARD,
-    BACKWARD
+enum class direction_t {
+    forward,
+    backward,
 };
 
-ARCHIVE_PRIM_MAKE_RANGED_SERIALIZABLE(direction_t, int8_t, FORWARD, BACKWARD);
+ARCHIVE_PRIM_MAKE_RANGED_SERIALIZABLE(direction_t, int8_t, direction_t::forward, direction_t::backward);
 
 /* Returns `CONTINUE` if we reached the end of the btree or range, and `ABORT` if
 `cb->handle_value()` returned `ABORT`. */

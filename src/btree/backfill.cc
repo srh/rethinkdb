@@ -145,7 +145,7 @@ continue_bool_t btree_send_backfill_pre(
     callback.reference_timestamp = reference_timestamp;
     callback.sizer = sizer;
     return btree_depth_first_traversal(superblock, range, &callback, access_t::read,
-        FORWARD, release_superblock, interruptor);
+        direction_t::forward, release_superblock, interruptor);
 }
 
 /* The `backfill_item_loader_t` gets backfill items from the `backfill_item_preparer_t`,
@@ -671,7 +671,7 @@ continue_bool_t btree_send_backfill(
         sizer, reference_timestamp, pre_item_producer, &abort_cond, &loader,
         memory_tracker);
     continue_bool_t cont = btree_depth_first_traversal(
-            superblock, range, &preparer, access_t::read, FORWARD, release_superblock,
+            superblock, range, &preparer, access_t::read, direction_t::forward, release_superblock,
             interruptor);
     /* Wait for `loader` to finish what it's doing, even if `btree_pre_item_producer`
     aborted. This is important so that we can make progress even if
@@ -726,7 +726,7 @@ void btree_receive_backfill_item_update_deletion_timestamps(
         "b.r.b.i.u.d.t. %" PRIu64, item.min_deletion_timestamp.longtime));
     backfill_deletion_timestamp_updater_t updater(sizer, item.min_deletion_timestamp);
     continue_bool_t res = btree_depth_first_traversal(
-        superblock, item.range, &updater, access_t::write, FORWARD, release_superblock,
+        superblock, item.range, &updater, access_t::write, direction_t::forward, release_superblock,
         interruptor);
     guarantee(res == continue_bool_t::CONTINUE);
 }

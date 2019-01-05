@@ -775,7 +775,7 @@ void store_t::clear_sindex_data(
                     remaining_range,
                     &traversal_cb,
                     access_t::read,
-                    direction_t::FORWARD,
+                    direction_t::forward,
                     release_superblock_t::KEEP,
                     interruptor));
         } catch (const interrupted_exc_t &) {

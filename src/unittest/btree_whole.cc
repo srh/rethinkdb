@@ -228,7 +228,7 @@ public:
                 _range,
                 &filler_cb,
                 access_t::read,
-                direction_t::FORWARD,
+                direction_t::forward,
                 release_superblock_t::RELEASE,
                 &interruptor);
         });
@@ -279,7 +279,7 @@ public:
                 key_range_t::universe(),
                 &filler_cb,
                 access_t::read,
-                direction_t::FORWARD,
+                direction_t::forward,
                 release_superblock_t::RELEASE,
                 &interruptor);
         });
