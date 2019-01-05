@@ -1,6 +1,7 @@
 #include "rockstore/store.hpp"
 
 #include "rocksdb/db.h"
+#include "rocksdb/utilities/transaction.h"
 #include "rocksdb/utilities/optimistic_transaction_db.h"
 
 #include "arch/runtime/thread_pool.hpp"
@@ -8,6 +9,142 @@
 #include "utils.hpp"
 
 namespace rockstore {
+
+// TODO: Move this somewhere?
+bool starts_with(const std::string& x, const std::string& prefix) {
+    return x.size() >= prefix.size() &&
+        memcmp(x.data(), prefix.data(), prefix.size()) == 0;
+}
+
+rocksdb::WriteOptions to_rocks(const write_options &opts) {
+    rocksdb::WriteOptions ret;
+    ret.sync = opts.sync;
+    return ret;
+}
+
+txn::txn() : txn_(), committed_(false) {}
+txn::txn(scoped_ptr_t<rocksdb::Transaction> &&tx) : txn_(std::move(tx)), committed_(false) {}
+
+txn::txn(txn &&movee) : txn_(std::move(movee.txn_)), committed_(movee.committed_) {
+    movee.committed_ = false;
+}
+
+txn::~txn() {
+    if (txn_.has()) {
+        guarantee(committed_);
+    }
+}
+txn &txn::operator=(txn &&movee) {
+    txn tmp{std::move(movee)};
+    std::swap(txn_, tmp.txn_);
+    std::swap(committed_, tmp.committed_);
+    return *this;
+}
+
+void txn::commit() {
+    guarantee(!committed_);
+    committed_ = true;  // Set to true first, in case we need to throw below.
+
+    rocksdb::Status status;
+    linux_thread_pool_t::run_in_blocker_pool([&]() {
+        status = txn_->Commit();
+    });
+    if (!status.ok()) {
+        throw std::runtime_error("txn::commit failed");
+    }
+}
+
+std::string txn::read(const std::string &key) {
+    std::string ret;
+    rocksdb::Status status;
+    linux_thread_pool_t::run_in_blocker_pool([&]() {
+        status = txn_->Get(rocksdb::ReadOptions(), key, &ret);
+    });
+    if (!status.ok()) {
+        // TODO
+        throw std::runtime_error("txn::read failed");
+    }
+    return ret;
+}
+
+std::pair<std::string, bool> txn::try_read(const std::string &key) {
+    std::pair<std::string, bool> ret;
+    rocksdb::Status status;
+    linux_thread_pool_t::run_in_blocker_pool([&]() {
+        status = txn_->Get(rocksdb::ReadOptions(), key, &ret.first);
+    });
+    if (!status.ok()) {
+        if (status.IsNotFound()) {
+            ret.second = false;
+        } else {
+            // TODO
+            throw std::runtime_error("txn::read failed");
+        }
+    } else {
+        ret.second = true;
+    }
+    return ret;
+}
+
+std::vector<std::pair<std::string, std::string>>
+txn::read_all_prefixed(const std::string &prefix) {
+    std::vector<std::pair<std::string, std::string>> ret;
+    linux_thread_pool_t::run_in_blocker_pool([&]() {
+        scoped_ptr_t<rocksdb::Iterator> iter(txn_->GetIterator(rocksdb::ReadOptions()));
+        iter->Seek(prefix);
+        while (iter->Valid()) {
+            std::string key = iter->key().ToString();
+            if (!starts_with(key, prefix)) {
+                break;
+            }
+            std::string value = iter->value().ToString();
+            ret.emplace_back(std::move(key), std::move(value));
+            iter->Next();
+        }
+    });
+    return ret;
+}
+
+
+void txn::put(const std::string &key, const std::string &value) {
+    rocksdb::Status status;
+    linux_thread_pool_t::run_in_blocker_pool([&]() {
+        status = txn_->Put(key, value);
+    });
+    if (!status.ok()) {
+        // TODO
+        throw std::runtime_error("store::put failed");
+    }
+    return;
+}
+
+void txn::insert(
+        const std::string &key, const std::string &value) {
+    rocksdb::Status status;
+    bool existed = false;
+    linux_thread_pool_t::run_in_blocker_pool([&]() {
+        // TODO: Use KeyMayExist. TODO: Also use KeyMayExist for reads, avoid
+        // going to blocker pool, audit rocks source code to make sure it can't
+        // block.
+        std::string old;
+        status = txn_->Get(rocksdb::ReadOptions(), key, &old);
+        if (status.IsNotFound()) {
+            status = txn_->Put(key, value);
+        } else if (status.ok()) {
+            existed = true;
+        }
+    });
+    if (existed) {
+        // TODO
+        throw std::runtime_error("txn::insert on top of existing key");
+    }
+    if (!status.ok()) {
+        // TODO
+        throw std::runtime_error("txn::insert failed");
+    }
+    return;
+}
+
 
 store::store(scoped_ptr_t<rocksdb::OptimisticTransactionDB> &&db) : db_(std::move(db)) {}
 store::store(store&& other) : db_(std::move(other.db_)) {}
@@ -70,12 +207,6 @@ std::pair<std::string, bool> store::try_read(const std::string &key) {
     return ret;
 }
 
-// TODO: Move this somewhere?
-bool starts_with(const std::string& x, const std::string& prefix) {
-    return x.size() >= prefix.size() &&
-        memcmp(x.data(), prefix.data(), prefix.size()) == 0;
-}
-
 std::vector<std::pair<std::string, std::string>>
 store::read_all_prefixed(std::string prefix) {
     std::vector<std::pair<std::string, std::string>> ret;
@@ -95,11 +226,6 @@ store::read_all_prefixed(std::string prefix) {
     return ret;
 }
 
-rocksdb::WriteOptions to_rocks(const write_options &opts) {
-    rocksdb::WriteOptions ret;
-    ret.sync = opts.sync;
-    return ret;
-}
 
 void store::put(const std::string &key, const std::string &value,
                 const write_options &opts) {
@@ -175,6 +301,11 @@ void store::remove(const std::string &key, const write_options &opts) {
         throw std::runtime_error("store::remove failed");
     }
     return;
+}
+
+txn store::begin(const write_options &opts) {
+    rocksdb::Transaction *tx = db_->BeginTransaction(to_rocks(opts));
+    return txn{scoped_ptr_t<rocksdb::Transaction>(tx)};
 }
 
 std::string table_prefix(namespace_id_t id, int shard_no) {
