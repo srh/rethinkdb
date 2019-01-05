@@ -101,7 +101,6 @@ public:
     void new_read_token(read_token_t *token_out);
     void new_write_token(write_token_t *token_out);
 
-    // TODO implement rocks reading below.
     region_map_t<binary_blob_t> get_metainfo(
             order_token_t order_token,
             read_token_t *token,
@@ -130,6 +129,7 @@ public:
             signal_t *interruptor)
         THROWS_ONLY(interrupted_exc_t);
 
+    // TODO implement rocks reading below.
     void read(
             DEBUG_ONLY(const metainfo_checker_t& metainfo_checker, )
             const read_t &read,
