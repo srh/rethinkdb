@@ -293,6 +293,7 @@ void do_read(ql::env_t *env,
 
 // TODO: get rid of this extra response_t copy on the stack
 struct rdb_read_visitor_t : public boost::static_visitor<void> {
+    // TODO: Implement rocks reading in this visitor below.
     void operator()(const changefeed_subscribe_t &s) {
         auto cserver = store->get_or_make_changefeed_server(s.shard_region);
         guarantee(cserver.first != nullptr);
