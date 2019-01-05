@@ -51,7 +51,7 @@ public:
     store& operator=(store&&) = delete;
 
 private:
-    explicit store(rocksdb::OptimisticTransactionDB *db);
+    explicit store(scoped_ptr_t<rocksdb::OptimisticTransactionDB> &&db);
     friend store create_rockstore(const base_path_t &base_path);
     scoped_ptr_t<rocksdb::OptimisticTransactionDB> db_;
 };

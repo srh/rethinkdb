@@ -9,7 +9,7 @@
 
 namespace rockstore {
 
-store::store(rocksdb::OptimisticTransactionDB *db) : db_(db) {}
+store::store(scoped_ptr_t<rocksdb::OptimisticTransactionDB> &&db) : db_(std::move(db)) {}
 store::store(store&& other) : db_(std::move(other.db_)) {}
 
 store create_rockstore(const base_path_t &base_path) {
@@ -26,7 +26,7 @@ store create_rockstore(const base_path_t &base_path) {
         // TODO
         throw std::runtime_error("Could not create rockstore");
     }
-    store ret(db);
+    store ret{scoped_ptr_t<rocksdb::OptimisticTransactionDB>(db)};
     return ret;
 }
 
