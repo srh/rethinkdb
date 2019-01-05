@@ -159,7 +159,7 @@ store_t::store_t(const region_t &_region,
                                 access_t::read);
 
         std::map<sindex_name_t, secondary_index_t> sindexes;
-        get_secondary_indexes(&sindex_block, &sindexes);
+        get_secondary_indexes(rocksh(), &sindex_block, &sindexes);
 
         for (auto it = sindexes.begin(); it != sindexes.end(); ++it) {
             // Deleted secondary indexes should not be added to the perfmons

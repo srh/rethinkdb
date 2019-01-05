@@ -109,7 +109,11 @@ bool get_secondary_index(buf_lock_t *sindex_block,
 bool get_secondary_index(buf_lock_t *sindex_block, uuid_u id,
                          secondary_index_t *sindex_out);
 
+// TODO: Remove when unused.
 void get_secondary_indexes(buf_lock_t *sindex_block,
+                           std::map<sindex_name_t, secondary_index_t> *sindexes_out);
+
+void get_secondary_indexes(rockshard rocksh, buf_lock_t *sindex_block,
                            std::map<sindex_name_t, secondary_index_t> *sindexes_out);
 
 /* Rewrites the secondary index block with up-to-date serialization */

@@ -79,7 +79,6 @@ class store_t final : public store_view_t {
 public:
     using home_thread_mixin_t::assert_thread;
 
-    // TODO: Implement or review rocks writing (and reading) in this constructor.
     store_t(const region_t &region,
             int shard_no,
             rockstore::store *rocks,

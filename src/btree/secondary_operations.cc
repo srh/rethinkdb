@@ -145,6 +145,34 @@ cluster_version_t sindex_block_version(const btree_sindex_block_t *data) {
     }
 }
 
+
+void get_secondary_indexes_internal(
+        rockshard rocksh,
+        buf_lock_t *sindex_block,
+        std::map<sindex_name_t, secondary_index_t> *sindexes_out) {
+    buf_read_t read(sindex_block);
+    const btree_sindex_block_t *data
+        = static_cast<const btree_sindex_block_t *>(read.get_data_read());
+
+    blob_t sindex_blob(sindex_block->cache()->max_block_size(),
+                       const_cast<char *>(data->sindex_blob),
+                       btree_sindex_block_t::SINDEX_BLOB_MAXREFLEN);
+    std::map<sindex_name_t, secondary_index_t> sindexes_old;
+    deserialize_for_version_from_blob(sindex_block_version(data),
+                                      buf_parent_t(sindex_block), &sindex_blob, &sindexes_old);
+
+
+    // TODO: Pay attention to locking when removing cache stuff.  We've got read access to the sindex_block buffer here.
+    std::string rocks_sindex_blob = rocksh->read(rockstore::table_sindex_map(rocksh.table_id, rocksh.shard_no));
+    string_read_stream_t stream(std::move(rocks_sindex_blob), 0);
+    archive_result_t res = deserialize<cluster_version_t::v2_4_is_latest_disk>(&stream, sindexes_out);
+    guarantee_deserialization(res, "sindex_map");
+
+    // TODO: Compare this (or remove)
+    // guarantee(*sindexes_out == sindexes_old);
+}
+
+// TODO: Remove old version
 void get_secondary_indexes_internal(
         buf_lock_t *sindex_block,
         std::map<sindex_name_t, secondary_index_t> *sindexes_out) {
@@ -227,6 +255,11 @@ void get_secondary_indexes(buf_lock_t *sindex_block,
     get_secondary_indexes_internal(sindex_block, sindexes_out);
 }
 
+void get_secondary_indexes(rockshard rocksh, buf_lock_t *sindex_block,
+                           std::map<sindex_name_t, secondary_index_t> *sindexes_out) {
+    get_secondary_indexes_internal(rocksh, sindex_block, sindexes_out);
+}
+
 void migrate_secondary_index_block(
         rockshard rocksh,
         buf_lock_t *sindex_block) {
@@ -239,7 +272,7 @@ void migrate_secondary_index_block(
     }
 
     std::map<sindex_name_t, secondary_index_t> sindexes;
-    get_secondary_indexes_internal(sindex_block, &sindexes);
+    get_secondary_indexes_internal(rocksh, sindex_block, &sindexes);
     if (block_version != cluster_version_t::LATEST_DISK) {
         set_secondary_indexes_internal(rocksh, sindex_block, sindexes);
     }

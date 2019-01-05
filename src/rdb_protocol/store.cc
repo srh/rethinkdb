@@ -132,12 +132,13 @@ void store_t::help_construct_bring_sindexes_up_to_date() {
     // Kick off coroutines to finish the respective operations
     {
         std::map<sindex_name_t, secondary_index_t> sindexes;
-        get_secondary_indexes(&sindex_block, &sindexes);
+        get_secondary_indexes(rocksh(), &sindex_block, &sindexes);
         for (auto it = sindexes.begin(); it != sindexes.end(); ++it) {
             if (it->second.being_deleted) {
                 coro_t::spawn_sometime(std::bind(clear_sindex,
                                                  it->second.id, drainer.lock()));
             } else if (!it->second.post_construction_complete()) {
+                // TODO: rocks read operations in resume_construct_sindex.
                 coro_t::spawn_sometime(std::bind(&rdb_protocol::resume_construct_sindex,
                                                  it->second.id,
                                                  it->second.needs_post_construction_range,
