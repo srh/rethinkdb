@@ -87,10 +87,11 @@ public:
 
             stores[ix].init(new store_t(
                 cpu_sharding_subspace(ix),
+                ix,
                 rocks,
                 multiplexer->proxies[ix],
                 cache_balancer,
-                strprintf("shard_%d", ix),
+                "shard",
                 create,
                 perfmon_collection_serializers,
                 rdb_context,

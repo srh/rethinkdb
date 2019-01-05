@@ -81,10 +81,11 @@ public:
 
     // TODO: Implement or review rocks writing (and reading) in this constructor.
     store_t(const region_t &region,
+            int shard_no,
             rockstore::store *rocks,
             serializer_t *serializer,
             cache_balancer_t *balancer,
-            const std::string &perfmon_name,
+            const char *perfmon_prefix,
             bool create,
             perfmon_collection_t *parent_perfmon_collection,
             rdb_context_t *_ctx,

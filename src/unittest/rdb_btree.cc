@@ -264,6 +264,7 @@ TPTEST(RDBBtree, SindexPostConstruct) {
 
     store_t store(
             region_t::universe(),
+            0,
             io_backender.rocks(),
             &serializer,
             &balancer,
@@ -308,6 +309,7 @@ TPTEST(RDBBtree, SindexEraseRange) {
 
     store_t store(
             region_t::universe(),
+            0,
             io_backender.rocks(),
             &serializer,
             &balancer,
@@ -398,6 +400,7 @@ TPTEST(RDBBtree, SindexInterruptionViaDrop) {
 
     store_t store(
             region_t::universe(),
+            0,
             io_backender.rocks(),
             &serializer,
             &balancer,
@@ -442,6 +445,7 @@ TPTEST(RDBBtree, SindexInterruptionViaStoreDelete) {
 
     scoped_ptr_t<store_t> store(new store_t(
             region_t::universe(),
+            0,
             io_backender.rocks(),
             &serializer,
             &balancer,

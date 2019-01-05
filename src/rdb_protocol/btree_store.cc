@@ -77,11 +77,13 @@ const char* sindex_not_ready_exc_t::what() const throw() {
 
 sindex_not_ready_exc_t::~sindex_not_ready_exc_t() throw() { }
 
+// TODO: Remove region parameter.
 store_t::store_t(const region_t &_region,
+                 int shard_no,
                  rockstore::store *_rocks,
                  serializer_t *serializer,
                  cache_balancer_t *balancer,
-                 const std::string &perfmon_name,
+                 const char *perfmon_prefix,
                  bool create,
                  perfmon_collection_t *parent_perfmon_collection,
                  rdb_context_t *_ctx,
@@ -93,7 +95,9 @@ store_t::store_t(const region_t &_region,
       perfmon_collection(),
       rocks(_rocks),
       io_backender_(io_backender), base_path_(base_path),
-      perfmon_collection_membership(parent_perfmon_collection, &perfmon_collection, perfmon_name),
+      perfmon_collection_membership(
+          parent_perfmon_collection, &perfmon_collection,
+          strprintf("%s_%d", perfmon_prefix, shard_no)),
       ctx(_ctx),
       table_id(_table_id),
       write_superblock_acq_semaphore(WRITE_SUPERBLOCK_ACQ_WAITERS_LIMIT)

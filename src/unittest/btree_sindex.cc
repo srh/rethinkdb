@@ -163,6 +163,7 @@ TPTEST(BTreeSindex, BtreeStoreAPI) {
 
     store_t store(
             region_t::universe(),
+            0,  // Just one shard.
             io_backender.rocks(),
             &serializer,
             &balancer,

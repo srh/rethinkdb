@@ -420,6 +420,7 @@ void check_for_obsolete_sindexes(io_backender_t *io_backender,
                 pmap(CPU_SHARDING_FACTOR, [&](int index) {
                         perfmon_collection_t inner_dummy_stats;
                         store_t store(cpu_sharding_subspace(index),
+                                      index,
                                       io_backender->rocks(),
                                       multiplexer.proxies[index],
                                       &balancer,
@@ -470,6 +471,7 @@ void migrate_tables(io_backender_t *io_backender,
                 pmap(CPU_SHARDING_FACTOR, [&](int index) {
                         perfmon_collection_t inner_dummy_stats;
                         store_t store(cpu_sharding_subspace(index),
+                                      index,
                                       io_backender->rocks(),
                                       multiplexer.proxies[index],
                                       &balancer,
