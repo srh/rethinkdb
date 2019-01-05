@@ -129,27 +129,6 @@ void rdb_set(rockstore::store *rocks, namespace_id_t table_id,
              profile::trace_t *trace,
              promise_t<superblock_t *> *pass_back_superblock);
 
-// TODO: Remove if nothing using this.
-void rdb_set(const store_key_t &key, ql::datum_t data,
-             bool overwrite,
-             btree_slice_t *slice, repli_timestamp_t timestamp,
-             superblock_t *superblock,
-             const deletion_context_t *deletion_context,
-             point_write_response_t *response,
-             rdb_modification_info_t *mod_info,
-             profile::trace_t *trace,
-             promise_t<superblock_t *> *pass_back_superblock);
-
-// TODO: Remove if nothing using this.
-void rdb_delete(const store_key_t &key, btree_slice_t *slice, repli_timestamp_t
-                timestamp, real_superblock_t *superblock,
-                const deletion_context_t *deletion_context,
-                delete_mode_t delete_mode,
-                point_delete_response_t *response,
-                rdb_modification_info_t *mod_info,
-                profile::trace_t *trace,
-                promise_t<superblock_t *> *pass_back_superblock);
-
 void rdb_delete(rockstore::store *rocks,
                 namespace_id_t table_id,
                 const store_key_t &key,

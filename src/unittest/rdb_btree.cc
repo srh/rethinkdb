@@ -57,6 +57,8 @@ void insert_rows(int start, int finish, store_t *store) {
             rapidjson::Document doc;
             doc.Parse(data.c_str());
             rdb_set(
+                store->rocks,
+                store->get_table_id(),
                 pk,
                 ql::to_datum(doc, limits, reql_version_t::LATEST),
                 false, store->btree.get(), repli_timestamp_t::distant_past,

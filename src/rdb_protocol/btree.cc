@@ -104,38 +104,6 @@ void rdb_get(const store_key_t &store_key, btree_slice_t *slice,
     }
 }
 
-// TODO: Remove after rocks switching done, no callers.
-void kv_location_delete(keyvalue_location_t *kv_location,
-                        const store_key_t &key,
-                        repli_timestamp_t timestamp,
-                        const deletion_context_t *deletion_context,
-                        delete_mode_t delete_mode,
-                        rdb_modification_info_t *mod_info_out) {
-    // Notice this also implies that buf is valid.
-    guarantee(kv_location->value.has());
-
-    // As noted above, we can be sure that buf is valid.
-    const max_block_size_t block_size = kv_location->buf.cache()->max_block_size();
-
-    if (mod_info_out != nullptr) {
-        guarantee(mod_info_out->deleted.second.empty());
-
-        mod_info_out->deleted.second.assign(
-                kv_location->value_as<rdb_value_t>()->value_ref(),
-                kv_location->value_as<rdb_value_t>()->value_ref()
-                + kv_location->value_as<rdb_value_t>()->inline_size(block_size));
-    }
-
-    // Detach/Delete
-    deletion_context->in_tree_deleter()->delete_value(buf_parent_t(&kv_location->buf),
-                                                      kv_location->value.get());
-
-    kv_location->value.reset();
-    rdb_value_sizer_t sizer(block_size);
-    apply_keyvalue_change(&sizer, kv_location, key.btree_key(), timestamp,
-            deletion_context->balancing_detacher(), delete_mode);
-}
-
 void kv_location_delete(rockstore::store *rocks,
                         const std::string &rocks_kv_location,
                         keyvalue_location_t *kv_location,
@@ -165,60 +133,11 @@ void kv_location_delete(rockstore::store *rocks,
 
     kv_location->value.reset();
     rdb_value_sizer_t sizer(block_size);
-    null_key_modification_callback_t null_cb;
     apply_keyvalue_change(&sizer, kv_location, key.btree_key(), timestamp,
-            deletion_context->balancing_detacher(), &null_cb, delete_mode);
+            deletion_context->balancing_detacher(), delete_mode);
 
     // TODO: We need to update the rocks secondary indexes (after primary key deletion), _transactionally_.
     rocks->remove(rocks_kv_location, rockstore::write_options::TODO());
-}
-
-// TODO: Remove this when rdb_set is done using it.
-MUST_USE ql::serialization_result_t
-kv_location_set(keyvalue_location_t *kv_location,
-                const store_key_t &key,
-                ql::datum_t data,
-                repli_timestamp_t timestamp,
-                const deletion_context_t *deletion_context,
-                rdb_modification_info_t *mod_info_out) THROWS_NOTHING {
-    scoped_malloc_t<rdb_value_t> new_value(blob::btree_maxreflen);
-    memset(new_value.get(), 0, blob::btree_maxreflen);
-
-    const max_block_size_t block_size = kv_location->buf.cache()->max_block_size();
-    {
-        blob_t blob(block_size, new_value->value_ref(), blob::btree_maxreflen);
-        ql::serialization_result_t res
-            = datum_serialize_onto_blob(buf_parent_t(&kv_location->buf),
-                                        &blob, data);
-        if (bad(res)) return res;
-    }
-
-    if (mod_info_out) {
-        guarantee(mod_info_out->added.second.empty());
-        mod_info_out->added.second.assign(new_value->value_ref(),
-            new_value->value_ref() + new_value->inline_size(block_size));
-    }
-
-    if (kv_location->value.has()) {
-        deletion_context->in_tree_deleter()->delete_value(
-                buf_parent_t(&kv_location->buf), kv_location->value.get());
-        if (mod_info_out != nullptr) {
-            guarantee(mod_info_out->deleted.second.empty());
-            mod_info_out->deleted.second.assign(
-                    kv_location->value_as<rdb_value_t>()->value_ref(),
-                    kv_location->value_as<rdb_value_t>()->value_ref()
-                    + kv_location->value_as<rdb_value_t>()->inline_size(block_size));
-        }
-    }
-
-    // Actually update the leaf, if needed.
-    kv_location->value = std::move(new_value);
-    rdb_value_sizer_t sizer(block_size);
-    apply_keyvalue_change(&sizer, kv_location, key.btree_key(),
-                          timestamp,
-                          deletion_context->balancing_detacher(),
-                          delete_mode_t::REGULAR_QUERY);
-    return ql::serialization_result_t::SUCCESS;
 }
 
 ql::serialization_result_t datum_serialize_to_string(const ql::datum_t &datum, std::string *out) {
@@ -278,11 +197,10 @@ kv_location_set(rockstore::store *rocks,
 
     // Actually update the leaf, if needed.
     kv_location->value = std::move(new_value);
-    null_key_modification_callback_t null_cb;
     rdb_value_sizer_t sizer(block_size);
     apply_keyvalue_change(&sizer, kv_location, key.btree_key(),
                           timestamp,
-                          deletion_context->balancing_detacher(), &null_cb,
+                          deletion_context->balancing_detacher(),
                           delete_mode_t::REGULAR_QUERY);
 
     {
@@ -325,10 +243,9 @@ kv_location_set_secondary(
     // Update the leaf, if needed.
     kv_location->value = std::move(new_value);
 
-    null_key_modification_callback_t null_cb;
     rdb_value_sizer_t sizer(kv_location->buf.cache()->max_block_size());
     apply_keyvalue_change(&sizer, kv_location, key.btree_key(), timestamp,
-                          deletion_context->balancing_detacher(), &null_cb,
+                          deletion_context->balancing_detacher(),
                           delete_mode_t::REGULAR_QUERY);
 
     {
@@ -339,33 +256,6 @@ kv_location_set_secondary(
         guarantee(!bad(res));
         rocks->put(rocks_kv_location, str, rockstore::write_options::TODO());
     }
-
-    return ql::serialization_result_t::SUCCESS;
-}
-
-// TODO: Remove if no callers.
-MUST_USE ql::serialization_result_t
-kv_location_set(keyvalue_location_t *kv_location,
-                const store_key_t &key,
-                const std::vector<char> &value_ref,
-                repli_timestamp_t timestamp,
-                const deletion_context_t *deletion_context) {
-    // Detach/Delete the old value.
-    if (kv_location->value.has()) {
-        deletion_context->in_tree_deleter()->delete_value(
-                buf_parent_t(&kv_location->buf), kv_location->value.get());
-    }
-
-    scoped_malloc_t<rdb_value_t> new_value(
-            value_ref.data(), value_ref.size());
-
-    // Update the leaf, if needed.
-    kv_location->value = std::move(new_value);
-
-    rdb_value_sizer_t sizer(kv_location->buf.cache()->max_block_size());
-    apply_keyvalue_change(&sizer, kv_location, key.btree_key(), timestamp,
-                          deletion_context->balancing_detacher(),
-                          delete_mode_t::REGULAR_QUERY);
 
     return ql::serialization_result_t::SUCCESS;
 }
@@ -749,54 +639,6 @@ void rdb_set(rockstore::store *rocks,
         (had_value ? point_write_result_t::DUPLICATE : point_write_result_t::STORED);
 }
 
-// TODO: Remove this if nothing is using it.
-void rdb_set(const store_key_t &key,
-             ql::datum_t data,
-             bool overwrite,
-             btree_slice_t *slice,
-             repli_timestamp_t timestamp,
-             superblock_t *superblock,
-             const deletion_context_t *deletion_context,
-             point_write_response_t *response_out,
-             rdb_modification_info_t *mod_info,
-             profile::trace_t *trace,
-             promise_t<superblock_t *> *pass_back_superblock) {
-    keyvalue_location_t kv_location;
-    rdb_value_sizer_t sizer(superblock->cache()->max_block_size());
-    find_keyvalue_location_for_write(&sizer, superblock, key.btree_key(), timestamp,
-                                     deletion_context->balancing_detacher(),
-                                     &kv_location, trace, pass_back_superblock);
-    slice->stats.pm_keys_set.record();
-    slice->stats.pm_total_keys_set += 1;
-    const bool had_value = kv_location.value.has();
-
-    /* update the modification report */
-    if (kv_location.value.has()) {
-        mod_info->deleted.first = get_data(kv_location.value_as<rdb_value_t>(),
-                                           buf_parent_t(&kv_location.buf));
-    }
-
-    mod_info->added.first = data;
-
-    if (overwrite || !had_value) {
-        ql::serialization_result_t res =
-            kv_location_set(&kv_location, key, data, timestamp, deletion_context,
-                            mod_info);
-        if (res & ql::serialization_result_t::ARRAY_TOO_BIG) {
-            rfail_typed_target(&data, "Array too large for disk writes "
-                               "(limit 100,000 elements).");
-        } else if (res & ql::serialization_result_t::EXTREMA_PRESENT) {
-            rfail_typed_target(&data, "`r.minval` and `r.maxval` cannot be "
-                               "written to disk.");
-        }
-        r_sanity_check(!ql::bad(res));
-        guarantee(mod_info->deleted.second.empty() == !had_value &&
-                  !mod_info->added.second.empty());
-    }
-    response_out->result =
-        (had_value ? point_write_result_t::DUPLICATE : point_write_result_t::STORED);
-}
-
 void rdb_delete(rockstore::store *rocks,
                 namespace_id_t table_id,
                 const store_key_t &key,
@@ -825,36 +667,6 @@ void rdb_delete(rockstore::store *rocks,
                                            buf_parent_t(&kv_location.buf));
         std::string rocks_kv_location = rockstore::table_primary_key(table_id, key_to_unescaped_str(key));
         kv_location_delete(rocks, rocks_kv_location, &kv_location, key, timestamp, deletion_context,
-            delete_mode, mod_info);
-        guarantee(!mod_info->deleted.second.empty() && mod_info->added.second.empty());
-    }
-    response->result = (exists ? point_delete_result_t::DELETED : point_delete_result_t::MISSING);
-}
-
-// TODO: Remove if no callers.
-void rdb_delete(const store_key_t &key, btree_slice_t *slice,
-                repli_timestamp_t timestamp,
-                real_superblock_t *superblock,
-                const deletion_context_t *deletion_context,
-                delete_mode_t delete_mode,
-                point_delete_response_t *response,
-                rdb_modification_info_t *mod_info,
-                profile::trace_t *trace,
-                promise_t<superblock_t *> *pass_back_superblock) {
-    keyvalue_location_t kv_location;
-    rdb_value_sizer_t sizer(superblock->cache()->max_block_size());
-    find_keyvalue_location_for_write(&sizer, superblock, key.btree_key(), timestamp,
-            deletion_context->balancing_detacher(), &kv_location, trace,
-            pass_back_superblock);
-    slice->stats.pm_keys_set.record();
-    slice->stats.pm_total_keys_set += 1;
-    bool exists = kv_location.value.has();
-
-    /* Update the modification report. */
-    if (exists) {
-        mod_info->deleted.first = get_data(kv_location.value_as<rdb_value_t>(),
-                                           buf_parent_t(&kv_location.buf));
-        kv_location_delete(&kv_location, key, timestamp, deletion_context,
             delete_mode, mod_info);
         guarantee(!mod_info->deleted.second.empty() && mod_info->added.second.empty());
     }

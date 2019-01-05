@@ -160,7 +160,7 @@ TPTEST(BTreeSindex, BtreeStoreAPI) {
         log_serializer_t::dynamic_config_t(),
         &file_opener,
         &get_global_perfmon_collection());
-
+    namespace_id_t table_id = str_to_uuid("12345678-abcd-abcd-abcd-121234345656");
     store_t store(
             region_t::universe(),
             0,  // Just one shard.
@@ -267,7 +267,8 @@ TPTEST(BTreeSindex, BtreeStoreAPI) {
                 rdb_modification_info_t mod_info;
 
                 rdb_live_deletion_context_t deletion_context;
-                rdb_set(key, data, true, store.get_sindex_slice(sindex_uuid),
+                rdb_set(io_backender.rocks(), table_id, key, data, true,
+                    store.get_sindex_slice(sindex_uuid),
                     repli_timestamp_t::distant_past,
                     sindex_super_block.get(), &deletion_context, &response,
                     &mod_info, static_cast<profile::trace_t *>(nullptr),
