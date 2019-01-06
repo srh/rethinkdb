@@ -64,7 +64,7 @@ std::string txn::read(const std::string &key) {
     });
     if (!status.ok()) {
         // TODO
-        throw std::runtime_error("txn::read failed");
+        throw std::runtime_error("txn::read failed (on key '" + key + "')");
     }
     return ret;
 }
@@ -80,7 +80,7 @@ std::pair<std::string, bool> txn::try_read(const std::string &key) {
             ret.second = false;
         } else {
             // TODO
-            throw std::runtime_error("txn::read failed");
+            throw std::runtime_error("txn::read failed (on key '" + key + "')");
         }
     } else {
         ret.second = true;
@@ -139,11 +139,11 @@ void txn::insert(
     });
     if (existed) {
         // TODO
-        throw std::runtime_error("txn::insert on top of existing key");
+        throw std::runtime_error("txn::insert on top of existing key ('" + key + "')");
     }
     if (!status.ok()) {
         // TODO
-        throw std::runtime_error("txn::insert failed");
+        throw std::runtime_error("txn::insert failed (on key '" + key + "')");
     }
     return;
 }
@@ -186,7 +186,7 @@ std::string store::read(const std::string &key) {
     });
     if (!status.ok()) {
         // TODO
-        throw std::runtime_error("store::read failed");
+        throw std::runtime_error("store::read failed (on key '" + key + "')");
     }
     return ret;
 }
@@ -202,7 +202,7 @@ std::pair<std::string, bool> store::try_read(const std::string &key) {
             ret.second = false;
         } else {
             // TODO
-            throw std::runtime_error("store::read failed");
+            throw std::runtime_error("store::read failed (on key '" + key + "')");
         }
     } else {
         ret.second = true;
@@ -259,11 +259,11 @@ void store::insert(const std::string &key, const std::string &value,
     });
     if (existed) {
         // TODO
-        throw std::runtime_error("store::insert on top of existing key");
+        throw std::runtime_error("store::insert on top of existing key ('" + key + "')");
     }
     if (!status.ok()) {
         // TODO
-        throw std::runtime_error("store::insert failed");
+        throw std::runtime_error("store::insert failed (on key '" + key + "')");
     }
     return;
 }
