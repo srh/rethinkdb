@@ -68,12 +68,12 @@ public:
 
     /* concurrent_traversal_callback_t interface */
     continue_bool_t handle_pair(scoped_key_value_t &&keyvalue,
-                                concurrent_traversal_fifo_enforcer_signal_t waiter)
+                                concurrent_traversal_fifo_enforcer_signal_t waiter) override
             THROWS_ONLY(interrupted_exc_t);
     void filter_range(
             const btree_key_t *left_excl_or_null,
             const btree_key_t *right_incl,
-            bool *skip_out);
+            bool *skip_out) override;
 
 private:
     static bool cell_intersects_with_range(const geo::S2CellId c,
