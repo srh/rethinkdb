@@ -17,6 +17,7 @@
 #include "concurrency/auto_drainer.hpp"
 #include "concurrency/semaphore.hpp"
 #include "concurrency/fifo_enforcer.hpp"
+#include "rockstore/store.hpp"
 
 
 class incr_decr_t {
@@ -208,23 +209,16 @@ continue_bool_t btree_concurrent_traversal(
     return failure_cond.is_pulsed() ? continue_bool_t::ABORT : continue_bool_t::CONTINUE;
 }
 
-// TODO: Dedup with other code in rockstore/store.cc and move it somewhere.
-static bool starts_with(const std::string& x, const std::string& prefix) {
-    return x.size() >= prefix.size() &&
-        memcmp(x.data(), prefix.data(), prefix.size()) == 0;
-}
-
-
 continue_bool_t process_traversal_element(
         const std::string &rocks_kv_prefix,
-        std::string &&key, std::string &&value, rocks_traversal_cb *cb) {
-    // TODO: Remove prefix from key, convert to a btree_key_t.
-    rassert(starts_with(key, rocks_kv_prefix));
+        rocksdb::Slice key, rocksdb::Slice value, rocks_traversal_cb *cb) {
+    rassert(key.starts_with(rocksdb::Slice(rocks_kv_prefix)));
 
-    // TODO: All this copying...
-    std::string trunc_key = key.substr(rocks_kv_prefix.size());
+    key.remove_prefix(rocks_kv_prefix.size());
 
-    return cb->handle_pair(std::move(trunc_key), std::move(value));
+    return cb->handle_pair(
+        std::make_pair(key.data(), key.size()),
+        std::make_pair(value.data(), value.size()));
 }
 
 continue_bool_t rocks_traversal(
@@ -274,10 +268,7 @@ continue_bool_t rocks_traversal(
             }
         });
         while (was_valid) {
-            // TODO: Avoid these copies if possible.  Likewise in any other loops.
-            std::string key = key_slice.ToString();
-            std::string value = value_slice.ToString();
-            continue_bool_t contbool = process_traversal_element(rocks_kv_prefix, std::move(key), std::move(value), cb);
+            continue_bool_t contbool = process_traversal_element(rocks_kv_prefix, key_slice, value_slice, cb);
             if (contbool == continue_bool_t::ABORT) {
                 return continue_bool_t::ABORT;
             }
@@ -338,10 +329,7 @@ continue_bool_t rocks_traversal(
         });
 
         while (was_valid) {
-            // TODO: Avoid these copies if possible.  Likewise in any other loops.
-            std::string key = key_slice.ToString();
-            std::string value = value_slice.ToString();
-            continue_bool_t contbool = process_traversal_element(rocks_kv_prefix, std::move(key), std::move(value), cb);
+            continue_bool_t contbool = process_traversal_element(rocks_kv_prefix, key_slice, value_slice, cb);
             if (contbool == continue_bool_t::ABORT) {
                 return continue_bool_t::ABORT;
             }

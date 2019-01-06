@@ -4,13 +4,13 @@
 
 #include "btree/depth_first_traversal.hpp"
 #include "concurrency/interruptor.hpp"
-#include "rockstore/store.hpp"
 
 // TODO: Remove unused stuff.
 
 class concurrent_traversal_adapter_t;
 
 namespace profile { class trace_t; }
+namespace rockstore { class store; }
 
 class concurrent_traversal_fifo_enforcer_signal_t {
 public:
@@ -34,8 +34,9 @@ private:
 class rocks_traversal_cb {
 public:
     rocks_traversal_cb() { }
+    // The implementor must copy out key and value (if they want to use it) before returning.
     virtual continue_bool_t handle_pair(
-            std::string &&key, std::string &&value)
+            std::pair<const char *, size_t> key, std::pair<const char *, size_t> value)
             THROWS_ONLY(interrupted_exc_t) = 0;
 protected:
     virtual ~rocks_traversal_cb() {}
