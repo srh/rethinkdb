@@ -13,6 +13,7 @@
 
 #include "arch/runtime/coroutines.hpp"
 #include "arch/runtime/thread_pool.hpp"
+#include "btree/superblock.hpp"
 #include "concurrency/auto_drainer.hpp"
 #include "concurrency/semaphore.hpp"
 #include "concurrency/fifo_enforcer.hpp"
@@ -223,7 +224,7 @@ continue_bool_t process_traversal_element(
     // TODO: All this copying...
     std::string trunc_key = key.substr(rocks_kv_prefix.size());
 
-    cb->handle_pair(std::move(trunc_key), std::move(value));
+    return cb->handle_pair(std::move(trunc_key), std::move(value));
 }
 
 continue_bool_t rocks_traversal(
@@ -257,6 +258,10 @@ continue_bool_t rocks_traversal(
         // TODO: Check if we must call NewIterator on the thread pool thread.
         // TODO: Switching threads for every key/value pair is kind of lame.
         scoped_ptr_t<rocksdb::Iterator> iter(db->NewIterator(opts));
+        // Release superblock after snapshotted iterator created.
+        if (release_superblock == release_superblock_t::RELEASE) {
+            superblock->release();
+        }
         bool was_valid;
         rocksdb::Slice key_slice;
         rocksdb::Slice value_slice;
@@ -296,6 +301,10 @@ continue_bool_t rocks_traversal(
         opts.iterate_lower_bound = &prefixed_left_bound_slice;
         // TODO: Check if we must call NewIterator on the thread pool thread.
         scoped_ptr_t<rocksdb::Iterator> iter(db->NewIterator(opts));
+        // Release superblock after snapshotted iterator created.
+        if (release_superblock == release_superblock_t::RELEASE) {
+            superblock->release();
+        }
 
         bool was_valid;
         rocksdb::Slice key_slice;
