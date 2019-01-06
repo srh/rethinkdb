@@ -27,6 +27,7 @@
 #include "rdb_protocol/shards.hpp"
 #include "region/region.hpp"
 #include "repli_timestamp.hpp"
+#include "rockstore/rockshard.hpp"
 #include "rpc/connectivity/peer_id.hpp"
 #include "rpc/mailbox/typed.hpp"
 #include "rpc/serialize_macros.hpp"
@@ -398,6 +399,7 @@ public:
     // `foreach_limit`) before calling the constructor or any of the member
     // functions.
     limit_manager_t(
+        rockshard rocksh,
         rwlock_in_line_t *clients_lock,
         region_t _region,
         std::string _table,
@@ -437,6 +439,7 @@ private:
         const optional<item_t> &start);
     void send(msg_t &&msg);
 
+    rockshard rocksh;
     scoped_ptr_t<env_t> env;
 
     server_t *parent;
@@ -561,7 +564,7 @@ private:
     // while looping over `clients`, and we need to make sure the map doesn't
     // change under it.
     rwlock_t clients_lock;
-    // We need access to the stamp lock that exists on the parent.
+    // We need access to the stamp lock that exists on the parent.  And rocksh().
     store_t *parent;
 
     auto_drainer_t drainer;

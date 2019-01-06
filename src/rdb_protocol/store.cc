@@ -196,7 +196,8 @@ scoped_ptr_t<sindex_superblock_t> acquire_sindex_for_read(
     return sindex_sb;
 }
 
-void do_read(ql::env_t *env,
+void do_read(rockshard rocksh,
+             ql::env_t *env,
              store_t *store,
              btree_slice_t *btree,
              real_superblock_t *superblock,
@@ -211,6 +212,7 @@ void do_read(ql::env_t *env,
             *sindex_id_out = r_nullopt;
         }
         rdb_rget_slice(
+            rocksh,
             btree,
             *rget.current_shard,
             rget.region.inner,
@@ -353,7 +355,7 @@ struct rdb_read_visitor_t : public boost::static_visitor<void> {
             // The superblock will instead be released in `store_t::read`
             // shortly after this function returns.
             rget_read_response_t resp;
-            do_read(&env, store, btree, superblock, rget, &resp,
+            do_read(store->rocksh(), &env, store, btree, superblock, rget, &resp,
                     release_superblock_t::KEEP,
                     &sindex_id);
             auto *gs = boost::get<ql::grouped_t<ql::stream_t> >(&resp.result);
@@ -644,7 +646,7 @@ struct rdb_read_visitor_t : public boost::static_visitor<void> {
             interruptor,
             rget.serializable_env,
             trace);
-        do_read(&ql_env, store, btree, superblock, rget, res,
+        do_read(store->rocksh(), &ql_env, store, btree, superblock, rget, res,
                 release_superblock_t::RELEASE, nullptr);
     }
 

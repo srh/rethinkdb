@@ -702,7 +702,8 @@ public:
             [](const std::map<ql::datum_t, uint64_t> &) { });
     }
 private:
-    friend class rget_cb_t;
+    friend class rget_cb_t;  // TODO: Remove when rocks
+    friend class rocks_rget_cb;
     const key_range_t pkey_range;
     const ql::datumspec_t datumspec;
     key_range_t *active_region_range_inout;
@@ -745,7 +746,8 @@ public:
         return accumulator->should_send_batch();
     }
 private:
-    friend class rget_cb_t;
+    friend class rget_cb_t;  // TODO: Remove when rocks.
+    friend class rocks_rget_cb;
     ql::env_t *const env;
     scoped_ptr_t<ql::batcher_t> batcher;
     std::vector<scoped_ptr_t<ql::op_t> > transformers;
@@ -758,7 +760,8 @@ public:
     rget_io_data_t(rget_read_response_t *_response, btree_slice_t *_slice)
         : response(_response), slice(_slice) { }
 private:
-    friend class rget_cb_t;
+    friend class rget_cb_t;  // TODO: Remove when rocks
+    friend class rocks_rget_cb;
     rget_read_response_t *const response;
     btree_slice_t *const slice;
 };
@@ -1087,8 +1090,340 @@ continue_bool_t rget_cb_t::handle_pair(
     }
 }
 
+
+class rocks_rget_cb {
+public:
+    rocks_rget_cb(
+        rget_io_data_t &&_io,
+        job_data_t &&_job,
+        optional<rget_sindex_data_t> &&_sindex);
+
+    continue_bool_t handle_pair(
+        std::pair<const char *, size_t> key, std::pair<const char *, size_t> value,
+        size_t default_copies,
+        const optional<std::string> &skey_left)
+        THROWS_ONLY(interrupted_exc_t);
+    void finish(continue_bool_t last_cb) THROWS_ONLY(interrupted_exc_t);
+private:
+    const rget_io_data_t io; // How do get data in/out.
+    job_data_t job; // What to do next (stateful).
+    const optional<rget_sindex_data_t> sindex; // Optional sindex information.
+
+    scoped_ptr_t<ql::env_t> sindex_env;
+
+    // State for internal bookkeeping.
+    bool bad_init;
+    optional<std::string> last_truncated_secondary_for_abort;
+    scoped_ptr_t<profile::disabler_t> disabler;
+    scoped_ptr_t<profile::sampler_t> sampler;
+};
+
+// This is the interface the btree code expects, but our actual callback needs a
+// little bit more so we use this wrapper to hold the extra information.
+class rocks_rget_cb_wrapper : public rocks_traversal_cb {
+public:
+    rocks_rget_cb_wrapper(
+            rocks_rget_cb *_cb,
+            size_t _copies,
+            optional<std::string> _skey_left)
+        : cb(_cb), copies(_copies), skey_left(std::move(_skey_left)) { }
+    virtual continue_bool_t handle_pair(
+        std::pair<const char *, size_t> key, std::pair<const char *, size_t> value)
+        THROWS_ONLY(interrupted_exc_t) {
+        return cb->handle_pair(
+            key, value,
+            copies,
+            skey_left);
+    }
+private:
+    rocks_rget_cb *cb;
+    size_t copies;
+    optional<std::string> skey_left;
+};
+
+rocks_rget_cb::rocks_rget_cb(rget_io_data_t &&_io,
+        job_data_t &&_job,
+        optional<rget_sindex_data_t> &&_sindex)
+    : io(std::move(_io)),
+      job(std::move(_job)),
+      sindex(std::move(_sindex)),
+      bad_init(false) {
+
+    if (sindex) {
+        // Secondary index functions are deterministic (so no need for an
+        // rdb_context_t) and evaluated in a pristine environment (without global
+        // optargs).
+        sindex_env.init(new ql::env_t(job.env->interruptor,
+                                      ql::return_empty_normal_batches_t::NO,
+                                      sindex->func_reql_version));
+    }
+
+    // We must disable profiler events for subtasks, because multiple instances
+    // of `handle_pair`are going to run in parallel which  would otherwise corrupt
+    // the sequence of events in the profiler trace.
+    disabler.init(new profile::disabler_t(job.env->trace));
+    sampler.init(new profile::sampler_t("Range traversal doc evaluation.",
+                                        job.env->trace));
+}
+
+void rocks_rget_cb::finish(continue_bool_t last_cb) THROWS_ONLY(interrupted_exc_t) {
+    job.accumulator->finish(last_cb, &io.response->result);
+}
+
+// Handle a keyvalue pair.  Returns whether or not we're done early.
+continue_bool_t rocks_rget_cb::handle_pair(
+        std::pair<const char *, size_t> keyslice, std::pair<const char *, size_t> value,
+        size_t default_copies,
+        const optional<std::string> &skey_left)
+    THROWS_ONLY(interrupted_exc_t) {
+
+    //////////////////////////////////////////////////
+    // STUFF THAT CAN HAPPEN OUT OF ORDER GOES HERE //
+    //////////////////////////////////////////////////
+    sampler->new_sample();
+    if (bad_init || boost::get<ql::exc_t>(&io.response->result) != nullptr) {
+        return continue_bool_t::ABORT;
+    }
+    // Load the key and value.
+    store_key_t key(keyslice.second, reinterpret_cast<const uint8_t *>(keyslice.first));
+    if (sindex && !sindex->pkey_range.contains_key(ql::datum_t::extract_primary(key))) {
+        return continue_bool_t::CONTINUE;
+    }
+    ql::datum_t val;
+    // Count stats whether or not we deserialize the value
+    io.slice->stats.pm_keys_read.record();
+    io.slice->stats.pm_total_keys_read += 1;
+    // We only load the value if we actually use it (`count` does not).
+    if (job.accumulator->uses_val() || job.transformers.size() != 0 || sindex) {
+        buffer_group_t buffer_group;
+        buffer_group.add_buffer(value.second, value.first);
+        buffer_group_read_stream_t read_stream(const_view(&buffer_group));
+        archive_result_t res = datum_deserialize(&read_stream, &val);
+        guarantee_deserialization(res, "rocks_rget_cb value");
+    }
+
+    // Note: Previously (before converting to use with rocksdb, we had a
+    // concurrent_traversal operation that spawned this method in multiple
+    // coroutines.  They'd get an order token and then we'd realign with the
+    // waiter right here, and proceed to process key/value pairs in order below.)
+
+    // TODO: We could do the rest of this rocks_rget_cb::handle_pair function concurrently.
+
+    // TODO: Can this function still throw interrupted_exc_t?
+
+    ///////////////////////////////////////////////////////
+    // STUFF THAT HAS TO HAPPEN IN ORDER GOES BELOW HERE //
+    ///////////////////////////////////////////////////////
+
+    // If the sindex portion of the key is long enough that it might be >= the
+    // length of a truncated sindex, we need to rember the key so we can make
+    // sure not to stop in the middle of a sindex range where some of the values
+    // are out of order because of truncation.
+    bool remember_key_for_sindex_batching = sindex
+        ? (ql::datum_t::extract_secondary(key_to_unescaped_str(key)).size()
+           >= ql::datum_t::max_trunc_size())
+        : false;
+    if (last_truncated_secondary_for_abort) {
+        std::string cur_truncated_secondary =
+            ql::datum_t::extract_truncated_secondary(key_to_unescaped_str(key));
+        if (cur_truncated_secondary != *last_truncated_secondary_for_abort) {
+            // The semantics here are that we're returning the "last considered
+            // key", which we set specially here to preserve the invariant that
+            // unsharding either consumes all rows with a particular truncated
+            // sindex value or none of them.
+            store_key_t stop_key;
+            if (!reversed(job.sorting)) {
+                stop_key = store_key_t(cur_truncated_secondary);
+            } else {
+                stop_key = store_key_t(*last_truncated_secondary_for_abort);
+            }
+            stop_key.decrement();
+            job.accumulator->stop_at_boundary(std::move(stop_key));
+            return continue_bool_t::ABORT;
+        }
+    }
+
+    try {
+        // Update the active region range.
+        if (sindex) {
+            if (!reversed(job.sorting)) {
+                if (sindex->active_region_range_inout->left < key) {
+                    sindex->active_region_range_inout->left = key;
+                    sindex->active_region_range_inout->left.increment();
+                }
+            } else {
+                if (key < sindex->active_region_range_inout->right.key_or_max()) {
+                    sindex->active_region_range_inout->right =
+                        key_range_t::right_bound_t(key);
+                }
+            }
+        }
+
+        // There are certain transformations and accumulators that need the
+        // secondary index value, though many don't. We don't want to compute
+        // it if we don't end up needing it, because that would be expensive.
+        // So we provide a function that computes the secondary index value
+        // lazily the first time it's called.
+        ql::datum_t sindex_val_cache; // an empty `datum_t` until initialized
+        auto lazy_sindex_val = [&]() -> ql::datum_t {
+            if (sindex && !sindex_val_cache.has()) {
+                sindex_val_cache =
+                    sindex->func->call(sindex_env.get(), val)->as_datum();
+                if (sindex->multi == sindex_multi_bool_t::MULTI
+                    && sindex_val_cache.get_type() == ql::datum_t::R_ARRAY) {
+                    uint64_t tag = ql::datum_t::extract_tag(key).get();
+                    sindex_val_cache = sindex_val_cache.get(tag, ql::NOTHROW);
+                    guarantee(sindex_val_cache.has());
+                }
+            }
+            return sindex_val_cache;
+        };
+
+        // Check whether we're outside the sindex range.
+        // We only need to check this if we are on the boundary of the sindex range, and
+        // the involved keys are truncated.
+        size_t copies = default_copies;
+        if (sindex) {
+            /* Here's an attempt at explaining the different case distinctions handled in
+               this check (for the left bound; the right bound check is similar):
+               The case distinctions are as follows:
+               1. left_bound_is_truncated
+                If the left bound key had to be truncated, we first compare the prefix of
+                the current secondary key (skey_current), and the left bound key.
+                The comparison cannot be -1, because that would mean that we computed the
+                traversal key range incorrectly in the first place (there's no need to
+                consider keys that are *smaller* than the left bound).
+                If the comparison is 1, the current key's secondary part is larger than
+                the left bound, and we know that the corresponding datum_t value must
+                also be larger than the datum_t corresponding to the left bound.
+                Finally, since the left bound is truncated, the comparison can determine
+                that the prefix is equal for values in the btree with corresponding index
+                values that are either left of the bound (but match in the truncated
+                prefix), at the bound (which we want to include only if the left bound is
+                closed), or right of the bound (which we always want to include, as far
+                as the left bound id concerned). We can't determine which case we have,
+                by looking only at the keys. Hence we must check the number of copies for
+                `cmp == 0`. The only exception is if the current key was actually not
+                truncated, in which case we know that it will actually be smaller than
+                the left bound (that's encoded in line 825).
+               2. !left_bound_is_truncated && left_bound is closed
+                If the bound wasn't truncated, we know that the traversal range will not
+                include any values which are smaller than the left bound. Hence we can
+                skip the check for whether the sindex value is actually in the datum
+                range.
+               3. !left_bound_is_truncated && left_bound is open
+                In contrast, if the left bound is open, we compare the left bound and
+                current key. If they have the same size and their contents compare equal,
+                we actually know that they are outside the range and could set the number
+                of copies to 0. We do the slightly less optimal but simpler thing and
+                just check the number of copies in this case, so that we can share the
+                code path with case 1. */
+            const size_t max_trunc_size = ql::datum_t::max_trunc_size();
+            sindex->datumspec.visit<void>(
+            [&](const ql::datum_range_t &r) {
+                bool must_check_copies = false;
+                std::string skey_current =
+                    ql::datum_t::extract_truncated_secondary(key_to_unescaped_str(key));
+                const bool left_bound_is_truncated =
+                    sindex->lbound_trunc_key.size() == max_trunc_size;
+                if (left_bound_is_truncated
+                    || r.left_bound_type == key_range_t::bound_t::open) {
+                    int cmp = memcmp(
+                        skey_current.data(),
+                        sindex->lbound_trunc_key.data(),
+                        std::min<size_t>(skey_current.size(),
+                                         sindex->lbound_trunc_key.size()));
+                    if (skey_current.size() < sindex->lbound_trunc_key.size()) {
+                        guarantee(cmp != 0);
+                    }
+                    guarantee(cmp >= 0);
+                    if (cmp == 0
+                        && skey_current.size() == sindex->lbound_trunc_key.size()) {
+                        must_check_copies = true;
+                    }
+                }
+                if (!must_check_copies) {
+                    const bool right_bound_is_truncated =
+                        sindex->rbound_trunc_key.size() == max_trunc_size;
+                    if (right_bound_is_truncated
+                        || r.right_bound_type == key_range_t::bound_t::open) {
+                        int cmp = memcmp(
+                            skey_current.data(),
+                            sindex->rbound_trunc_key.data(),
+                            std::min<size_t>(skey_current.size(),
+                                             sindex->rbound_trunc_key.size()));
+                        if (skey_current.size() > sindex->rbound_trunc_key.size()) {
+                            guarantee(cmp != 0);
+                        }
+                        guarantee(cmp <= 0);
+                        if (cmp == 0
+                            && skey_current.size() == sindex->rbound_trunc_key.size()) {
+                            must_check_copies = true;
+                        }
+                    }
+                }
+                if (must_check_copies) {
+                    copies = sindex->datumspec.copies(lazy_sindex_val());
+                } else {
+                    copies = 1;
+                }
+            },
+            [&](const std::map<ql::datum_t, uint64_t> &) {
+                guarantee(skey_left);
+                std::string skey_current =
+                    ql::datum_t::extract_secondary(key_to_unescaped_str(key));
+                const bool skey_current_is_truncated =
+                    skey_current.size() >= max_trunc_size;
+                const bool skey_left_is_truncated = skey_left->size() >= max_trunc_size;
+
+                if (skey_current_is_truncated || skey_left_is_truncated) {
+                    copies = sindex->datumspec.copies(lazy_sindex_val());
+                } else if (*skey_left != skey_current) {
+                    copies = 0;
+                }
+            });
+            if (copies == 0) {
+                return continue_bool_t::CONTINUE;
+            }
+        }
+
+        ql::groups_t data = {{ql::datum_t(), ql::datums_t(copies, val)}};
+
+        for (auto it = job.transformers.begin(); it != job.transformers.end(); ++it) {
+            (**it)(job.env, &data, lazy_sindex_val);
+        }
+        // We need lots of extra data for the accumulation because we might be
+        // accumulating `rget_item_t`s for a batch.
+        continue_bool_t cont = (*job.accumulator)(job.env, &data, key, lazy_sindex_val);
+        if (remember_key_for_sindex_batching) {
+            if (cont == continue_bool_t::ABORT) {
+                last_truncated_secondary_for_abort.set(
+                    ql::datum_t::extract_truncated_secondary(key_to_unescaped_str(key)));
+            }
+            return continue_bool_t::CONTINUE;
+        } else {
+            return cont;
+        }
+    } catch (const ql::exc_t &e) {
+        io.response->result = e;
+        return continue_bool_t::ABORT;
+    } catch (const ql::datum_exc_t &e) {
+#ifndef NDEBUG
+        unreachable();
+#else
+        io.response->result = ql::exc_t(e, ql::backtrace_id_t::empty());
+        return continue_bool_t::ABORT;
+#endif // NDEBUG
+    }
+}
+
+// TODO: I get the feeling this ismissing some functionality, such as use of
+// batchspec -- we returned all 12000 rows in the data explorer, instead of
+// paging.  It took a while and felt weird.
+
 // TODO: Having two functions which are 99% the same sucks.
 void rdb_rget_slice(
+        rockshard rocksh,
         btree_slice_t *slice,
         const region_t &shard,
         const key_range_t &range,
@@ -1107,7 +1442,7 @@ void rdb_rget_slice(
         "Do range scan on primary index.",
         ql_env->trace);
 
-    rget_cb_t callback(
+    rocks_rget_cb callback(
         rget_io_data_t(response, slice),
         job_data_t(ql_env,
                    batchspec,
@@ -1123,15 +1458,18 @@ void rdb_rget_slice(
 
     direction_t direction = reversed(sorting) ? direction_t::backward : direction_t::forward;
     continue_bool_t cont = continue_bool_t::CONTINUE;
+    std::string rocks_kv_prefix = rockstore::table_primary_prefix(rocksh.table_id, rocksh.shard_no);
     if (primary_keys.has_value()) {
         auto cb = [&](const std::pair<store_key_t, uint64_t> &pair, bool is_last) {
-            rget_cb_wrapper_t wrapper(&callback, pair.second, r_nullopt);
-            return btree_concurrent_traversal(
+            rocks_rget_cb_wrapper wrapper(&callback, pair.second, r_nullopt);
+            return rocks_traversal(
                 superblock,
+                rocksh.rocks,
+                rocks_kv_prefix,
                 key_range_t::one_key(pair.first),
-                &wrapper,
                 direction,
-                is_last ? release_superblock : release_superblock_t::KEEP);
+                is_last ? release_superblock : release_superblock_t::KEEP,
+                &wrapper);
         };
         if (!reversed(sorting)) {
             for (auto it = primary_keys->begin(); it != primary_keys->end();) {
@@ -1153,9 +1491,9 @@ void rdb_rget_slice(
             }
         }
     } else {
-        rget_cb_wrapper_t wrapper(&callback, 1, r_nullopt);
-        cont = btree_concurrent_traversal(
-            superblock, range, &wrapper, direction, release_superblock);
+        rocks_rget_cb_wrapper wrapper(&callback, 1, r_nullopt);
+        cont = rocks_traversal(
+            superblock, rocksh.rocks, rocks_kv_prefix, range, direction, release_superblock, &wrapper);
     }
     callback.finish(cont);
 }

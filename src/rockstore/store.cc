@@ -342,10 +342,15 @@ std::string table_secondary_key(
     return ret;
 }
 
-std::string table_primary_key(namespace_id_t id, int shard_no, const std::string &key) {
-    // We use the empty index name for primary index.
+std::string table_primary_prefix(namespace_id_t id, int shard_no) {
     std::string ret = table_prefix(id, shard_no);
+    // We use the empty index name for primary index.
     ret += '/';
+    return ret;
+}
+
+std::string table_primary_key(namespace_id_t id, int shard_no, const std::string &key) {
+    std::string ret = table_primary_prefix(id, shard_no);
     ret += key;
     return ret;
 }

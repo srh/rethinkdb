@@ -141,6 +141,7 @@ void rdb_delete(rockshard rocksh,
                 promise_t<superblock_t *> *pass_back_superblock);
 
 void rdb_rget_slice(
+    rockshard rocksh,
     btree_slice_t *slice,
     const region_t &shard,
     const key_range_t &range,
