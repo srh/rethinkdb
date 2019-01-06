@@ -79,6 +79,7 @@ void run_with_namespace_interface(
     extproc_pool_t extproc_pool(2);
     dummy_semilattice_controller_t<auth_semilattice_metadata_t> auth_manager;
     rdb_context_t ctx(&extproc_pool, nullptr, auth_manager.get_view());
+    namespace_id_t table_id = str_to_uuid("12345678-aaaa-bbbb-cccc-12345678abcd");
 
     for (int rep = 0; rep < num_restarts; ++rep) {
         const bool do_create = rep == 0;
@@ -90,7 +91,7 @@ void run_with_namespace_interface(
                         serializers[i].get(),
                         &balancer, temp_files[i]->name().permanent_path().c_str(), do_create,
                         &get_global_perfmon_collection(), &ctx, &io_backender,
-                        base_path_t("."), generate_uuid(), update_sindexes_t::UPDATE));
+                        base_path_t("."), table_id, update_sindexes_t::UPDATE));
         }
 
         std::vector<scoped_ptr_t<store_view_t> > stores;

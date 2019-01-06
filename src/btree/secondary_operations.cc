@@ -206,7 +206,8 @@ void set_secondary_indexes_internal(
 
     // TODO: rocksdb transactionality
     std::string sindex_rocks_blob = serialize_to_string<cluster_version_t::LATEST_DISK>(sindexes);
-    rocksh->put(rockstore::table_sindex_map(rocksh.table_id, rocksh.shard_no), sindex_rocks_blob, rockstore::write_options::TODO());
+    std::string sindex_rocks_key = rockstore::table_sindex_map(rocksh.table_id, rocksh.shard_no);
+    rocksh->put(sindex_rocks_key, sindex_rocks_blob, rockstore::write_options::TODO());
 }
 
 void initialize_secondary_indexes(rockshard rocksh,
