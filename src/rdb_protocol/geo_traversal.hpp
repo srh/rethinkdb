@@ -92,7 +92,7 @@ public:
 
     continue_bool_t on_candidate(scoped_key_value_t &&keyvalue,
                                  concurrent_traversal_fifo_enforcer_signal_t waiter,
-                                 bool definitely_intersects)
+                                 bool definitely_intersects) override
             THROWS_ONLY(interrupted_exc_t);
 
 protected:

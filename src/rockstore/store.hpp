@@ -86,6 +86,8 @@ public:
 
     txn begin(const write_options &opts);
 
+    rocksdb::OptimisticTransactionDB *db() { return db_.get(); }
+
     ~store();
     store(store&&);
     store& operator=(store&&) = delete;

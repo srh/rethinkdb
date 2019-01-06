@@ -6,10 +6,17 @@
 #include <algorithm>
 #include <functional>
 
+// TODO: Remove this include if we wrap the iterator stuff...
+#include "rocksdb/db.h"
+#include "rocksdb/iterator.h"
+#include "rocksdb/utilities/optimistic_transaction_db.h"
+
 #include "arch/runtime/coroutines.hpp"
+#include "arch/runtime/thread_pool.hpp"
 #include "concurrency/auto_drainer.hpp"
 #include "concurrency/semaphore.hpp"
 #include "concurrency/fifo_enforcer.hpp"
+
 
 class incr_decr_t {
 public:
@@ -200,3 +207,145 @@ continue_bool_t btree_concurrent_traversal(
     return failure_cond.is_pulsed() ? continue_bool_t::ABORT : continue_bool_t::CONTINUE;
 }
 
+// TODO: Dedup with other code in rockstore/store.cc and move it somewhere.
+static bool starts_with(const std::string& x, const std::string& prefix) {
+    return x.size() >= prefix.size() &&
+        memcmp(x.data(), prefix.data(), prefix.size()) == 0;
+}
+
+
+continue_bool_t process_traversal_element(
+        const std::string &rocks_kv_prefix,
+        std::string &&key, std::string &&value, rocks_traversal_cb *cb) {
+    // TODO: Remove prefix from key, convert to a btree_key_t.
+    rassert(starts_with(key, rocks_kv_prefix));
+
+    // TODO: All this copying...
+    std::string trunc_key = key.substr(rocks_kv_prefix.size());
+
+    cb->handle_pair(std::move(trunc_key), std::move(value));
+}
+
+continue_bool_t rocks_traversal(
+        superblock_t *superblock,
+        rockstore::store *rocks,
+        const std::string &rocks_kv_prefix,
+        const key_range_t &range,
+        direction_t direction,
+        release_superblock_t release_superblock,
+        rocks_traversal_cb *cb) {
+    // duh
+    rocksdb::OptimisticTransactionDB *db = rocks->db();
+
+    // linux_thread_pool_t::run_in_blocker_pool([&]() {
+    // TODO: Release the superblock after we get a snapshot or something.
+    // (Does making an iterator get us a snapshot?)
+
+    // TODO: Check if we use switches for this type in other code.
+    if (direction == direction_t::forward) {
+        std::string prefixed_left_bound = rocks_kv_prefix + key_to_unescaped_str(range.left);
+        std::string prefixed_upper_bound;
+        rocksdb::Slice prefixed_upper_bound_slice;
+        // TODO: Proper rocksdb::ReadOptions()
+        rocksdb::ReadOptions opts;
+        if (!range.right.unbounded) {
+            prefixed_upper_bound = rocks_kv_prefix + key_to_unescaped_str(range.right.key());
+            // Note: prefixed_upper_bound_slice doesn't copy the string, it points into it.
+            prefixed_upper_bound_slice = rocksdb::Slice(prefixed_upper_bound);
+            opts.iterate_upper_bound = &prefixed_upper_bound_slice;
+        }
+        // TODO: Check if we must call NewIterator on the thread pool thread.
+        // TODO: Switching threads for every key/value pair is kind of lame.
+        scoped_ptr_t<rocksdb::Iterator> iter(db->NewIterator(opts));
+        bool was_valid;
+        rocksdb::Slice key_slice;
+        rocksdb::Slice value_slice;
+        linux_thread_pool_t::run_in_blocker_pool([&]() {
+            iter->Seek(prefixed_left_bound);
+            was_valid = iter->Valid();
+            if (was_valid) {
+                key_slice = iter->key();
+                value_slice = iter->value();
+            }
+        });
+        while (was_valid) {
+            // TODO: Avoid these copies if possible.  Likewise in any other loops.
+            std::string key = key_slice.ToString();
+            std::string value = value_slice.ToString();
+            continue_bool_t contbool = process_traversal_element(rocks_kv_prefix, std::move(key), std::move(value), cb);
+            if (contbool == continue_bool_t::ABORT) {
+                return continue_bool_t::ABORT;
+            }
+
+            linux_thread_pool_t::run_in_blocker_pool([&]() {
+                iter->Next();
+                was_valid = iter->Valid();
+                if (was_valid) {
+                    key_slice = iter->key();
+                    value_slice = iter->value();
+                }
+            });
+        }
+        return continue_bool_t::CONTINUE;
+    } else {
+        std::string prefixed_left_bound = rocks_kv_prefix + key_to_unescaped_str(range.left);
+        // Note: Constructor here doesn't copy the string, it points to it.
+        rocksdb::Slice prefixed_left_bound_slice(prefixed_left_bound);
+        // TODO: Proper rocksdb::ReadOptions()
+        rocksdb::ReadOptions opts;
+        opts.iterate_lower_bound = &prefixed_left_bound_slice;
+        // TODO: Check if we must call NewIterator on the thread pool thread.
+        scoped_ptr_t<rocksdb::Iterator> iter(db->NewIterator(opts));
+
+        bool was_valid;
+        rocksdb::Slice key_slice;
+        rocksdb::Slice value_slice;
+        linux_thread_pool_t::run_in_blocker_pool([&]() {
+            if (range.right.unbounded) {
+                iter->SeekToLast();
+                was_valid = iter->Valid();
+                if (was_valid) {
+                    key_slice = iter->key();
+                    value_slice = iter->value();
+                }
+            } else {
+                std::string prefixed_right = rocks_kv_prefix + key_to_unescaped_str(range.right.key());
+                iter->SeekForPrev(prefixed_right);
+                was_valid = iter->Valid();
+                if (was_valid) {
+                    key_slice = iter->key();
+                    if (key_slice.ToString() == prefixed_right) {
+                        iter->Prev();
+                        was_valid = iter->Valid();
+                        if (was_valid) {
+                            key_slice = iter->key();
+                            value_slice = iter->value();
+                        }
+                    } else {
+                        value_slice = iter->value();
+                    }
+                }
+            }
+        });
+
+        while (was_valid) {
+            // TODO: Avoid these copies if possible.  Likewise in any other loops.
+            std::string key = key_slice.ToString();
+            std::string value = value_slice.ToString();
+            continue_bool_t contbool = process_traversal_element(rocks_kv_prefix, std::move(key), std::move(value), cb);
+            if (contbool == continue_bool_t::ABORT) {
+                return continue_bool_t::ABORT;
+            }
+
+            linux_thread_pool_t::run_in_blocker_pool([&]() {
+                iter->Prev();
+                was_valid = iter->Valid();
+                if (was_valid) {
+                    key_slice = iter->key();
+                    value_slice = iter->value();
+                }
+            });
+        }
+        return continue_bool_t::CONTINUE;
+    }
+}

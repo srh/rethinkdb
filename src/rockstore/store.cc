@@ -8,6 +8,8 @@
 #include "paths.hpp"
 #include "utils.hpp"
 
+// TODO: Ctrl+F rocksdb::ReadOptions() and fix usage everywhere.
+
 namespace rockstore {
 
 // TODO: Move this somewhere?
@@ -93,6 +95,7 @@ txn::read_all_prefixed(const std::string &prefix) {
         scoped_ptr_t<rocksdb::Iterator> iter(txn_->GetIterator(rocksdb::ReadOptions()));
         iter->Seek(prefix);
         while (iter->Valid()) {
+            // TODO: Maybe we could drop prefixes efficiently here, instead of the caller.
             std::string key = iter->key().ToString();
             if (!starts_with(key, prefix)) {
                 break;
