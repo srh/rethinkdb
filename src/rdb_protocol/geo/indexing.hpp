@@ -13,7 +13,9 @@ namespace ql {
 class datum_t;
 enum class skey_version_t;
 }
+class rockshard;
 class signal_t;
+class sindex_superblock_t;
 
 
 /* Polygons and lines are inserted into an index by computing a coverage of them
@@ -75,6 +77,10 @@ public:
             const btree_key_t *right_incl,
             bool *skip_out) override;
 
+    const std::vector<geo::S2CellId> &query_cells() const {
+        return query_cells_;
+    }
+
 private:
     static bool cell_intersects_with_range(const geo::S2CellId c,
                                            const geo::S2CellId left_min,
@@ -93,5 +99,11 @@ private:
     const ql::skey_version_t skey_version_;
     const signal_t *interruptor_;
 };
+
+continue_bool_t geo_traversal(
+        rockshard rocksh, uuid_u sindex_uuid,
+        sindex_superblock_t *superblock, const key_range_t &sindex_range,
+        geo_index_traversal_helper_t *helper);
+
 
 #endif  // RDB_PROTOCOL_GEO_INDEXING_HPP_

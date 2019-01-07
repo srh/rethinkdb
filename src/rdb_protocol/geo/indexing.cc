@@ -6,6 +6,7 @@
 
 #include "btree/keys.hpp"
 #include "btree/leaf_node.hpp"
+#include "btree/reql_specific.hpp"
 #include "concurrency/interruptor.hpp"
 #include "concurrency/signal.hpp"
 #include "containers/scoped.hpp"
@@ -21,6 +22,7 @@
 #include "rdb_protocol/geo/s2/strings/strutil.h"
 #include "rdb_protocol/datum.hpp"
 #include "rdb_protocol/pseudo_geometry.hpp"
+#include "rockstore/rockshard.hpp"
 
 using geo::S2Cell;
 using geo::S2CellId;
@@ -419,3 +421,13 @@ bool geo_index_traversal_helper_t::any_cell_contains(
     return false;
 }
 
+continue_bool_t geo_traversal(
+        rockshard rocksh, uuid_u sindex_uuid,
+        sindex_superblock_t *superblock, const key_range_t &sindex_range,
+        geo_index_traversal_helper_t *helper) {
+    (void)rocksh, (void)sindex_uuid;  // TODO
+    return btree_concurrent_traversal(
+        superblock, sindex_range, helper,
+        direction_t::forward,
+        release_superblock_t::RELEASE);
+}

@@ -1574,6 +1574,52 @@ void rdb_rget_secondary_slice(
 }
 
 void rdb_get_intersecting_slice(
+        rockshard rocksh,
+        uuid_u sindex_uuid,
+        btree_slice_t *slice,
+        const region_t &shard,
+        const ql::datum_t &query_geometry,
+        const key_range_t &sindex_range,
+        sindex_superblock_t *superblock,
+        ql::env_t *ql_env,
+        const ql::batchspec_t &batchspec,
+        const std::vector<ql::transform_variant_t> &transforms,
+        const optional<ql::terminal_variant_t> &terminal,
+        const key_range_t &pk_range,
+        const sindex_disk_info_t &sindex_info,
+        is_stamp_read_t is_stamp_read,
+        rget_read_response_t *response) {
+    guarantee(query_geometry.has());
+
+    guarantee(sindex_info.geo == sindex_geo_bool_t::GEO);
+    PROFILE_STARTER_IF_ENABLED(
+        ql_env->profile() == profile_bool_t::PROFILE,
+        "Do intersection scan on geospatial index.",
+        ql_env->trace);
+
+    const reql_version_t sindex_func_reql_version =
+        sindex_info.mapping_version_info.latest_compatible_reql_version;
+    collect_all_geo_intersecting_cb_t callback(
+        slice,
+        geo_job_data_t(ql_env,
+                       shard,
+                       // The sorting is never `DESCENDING`, so this is always right.
+                       sindex_range.left,
+                       batchspec,
+                       transforms,
+                       terminal,
+                       is_stamp_read),
+        geo_sindex_data_t(pk_range, sindex_info.mapping,
+                          sindex_func_reql_version, sindex_info.multi),
+        query_geometry,
+        response);
+
+    continue_bool_t cont = geo_traversal(rocksh, sindex_uuid, superblock, sindex_range, &callback);
+    callback.finish(cont);
+}
+
+// TODO: Remove this old version
+void rdb_get_intersecting_slice(
         btree_slice_t *slice,
         const region_t &shard,
         const ql::datum_t &query_geometry,
