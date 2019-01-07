@@ -390,6 +390,7 @@ struct sindex_ref_t {
     btree_slice_t *btree;
     sindex_superblock_t *superblock;
     const sindex_disk_info_t *sindex_info;
+    uuid_u sindex_uuid;
 };
 
 class server_t;

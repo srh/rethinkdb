@@ -332,12 +332,18 @@ std::string table_sindex_map(namespace_id_t id, int shard_no) {
 // TODO: Remove primary key length limitation at some point.
 // TODO: table_secondary_key is still using gnarly 250-byte sindex keys.
 
-std::string table_secondary_key(
-        namespace_id_t id, int shard_no, uuid_u index_id,
-        const std::string &key) {
+std::string table_secondary_prefix(
+        namespace_id_t id, int shard_no, uuid_u index_id) {
     std::string ret = table_prefix(id, shard_no);
     ret += uuid_to_str(index_id);
     ret += '/';
+    return ret;
+}
+
+std::string table_secondary_key(
+        namespace_id_t id, int shard_no, uuid_u index_id,
+        const std::string &key) {
+    std::string ret = table_secondary_prefix(id, shard_no, index_id);
     ret += key;
     return ret;
 }

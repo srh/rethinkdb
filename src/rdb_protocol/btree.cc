@@ -1499,6 +1499,8 @@ void rdb_rget_slice(
 }
 
 void rdb_rget_secondary_slice(
+        rockshard rocksh,
+        uuid_u sindex_uuid,
         btree_slice_t *slice,
         const region_t &shard,
         const ql::datumspec_t &datumspec,
@@ -1525,7 +1527,7 @@ void rdb_rget_secondary_slice(
         sindex_info.mapping_version_info.latest_compatible_reql_version;
 
     key_range_t active_region_range = sindex_region_range;
-    rget_cb_t callback(
+    rocks_rget_cb callback(
         rget_io_data_t(response, slice),
         job_data_t(ql_env,
                    batchspec,
@@ -1545,23 +1547,27 @@ void rdb_rget_secondary_slice(
             sindex_info.mapping,
             sindex_info.multi)));
 
+    std::string rocks_kv_prefix = rockstore::table_secondary_prefix(rocksh.table_id, rocksh.shard_no, sindex_uuid);
+
     direction_t direction = reversed(sorting) ? direction_t::backward : direction_t::forward;
     auto cb = [&](const std::pair<ql::datum_range_t, uint64_t> &pair, bool is_last) {
         key_range_t sindex_keyrange =
             pair.first.to_sindex_keyrange(sindex_func_reql_version);
-        rget_cb_wrapper_t wrapper(
+        rocks_rget_cb_wrapper wrapper(
             &callback,
             pair.second,
             make_optional(key_to_unescaped_str(sindex_keyrange.left)));
         key_range_t active_range = active_region_range.intersection(sindex_keyrange);
         // This can happen sometimes with truncated keys.
         if (active_range.is_empty()) return continue_bool_t::CONTINUE;
-        return btree_concurrent_traversal(
+        return rocks_traversal(
             superblock,
+            rocksh.rocks,
+            rocks_kv_prefix,
             active_range,
-            &wrapper,
             direction,
-            is_last ? release_superblock : release_superblock_t::KEEP);
+            is_last ? release_superblock : release_superblock_t::KEEP,
+            &wrapper);
     };
     continue_bool_t cont = datumspec.iter(sorting, cb);
     callback.finish(cont);
@@ -2371,7 +2377,7 @@ void rdb_update_single_sindex(
                 guarantee(clients_spot->read_signal()->is_pulsed());
                 guarantee(limit_clients_spot->read_signal()->is_pulsed());
                 lm->commit(lm_spot, ql::changefeed::sindex_ref_t{
-                        sindex->btree, superblock, &sindex_info});
+                        sindex->btree, superblock, &sindex_info, sindex->sindex.id});
             }, cserver.second);
     }
 }

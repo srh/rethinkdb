@@ -266,6 +266,8 @@ void do_read(rockshard rocksh,
             }
 
             rdb_rget_secondary_slice(
+                rocksh,
+                sindex_uuid,
                 store->get_sindex_slice(sindex_uuid),
                 *rget.current_shard,
                 rget.sindex->datumspec,

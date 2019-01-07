@@ -158,6 +158,8 @@ ql::grouped_t<ql::stream_t> read_row_via_sindex(
                         reql_version_t::LATEST);
 
     rdb_rget_secondary_slice(
+        store->rocksh(),
+        sindex_uuid,
         store->get_sindex_slice(sindex_uuid),
         region_t(),
         ql::datumspec_t(datum_range),

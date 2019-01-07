@@ -156,6 +156,8 @@ void rdb_rget_slice(
     release_superblock_t release_superblock);
 
 void rdb_rget_secondary_slice(
+    rockshard rocksh,
+    uuid_u sindex_uuid,
     btree_slice_t *slice,
     const region_t &shard,
     const ql::datumspec_t &datumspec,
