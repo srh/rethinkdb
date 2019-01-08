@@ -221,6 +221,22 @@ continue_bool_t process_traversal_element(
         std::make_pair(value.data(), value.size()));
 }
 
+// Returns the minimum upper bound of the set of strings prefixed by prefix. If
+// and only if there is no upper bound (the string matches /^(\xFF)*$/), returns
+// the empty string.
+std::string prefix_end(const std::string &prefix) {
+    std::string ret = prefix;
+    while (!ret.empty()) {
+        if (static_cast<uint8_t>(ret.back()) != 0xFF) {
+            ret.back() = static_cast<char>(static_cast<uint8_t>(ret.back()) + 1);
+            break;
+        }
+        ret.pop_back();
+        continue;
+    }
+    return ret;
+}
+
 continue_bool_t rocks_traversal(
         superblock_t *superblock,
         rockstore::store *rocks,
@@ -245,10 +261,16 @@ continue_bool_t rocks_traversal(
         rocksdb::ReadOptions opts;
         if (!range.right.unbounded) {
             prefixed_upper_bound = rocks_kv_prefix + key_to_unescaped_str(range.right.key());
+        } else {
+            prefixed_upper_bound = prefix_end(rocks_kv_prefix);
+        }
+
+        if (!prefixed_upper_bound.empty()) {
             // Note: prefixed_upper_bound_slice doesn't copy the string, it points into it.
             prefixed_upper_bound_slice = rocksdb::Slice(prefixed_upper_bound);
             opts.iterate_upper_bound = &prefixed_upper_bound_slice;
         }
+
         // TODO: Check if we must call NewIterator on the thread pool thread.
         // TODO: Switching threads for every key/value pair is kind of lame.
         scoped_ptr_t<rocksdb::Iterator> iter(db->NewIterator(opts));
@@ -301,7 +323,14 @@ continue_bool_t rocks_traversal(
         rocksdb::Slice key_slice;
         rocksdb::Slice value_slice;
         linux_thread_pool_t::run_in_blocker_pool([&]() {
-            if (range.right.unbounded) {
+            std::string prefixed_right;
+            if (!range.right.unbounded) {
+                prefixed_right = rocks_kv_prefix + key_to_unescaped_str(range.right.key());
+            } else {
+                prefixed_right = prefix_end(rocks_kv_prefix);
+            }
+
+            if (prefixed_right.empty()) {
                 iter->SeekToLast();
                 was_valid = iter->Valid();
                 if (was_valid) {
@@ -309,12 +338,11 @@ continue_bool_t rocks_traversal(
                     value_slice = iter->value();
                 }
             } else {
-                std::string prefixed_right = rocks_kv_prefix + key_to_unescaped_str(range.right.key());
                 iter->SeekForPrev(prefixed_right);
                 was_valid = iter->Valid();
                 if (was_valid) {
                     key_slice = iter->key();
-                    if (key_slice.ToString() == prefixed_right) {
+                    if (key_slice.ToString() == prefixed_right) {  // TODO: perf
                         iter->Prev();
                         was_valid = iter->Valid();
                         if (was_valid) {
