@@ -113,6 +113,8 @@ std::string table_secondary_key(
 std::string table_primary_prefix(namespace_id_t id, int shard_no);
 std::string table_primary_key(namespace_id_t id, int shard_no, const std::string &key);
 
+std::string prefix_end(const std::string &prefix);
+
 inline const char * VERSION() { return "v2_4"; }
 inline const char * TABLE_METADATA_VERSION_KEY() { return "version"; }
 inline const char * TABLE_METADATA_METAINFO_KEY() { return "metainfo"; }

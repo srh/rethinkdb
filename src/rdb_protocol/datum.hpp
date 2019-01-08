@@ -84,17 +84,7 @@ escape_nulls_t escape_nulls_from_reql_version_for_sindex(reql_version_t rv);
 
 void debug_print(printf_buffer_t *, const datum_t &);
 
-// The serialization for this is defined in `protocol.cc` and needs to be
-// updated if more versions are added.
-enum class skey_version_t {
-    // We used to distinguish between pre 1.16 and post 1.16 secondary index keys.
-    // At the moment we only have one format.
-    post_1_16 = 1
-};
-skey_version_t skey_version_from_reql_version(reql_version_t rv);
-
 struct components_t {
-    skey_version_t skey_version;
     std::string secondary;
     std::string primary;
     optional<uint64_t> tag_num;
@@ -231,12 +221,10 @@ public:
     std::string print_primary_internal() const;
     /* TODO: All of this key-mangling logic belongs elsewhere. Maybe
     `print_primary()` belongs there as well. */
-    static std::string compose_secondary(skey_version_t skey_version,
-                                         const std::string &secondary_key,
+    static std::string compose_secondary(const std::string &secondary_key,
                                          const store_key_t &primary_key,
                                          optional<uint64_t> tag_num);
     static std::string mangle_secondary(
-        skey_version_t skey_version,
         const std::string &secondary,
         const std::string &primary,
         const std::string &tag);
@@ -343,8 +331,6 @@ public:
                               datum_t orig_key,
                               const datum_string_t &pkey) const;
 
-    // Used by skey_version code. Returns a pointer to the buf_ref, if
-    // the datum is currently backed by one, or NULL otherwise.
     const shared_buf_ref_t<char> *get_buf_ref() const;
 
     // Same as get_pair() / get(), but don't perform boundary or type checks.

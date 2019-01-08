@@ -361,4 +361,21 @@ std::string table_primary_key(namespace_id_t id, int shard_no, const std::string
     return ret;
 }
 
+// Returns the minimum upper bound of the set of strings prefixed by prefix. If
+// and only if there is no upper bound (the string matches /^(\xFF)*$/), returns
+// the empty string.
+std::string prefix_end(const std::string &prefix) {
+    std::string ret = prefix;
+    while (!ret.empty()) {
+        if (static_cast<uint8_t>(ret.back()) != 0xFF) {
+            ret.back() = static_cast<char>(static_cast<uint8_t>(ret.back()) + 1);
+            break;
+        }
+        ret.pop_back();
+        continue;
+    }
+    return ret;
+}
+
+
 }  // namespace rockstore

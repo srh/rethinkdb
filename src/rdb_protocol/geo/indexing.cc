@@ -4,6 +4,12 @@
 #include <string>
 #include <vector>
 
+// TODO: Remove this include if we wrap the iterator stuff...
+#include "rocksdb/db.h"
+#include "rocksdb/iterator.h"
+#include "rocksdb/utilities/optimistic_transaction_db.h"
+
+#include "arch/runtime/thread_pool.hpp"
 #include "btree/keys.hpp"
 #include "btree/leaf_node.hpp"
 #include "btree/reql_specific.hpp"
@@ -23,6 +29,7 @@
 #include "rdb_protocol/datum.hpp"
 #include "rdb_protocol/pseudo_geometry.hpp"
 #include "rockstore/rockshard.hpp"
+#include "rockstore/store.hpp"
 
 using geo::S2Cell;
 using geo::S2CellId;
@@ -136,10 +143,7 @@ std::string s2cellid_to_key(S2CellId id) {
 
 S2CellId key_to_s2cellid(const std::string &sid) {
     guarantee(sid.length() >= 2
-              // We need the static cast here because `'G' | 0x80` does integer
-              // promotion and produces 199, whereas `sid[0]` produces -57
-              // because it's a signed char.  C FTW!
-              && (sid[0] == 'G' || static_cast<uint8_t>(sid[0]) == ('G' | 0x80))
+              && sid[0] == 'G'
               && sid[1] == 'C');
     return S2CellId::FromToken(sid.substr(2));
 }
@@ -148,9 +152,9 @@ S2CellId key_to_s2cellid(const std::string &sid) {
 formatted sindex key. */
 S2CellId btree_key_to_s2cellid(const btree_key_t *key) {
     rassert(key != NULL);
+    std::string tmp(reinterpret_cast<const char *>(key->contents), key->size);
     return key_to_s2cellid(
-        datum_t::extract_secondary(
-            std::string(reinterpret_cast<const char *>(key->contents), key->size)));
+        datum_t::extract_secondary(tmp));
 }
 
 /* `key_or_null` represents a point to the left or right of a key in the B-tree
@@ -168,21 +172,14 @@ relative to geospatial sindex keys. There are four possible outcomes:
   - `key_or_null` lies before all possible sindex keys for `S2CellId`s. It will return
     `(S2CellId::FromFacePosLevel(0, 0, geo::S2::kMaxCellLevel), false)`. */
 std::pair<S2CellId, bool> order_btree_key_relative_to_s2cellid_keys(
-        const btree_key_t *key_or_null,
-        ql::skey_version_t skey_version) {
+        const btree_key_t *key_or_null) {
     static const std::pair<S2CellId, bool> before_all(
         S2CellId::FromFacePosLevel(0, 0, geo::S2::kMaxCellLevel), false);
     static const std::pair<S2CellId, bool> after_all(
         S2CellId::Sentinel(), false);
 
-    /* A well-formed sindex key will start with the characters 'GC'. But if the sindex
-    version is 1.16 or higher, the high bit on the 'G' will be set. */
-    uint8_t first_char;
-    switch (skey_version) {
-        case ql::skey_version_t::post_1_16:
-            first_char = static_cast<uint8_t>('G') | 0x80; break;
-        default: unreachable();
-    }
+    /* A well-formed sindex key will start with the characters 'GC'. */
+    uint8_t first_char = 'G';
     if (key_or_null == nullptr || key_or_null->size == 0) return before_all;
     if (key_or_null->contents[0] < first_char) return before_all;
     if (key_or_null->contents[0] > first_char) return after_all;
@@ -307,8 +304,23 @@ std::vector<S2CellId> compute_interior_cell_covering(
 }
 
 geo_index_traversal_helper_t::geo_index_traversal_helper_t(
-        ql::skey_version_t skey_version, const signal_t *interruptor)
-    : is_initialized_(false), skey_version_(skey_version), interruptor_(interruptor) { }
+        const signal_t *interruptor)
+    : is_initialized_(false), interruptor_(interruptor) { }
+
+// Computes the query cells' ancestors, deduped and in sorted order.
+std::vector<geo::S2CellId> compute_ancestors(const std::vector<geo::S2CellId> &query_cells) {
+    std::vector<geo::S2CellId> build;
+    for (geo::S2CellId cell : query_cells) {
+        geo::S2CellId c = cell;
+        while (c.level() != 0) {
+            c = c.parent();
+            build.push_back(c);
+        }
+    }
+    std::sort(build.begin(), build.end());
+    build.erase(std::unique(build.begin(), build.end()), build.end());
+    return build;
+}
 
 void geo_index_traversal_helper_t::init_query(
         const std::vector<geo::S2CellId> &query_cell_covering,
@@ -316,14 +328,15 @@ void geo_index_traversal_helper_t::init_query(
     guarantee(!is_initialized_);
     rassert(query_cells_.empty());
     query_cells_ = query_cell_covering;
+    std::sort(query_cells_.begin(), query_cells_.end());
+    query_cell_ancestors_ = compute_ancestors(query_cells_);
     query_interior_cells_ = query_interior_cell_covering;
     is_initialized_ = true;
 }
 
 continue_bool_t
 geo_index_traversal_helper_t::handle_pair(
-    scoped_key_value_t &&keyvalue,
-    concurrent_traversal_fifo_enforcer_signal_t waiter)
+    std::pair<const char *, size_t> key, std::pair<const char *, size_t> value)
         THROWS_ONLY(interrupted_exc_t) {
     guarantee(is_initialized_);
 
@@ -331,30 +344,24 @@ geo_index_traversal_helper_t::handle_pair(
         throw interrupted_exc_t();
     }
 
-    const S2CellId key_cell = btree_key_to_s2cellid(keyvalue.key());
+    store_key_t skey(key.second, reinterpret_cast<const uint8_t *>(key.first));
+    const S2CellId key_cell = btree_key_to_s2cellid(skey.btree_key());
     if (any_cell_intersects(query_cells_, key_cell.range_min(), key_cell.range_max())) {
         bool definitely_intersects_if_point =
             any_cell_contains(query_interior_cells_, key_cell);
-        return on_candidate(std::move(keyvalue), waiter, definitely_intersects_if_point);
+        return on_candidate(key, value, definitely_intersects_if_point);
     } else {
         return continue_bool_t::CONTINUE;
     }
 }
 
-void geo_index_traversal_helper_t::filter_range(
-        const btree_key_t *left_excl_or_null,
-        const btree_key_t *right_incl,
-        bool *skip_out) {
-    guarantee(is_initialized_);
-    *skip_out = !any_query_cell_intersects(left_excl_or_null, right_incl);
-}
-
+// TODO: Remove if unused.
 bool geo_index_traversal_helper_t::any_query_cell_intersects(
         const btree_key_t *left_excl_or_null, const btree_key_t *right_incl) const {
     std::pair<S2CellId, bool> left =
-        order_btree_key_relative_to_s2cellid_keys(left_excl_or_null, skey_version_);
+        order_btree_key_relative_to_s2cellid_keys(left_excl_or_null);
     std::pair<S2CellId, bool> right =
-        order_btree_key_relative_to_s2cellid_keys(right_incl, skey_version_);
+        order_btree_key_relative_to_s2cellid_keys(right_incl);
 
     /* This is more conservative than necessary. For example, if `left_excl_or_null` is
     after the largest possible cell or `right_incl` is before the smallest possible cell,
@@ -421,13 +428,215 @@ bool geo_index_traversal_helper_t::any_cell_contains(
     return false;
 }
 
+// The job of this function is to advance pos forward (or not at all) to the
+// next key (or next key prefix) we're interested in.  This is either the
+// beginning of a query cell, or an ancestor of a query cell, or pos itself, if
+// pos lies within the range of a query cell range or ancestor cell value.
+// Whatever is smallest and >=*pos, among all such values.
+bool geo_index_traversal_helper_t::skip_forward_to_seek_key(std::string *pos) const {
+    rassert(!query_cells_.empty());
+    if (query_cells_.empty()) {  // TODO: Verify if this is impossible.
+        return false;
+    }
+
+    // TODO: We parse this twice, I'm pretty sure.
+    store_key_t skey(*pos);
+
+    // TODO: Fragile code.
+    geo::S2CellId pos_cell;
+    if (*pos < "GC") {
+        // The minimal cell id.
+        pos_cell = geo::S2CellId(1);
+    } else if (*pos < "GD") {
+        pos_cell = btree_key_to_s2cellid(skey.btree_key());
+    } else {
+        return false;
+    }
+
+    bool has_candidate = false;
+    geo::S2CellId candidate_pos;
+    {
+        auto it = std::lower_bound(query_cells_.begin(), query_cells_.end(), pos_cell);
+        // The return pos might intersect *it or *(it-1).
+
+        if (it != query_cells_.begin() && pos_cell.intersects(*(it - 1))) {
+            // Don't advance pos, it's already in a range.
+            return true;
+        }
+        if (it != query_cells_.end()) {
+            if (pos_cell.intersects(*it)) {
+                // Don't advance pos, it's already in a range.
+                return true;
+            }
+            // First candidate is the beginning of a query cell (which we know
+            // pos_cell is before, because it's before the midpoint and doesn't
+            // intersect).
+            candidate_pos = it->range_min();
+            has_candidate = true;
+        }
+    }
+
+    auto it = std::lower_bound(
+        query_cell_ancestors_.begin(),
+        query_cell_ancestors_.end(),
+        pos_cell);
+    if (it != query_cell_ancestors_.end()) {
+        if (has_candidate) {
+            candidate_pos = std::min<geo::S2CellId>(*it, candidate_pos);
+        } else {
+            has_candidate = true;
+            candidate_pos = *it;
+        }
+    }
+    if (has_candidate) {
+        *pos = s2cellid_to_key(candidate_pos);
+        return true;
+    }
+    return false;
+}
+
+
 continue_bool_t geo_traversal(
-        rockshard rocksh, uuid_u sindex_uuid,
-        sindex_superblock_t *superblock, const key_range_t &sindex_range,
+        rockshard rocksh,
+        uuid_u sindex_uuid,
+        sindex_superblock_t *superblock,
+        release_superblock_t release_superblock,
+        const key_range_t &sindex_range,
         geo_index_traversal_helper_t *helper) {
-    (void)rocksh, (void)sindex_uuid;  // TODO
-    return btree_concurrent_traversal(
-        superblock, sindex_range, helper,
-        direction_t::forward,
-        release_superblock_t::RELEASE);
+    std::string rocks_kv_prefix = rockstore::table_secondary_prefix(rocksh.table_id, rocksh.shard_no, sindex_uuid);
+
+    // duh
+    rocksdb::OptimisticTransactionDB *db = rocksh.rocks->db();
+
+    // TODO: Use
+    // linux_thread_pool_t::run_in_blocker_pool([&]() {
+
+    // We'll overwrite prefixed_pos as we iterate.
+    // TODO: Do we use prefixed_left_bound?
+    std::string prefixed_left_bound = rocks_kv_prefix + key_to_unescaped_str(sindex_range.left);
+    std::string prefixed_upper_bound;
+    rocksdb::Slice prefixed_upper_bound_slice;
+    // TODO: Proper rocksdb::ReadOptions()
+    rocksdb::ReadOptions opts;
+    if (!sindex_range.right.unbounded) {
+        prefixed_upper_bound = rocks_kv_prefix + key_to_unescaped_str(sindex_range.right.key());
+    } else {
+        prefixed_upper_bound = rockstore::prefix_end(rocks_kv_prefix);
+    }
+
+    if (!prefixed_upper_bound.empty()) {
+        // Note: prefixed_upper_bound_slice doesn't copy the string, it points into it.
+        prefixed_upper_bound_slice = rocksdb::Slice(prefixed_upper_bound);
+        opts.iterate_upper_bound = &prefixed_upper_bound_slice;
+    }
+
+    // TODO: Check if we must call NewIterator on the thread pool thread.
+    // TODO: Switching threads for every key/value pair is kind of lame.
+    scoped_ptr_t<rocksdb::Iterator> iter(db->NewIterator(opts));
+    // Release superblock after snapshotted iterator created.
+    if (release_superblock == release_superblock_t::RELEASE) {
+        superblock->release();
+    }
+
+    // There are two modes of iteration:  Stepping forward to cells and cell
+    // ancestors, and stepping through the contents of a cover cell or ancestor cell.
+
+    std::string pos = key_to_unescaped_str(sindex_range.left);
+
+    for (;;) {
+        // At this point, we want to advance the iterator forward to the first
+        // cell key intersecting the cover, greater than or equal to prefixed_left_bound.
+        if (!helper->skip_forward_to_seek_key(&pos)) {
+            return continue_bool_t::CONTINUE;
+        }
+        std::string prefixed_pos = rocks_kv_prefix + pos;
+        bool was_valid;
+        rocksdb::Slice key_slice;
+        rocksdb::Slice value_slice;
+        linux_thread_pool_t::run_in_blocker_pool([&]() {
+            iter->Seek(prefixed_pos);  // TODO: blocker pool
+            was_valid = iter->Valid();
+            if (was_valid) {
+                key_slice = iter->key();
+                // TODO: Is there advantage in delaying this?
+                value_slice = iter->value();
+            }
+        });
+        if (!was_valid) {
+            return continue_bool_t::CONTINUE;
+        }
+        key_slice.remove_prefix(rocks_kv_prefix.size());
+
+        store_key_t skey(key_slice.size(), reinterpret_cast<const uint8_t *>(key_slice.data()));
+        S2CellId cellid = btree_key_to_s2cellid(skey.btree_key());
+
+        bool found_cell = false;
+        S2CellId max_cell;
+        // And now we want to see: Are we intersecting?  Or do we need to seek further?
+        for (S2CellId cell : helper->query_cells()) {
+            if (cell.contains(cellid)) {
+                // We're inside the cell.  Iterate through it entirely.
+                max_cell = cell.range_max();
+                found_cell = true;
+                break;
+            } else if (cellid.contains(cell)) {
+                // Iterate through all keys with the entire ancestor's _value_.
+                max_cell = cellid;
+                found_cell = true;
+                break;
+            } else {
+                // We're outside the cell.  Go to the next one.
+                continue;
+            }
+        }
+
+        if (!found_cell) {
+            pos = key_slice.ToString();
+            continue;
+        }
+
+        std::string stop_line
+            = rocks_kv_prefix + rockstore::prefix_end(s2cellid_to_key(max_cell));
+
+        for (;;) {
+            // key_slice at this point has had the prefix truncated.
+            continue_bool_t contbool = helper->handle_pair(
+                std::make_pair(key_slice.data(), key_slice.size()),
+                std::make_pair(value_slice.data(), value_slice.size()));
+            if (contbool == continue_bool_t::ABORT) {
+                return continue_bool_t::ABORT;
+            }
+
+            linux_thread_pool_t::run_in_blocker_pool([&]() {
+                iter->Next();
+                was_valid = iter->Valid();
+                if (was_valid) {
+                    key_slice = iter->key();
+                    // TODO: Useful to be lazy about?
+                    value_slice = iter->value();
+                }
+
+            });
+            if (!was_valid) {
+                break;
+            }
+            if (key_slice.ToString() >= stop_line) {  // TODO: Perf.
+                key_slice.remove_prefix(rocks_kv_prefix.size());
+                break;
+            }
+
+            key_slice.remove_prefix(rocks_kv_prefix.size());
+        }
+
+        // At this point, maybe we've iterated through an entire cell's range or
+        // value, maybe not.  The iterator is now pointing at the key _past_
+        // that cell (or is not valid).  We continue through the loop if it's
+        // valid.
+        if (!was_valid) {
+            return continue_bool_t::CONTINUE;
+        }
+        // At this point key_slice has had the prefix truncated.
+        pos = key_slice.ToString();
+    }
+
 }

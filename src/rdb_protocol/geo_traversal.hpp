@@ -90,8 +90,7 @@ public:
 
     void init_query(const ql::datum_t &_query_geometry);
 
-    continue_bool_t on_candidate(scoped_key_value_t &&keyvalue,
-                                 concurrent_traversal_fifo_enforcer_signal_t waiter,
+    continue_bool_t on_candidate(std::pair<const char *, size_t> key, std::pair<const char *, size_t> value,
                                  bool definitely_intersects) override
             THROWS_ONLY(interrupted_exc_t);
 

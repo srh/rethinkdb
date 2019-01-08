@@ -11,7 +11,6 @@
 
 namespace ql {
 class datum_t;
-enum class skey_version_t;
 }
 class rockshard;
 class signal_t;
@@ -39,10 +38,9 @@ std::vector<geo::S2CellId> compute_interior_cell_covering(
         const std::vector<geo::S2CellId> &exterior_covering);
 
 // TODO (daniel): Support compound indexes somehow.
-class geo_index_traversal_helper_t : public concurrent_traversal_callback_t {
+class geo_index_traversal_helper_t {
 public:
-    geo_index_traversal_helper_t(
-        ql::skey_version_t skey_version, const signal_t *interruptor);
+    geo_index_traversal_helper_t(const signal_t *interruptor);
 
     void init_query(
         const std::vector<geo::S2CellId> &query_cell_covering,
@@ -63,23 +61,22 @@ public:
     `definitely_intersects_if_point` can be used to avoid unnecessary intersection
     tests during post-filtering. */
     virtual continue_bool_t on_candidate(
-        scoped_key_value_t &&keyvalue,
-        concurrent_traversal_fifo_enforcer_signal_t waiter,
+        std::pair<const char *, size_t> key, std::pair<const char *, size_t> value,
         bool definitely_intersects_if_point)
             THROWS_ONLY(interrupted_exc_t) = 0;
 
     /* concurrent_traversal_callback_t interface */
-    continue_bool_t handle_pair(scoped_key_value_t &&keyvalue,
-                                concurrent_traversal_fifo_enforcer_signal_t waiter) override
+    continue_bool_t handle_pair(std::pair<const char *, size_t> key, std::pair<const char *, size_t> value)
             THROWS_ONLY(interrupted_exc_t);
-    void filter_range(
-            const btree_key_t *left_excl_or_null,
-            const btree_key_t *right_incl,
-            bool *skip_out) override;
 
     const std::vector<geo::S2CellId> &query_cells() const {
         return query_cells_;
     }
+
+    bool skip_forward_to_seek_key(std::string *pos) const;
+
+protected:
+    virtual ~geo_index_traversal_helper_t() { }
 
 private:
     static bool cell_intersects_with_range(const geo::S2CellId c,
@@ -93,16 +90,21 @@ private:
     static bool any_cell_contains(const std::vector<geo::S2CellId> &cells,
                                   const geo::S2CellId key);
 
+    // Sorted.
     std::vector<geo::S2CellId> query_cells_;
+    // Sorted and deduped.
+    std::vector<geo::S2CellId> query_cell_ancestors_;
     std::vector<geo::S2CellId> query_interior_cells_;
     bool is_initialized_;
-    const ql::skey_version_t skey_version_;
     const signal_t *interruptor_;
 };
 
 continue_bool_t geo_traversal(
-        rockshard rocksh, uuid_u sindex_uuid,
-        sindex_superblock_t *superblock, const key_range_t &sindex_range,
+        rockshard rocksh,
+        uuid_u sindex_uuid,
+        sindex_superblock_t *superblock,
+        release_superblock_t release_superblock,
+        const key_range_t &sindex_range,
         geo_index_traversal_helper_t *helper);
 
 

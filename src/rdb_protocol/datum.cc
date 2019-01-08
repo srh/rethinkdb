@@ -1080,23 +1080,7 @@ std::string datum_t::print_primary() const {
     return s;
 }
 
-// Returns `true` if it tagged the skey version.
-// Since we've removed support for pre 1.16 indexes, this function now always returns
-// `true`.
-bool tag_skey_version(skey_version_t skey_version, std::string *s) {
-    guarantee(s->size() > 0);
-    guarantee(!((*s)[0] & 0x80)); // None of our types have the top bit set
-    switch (skey_version) {
-    case skey_version_t::post_1_16:
-        (*s)[0] |= 0x80; // Flip the top bit to indicate 1.16+ skey_version.
-        return true;
-    default: unreachable();
-    }
-    unreachable();
-}
-
 std::string datum_t::mangle_secondary(
-    skey_version_t skey_version,
     const std::string &secondary,
     const std::string &primary,
     const std::string &tag) {
@@ -1108,9 +1092,7 @@ std::string datum_t::mangle_secondary(
     // it was truncated (in which case it's fixed-width and doesn't need a
     // terminator).
     std::string res = secondary + primary;
-    if (tag_skey_version(skey_version, &res)) {
-        res += std::string(1, 0);
-    }
+    res += std::string(1, 0);
     uint8_t tag_offset = res.size();
     guarantee(res.size() <= MAX_KEY_SIZE);
     res += tag + std::string(1, pk_offset) + std::string(1, tag_offset);
@@ -1129,7 +1111,6 @@ std::string datum_t::encode_tag_num(uint64_t tag_num) {
 }
 
 std::string datum_t::compose_secondary(
-    skey_version_t skey_version,
     const std::string &secondary_key,
     const store_key_t &primary_key,
     optional<uint64_t> tag_num) {
@@ -1149,7 +1130,7 @@ std::string datum_t::compose_secondary(
         secondary_key.substr(0, trunc_size(primary_key_string.length()));
 
     return mangle_secondary(
-        skey_version, truncated_secondary_key, primary_key_string, tag_string);
+        truncated_secondary_key, primary_key_string, tag_string);
 }
 
 std::string datum_t::print_secondary(reql_version_t reql_version,
@@ -1161,7 +1142,6 @@ std::string datum_t::print_secondary(reql_version_t reql_version,
     secondary_key_string.reserve(MAX_KEY_SIZE);
 
     escape_nulls_t escape_nulls = escape_nulls_from_reql_version_for_sindex(reql_version);
-    skey_version_t skey_version = skey_version_from_reql_version(reql_version);
     extrema_encoding_t extrema_encoding =
         extrema_encoding_from_reql_version_for_sindex(reql_version);
 
@@ -1192,20 +1172,9 @@ std::string datum_t::print_secondary(reql_version_t reql_version,
             get_type_name().c_str(), trunc_print().c_str()));
     }
 
-    switch (skey_version) {
-    case skey_version_t::post_1_16:
-        secondary_key_string.append(1, '\x00');
-        break;
-    default: unreachable();
-    }
+    secondary_key_string.append(1, '\x00');
 
-    return compose_secondary(skey_version, secondary_key_string, primary_key, tag_num);
-}
-
-skey_version_t skey_version_from_reql_version(reql_version_t) {
-    // We only have one value at the moment, since we've dropped support for pre-1.16
-    // indexes.
-    return skey_version_t::post_1_16;
+    return compose_secondary(secondary_key_string, primary_key, tag_num);
 }
 
 escape_nulls_t escape_nulls_from_reql_version_for_sindex(reql_version_t rv) {
@@ -1231,16 +1200,9 @@ components_t parse_secondary(const std::string &key) THROWS_NOTHING {
 
     // This parses the NULL byte into secondary. We rely on this in
     // `rget_cb_t::handle_pair()`.
-    skey_version_t skey_version = skey_version_t::post_1_16;
     std::string secondary = key.substr(0, start_of_primary);
-    if (secondary[0] & 0x80) {
-        skey_version = skey_version_t::post_1_16;
-        // To account for extra NULL byte in 1.16+.
-        end_of_primary -= 1;
-    } else {
-        // pre 1.16 versions are no longer supported
-        unreachable();
-    }
+    // To account for extra NULL byte in 1.16+.
+    end_of_primary -= 1;
     guarantee(start_of_primary < end_of_primary);
     std::string primary =
         key.substr(start_of_primary, end_of_primary - start_of_primary);
@@ -1257,7 +1219,6 @@ components_t parse_secondary(const std::string &key) THROWS_NOTHING {
         tag_num.set(t);
     }
     return components_t{
-        skey_version,
         std::move(secondary),
         std::move(primary),
         std::move(tag_num)};
@@ -1337,10 +1298,7 @@ store_key_t datum_t::truncated_secondary(
             print().c_str(), get_type_name().c_str()));
     }
 
-    skey_version_t skey_version = skey_version_from_reql_version(reql_version);
-
     // Since 1.16, we add a null byte to the end of the secondary index key.
-    guarantee(skey_version == skey_version_t::post_1_16);
     s.push_back('\0');
 
     // Truncate the key if necessary
@@ -1349,7 +1307,6 @@ store_key_t datum_t::truncated_secondary(
         s.erase(mts);
     }
 
-    tag_skey_version(skey_version, &s);
     return store_key_t(s);
 }
 

@@ -231,7 +231,6 @@ TPTEST(BTreeSindex, BtreeStoreAPI) {
         }
 
         store_key_t key(ql::datum_t::compose_secondary(
-                ql::skey_version_t::post_1_16,
                 "sec",
                 store_key_t("pri"),
                 r_nullopt));

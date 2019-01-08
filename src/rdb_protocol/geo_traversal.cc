@@ -83,7 +83,6 @@ geo_intersecting_cb_t::geo_intersecting_cb_t(
         std::set<std::pair<store_key_t, optional<uint64_t> > >
             *_distinct_emitted_in_out)
     : geo_index_traversal_helper_t(
-        ql::skey_version_from_reql_version(_sindex.func_reql_version),
         _env->interruptor),
       slice(_slice),
       sindex(std::move(_sindex)),
@@ -106,15 +105,15 @@ void geo_intersecting_cb_t::init_query(const ql::datum_t &_query_geometry) {
         covering, compute_interior_cell_covering(query_geometry, covering));
 }
 
+// TODO: Would definitely be nice if we could be lazy about loading the value.
 continue_bool_t geo_intersecting_cb_t::on_candidate(
-        scoped_key_value_t &&keyvalue,
-        concurrent_traversal_fifo_enforcer_signal_t waiter,
+        std::pair<const char *, size_t> key, std::pair<const char *, size_t> value,
         bool definitely_intersects_if_point)
         THROWS_ONLY(interrupted_exc_t) {
     guarantee(query_geometry.has());
     sampler->new_sample();
 
-    store_key_t store_key(keyvalue.key());
+    store_key_t store_key(key.second, reinterpret_cast<const uint8_t *>(key.first));
     store_key_t primary_key(ql::datum_t::extract_primary(store_key));
     // Check if the primary key is in the range of the current slice
     if (!sindex.pkey_range.contains_key(primary_key)) {
@@ -132,16 +131,21 @@ continue_bool_t geo_intersecting_cb_t::on_candidate(
         return continue_bool_t::CONTINUE;
     }
 
-    lazy_btree_val_t row(static_cast<const rdb_value_t *>(keyvalue.value()),
-                         keyvalue.expose_buf());
-    ql::datum_t val = row.get();
+    ql::datum_t val;
+    {
+        buffer_group_t buffer_group;
+        buffer_group.add_buffer(value.second, value.first);
+        buffer_group_read_stream_t read_stream(const_view(&buffer_group));
+        archive_result_t res = datum_deserialize(&read_stream, &val);
+        guarantee_deserialization(res, "geo_intersecting_cb_t::on_candidate value");
+    }
+
     slice->stats.pm_keys_read.record();
     slice->stats.pm_total_keys_read += 1;
-    guarantee(!row.references_parent());
-    keyvalue.reset();
 
-    // Everything happens in key order after this.
-    waiter.wait_interruptible();
+    // Everything happens in key order after this. (Concurrent traversal used to
+    // have a fifo token, allowing preceding code to run out of order.)
+    // waiter.wait_interruptible();
 
     // row.get() or waiter.wait_interruptible() might have blocked, and another
     // coroutine could have found the document in the meantime. Re-check
