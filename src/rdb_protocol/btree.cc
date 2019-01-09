@@ -87,6 +87,21 @@ void detach_rdb_value(buf_parent_t parent, const void *value) {
     blob.detach_subtrees(parent);
 }
 
+void rdb_get(rockshard rocksh, const store_key_t &store_key,
+             superblock_t *superblock, point_read_response_t *response) {
+    std::string loc = rockstore::table_primary_key(rocksh.table_id, rocksh.shard_no, key_to_unescaped_str(store_key));
+    std::pair<std::string, bool> val = rocksh.rocks->try_read(loc);
+    superblock->release();
+    if (!val.second) {
+        response->data = ql::datum_t::null();
+    } else {
+        ql::datum_t datum;
+        datum_deserialize_from_buf(val.first.data(), val.first.size(), &datum);
+        response->data = std::move(datum);
+    }
+}
+
+// TODO: Remove when unused.
 void rdb_get(const store_key_t &store_key, btree_slice_t *slice,
              superblock_t *superblock, point_read_response_t *response,
              profile::trace_t *trace) {

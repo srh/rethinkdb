@@ -40,5 +40,12 @@ inline void datum_deserialize_from_blob(buf_parent_t parent, blob_t *blob,
     datum_deserialize_from_group(const_view(&group), value_out);
 }
 
+// TODO: Make use fo this.
+inline void datum_deserialize_from_buf(const void *buf, size_t count, ql::datum_t *out) {
+    buffer_group_t group;
+    group.add_buffer(count, buf);
+    datum_deserialize_from_group(const_view(&group), out);
+}
+
 
 #endif /* RDB_PROTOCOL_SERIALIZE_DATUM_ONTO_BLOB_HPP_ */

@@ -58,6 +58,13 @@ struct rdb_modification_report_t;
 class rdb_modification_report_cb_t;
 
 void rdb_get(
+    rockshard rocksh,
+    const store_key_t &store_key,
+    superblock_t *superblock,
+    point_read_response_t *response);
+
+// TODO: Remove
+void rdb_get(
     const store_key_t &key,
     btree_slice_t *slice,
     superblock_t *superblock,
