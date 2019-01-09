@@ -212,8 +212,8 @@ void rdb_get_nearest_slice(
     const sindex_disk_info_t &sindex_info,
     nearest_geo_read_response_t *response);
 
-void rdb_distribution_get(int max_depth,
-                          const store_key_t &left_key,
+void rdb_distribution_get(rockshard rocksh, int keys_limit,
+                          const key_range_t &key_range,
                           real_superblock_t *superblock,
                           distribution_read_response_t *response);
 

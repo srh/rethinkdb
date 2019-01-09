@@ -7,10 +7,12 @@
 #include "btree/keys.hpp"
 #include "buffer_cache/types.hpp"
 
+class rockshard;
 class superblock_t;
 
-void get_btree_key_distribution(superblock_t *superblock, int depth_limit,
-                                int64_t *key_count_out,
-                                std::vector<store_key_t> *keys_out);
+// TODO: Rename this function...?
+void get_btree_key_distribution(rockshard rocksh, key_range_t key_range, superblock_t *superblock, int keys_limit,
+                                std::vector<store_key_t> *keys_out, std::vector<uint64_t> *counts_out);
+
 
 #endif /* BTREE_GET_DISTRIBUTION_HPP_ */

@@ -1695,27 +1695,23 @@ void rdb_get_nearest_slice(
     } while (state.proceed_to_next_batch() == continue_bool_t::CONTINUE);
 }
 
-void rdb_distribution_get(int max_depth,
-                          const store_key_t &left_key,
+// TODO: Make sure that distribution gets (with new rockstore stuff) get tested.
+void rdb_distribution_get(rockshard rocksh, int keys_limit,
+                          const key_range_t &key_range,
                           real_superblock_t *superblock,
                           distribution_read_response_t *response) {
-    int64_t key_count_out;
-    std::vector<store_key_t> key_splits;
-    get_btree_key_distribution(superblock, max_depth,
-                               &key_count_out, &key_splits);
+    std::vector<store_key_t> key_lowerbounds;
+    std::vector<uint64_t> interval_disk_sizes;
+    get_btree_key_distribution(rocksh, key_range, superblock, keys_limit,
+                               &key_lowerbounds, &interval_disk_sizes);
+    // TODO: Return a vec of pairs in get_btree_key_distribution.
+    guarantee(key_lowerbounds.size() == interval_disk_sizes.size());
 
-    int64_t keys_per_bucket;
-    if (key_splits.size() == 0) {
-        keys_per_bucket = key_count_out;
-    } else  {
-        keys_per_bucket = std::max<int64_t>(key_count_out / key_splits.size(), 1);
-    }
-    response->key_counts[left_key] = keys_per_bucket;
+    // TODO: We're changing from key counts to disk size.  This means a rocksdb
+    // shard is not compatible with the cluster.
 
-    for (std::vector<store_key_t>::iterator it  = key_splits.begin();
-                                            it != key_splits.end();
-                                            ++it) {
-        response->key_counts[*it] = keys_per_bucket;
+    for (size_t i = 0; i < key_lowerbounds.size(); ++i) {
+        response->key_counts[key_lowerbounds[i]] = interval_disk_sizes[i];
     }
 }
 

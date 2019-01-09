@@ -160,6 +160,7 @@ struct distribution_read_response_t {
     // and key_counts[ki] = the number of keys in [ki, ki+1) if i < n
     // key_counts[kn] = the number of keys in [kn, right_key)
     region_t region;
+    // TODO: Update comment above.  These are approx disk usage in bytes.
     std::map<store_key_t, int64_t> key_counts;
 };
 RDB_DECLARE_SERIALIZABLE_FOR_CLUSTER(distribution_read_response_t);
