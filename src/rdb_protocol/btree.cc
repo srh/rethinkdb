@@ -89,6 +89,7 @@ void detach_rdb_value(buf_parent_t parent, const void *value) {
 
 void rdb_get(rockshard rocksh, const store_key_t &store_key,
              superblock_t *superblock, point_read_response_t *response) {
+    superblock->read_acq_signal()->wait_lazily_unordered();
     std::string loc = rockstore::table_primary_key(rocksh.table_id, rocksh.shard_no, key_to_unescaped_str(store_key));
     std::pair<std::string, bool> val = rocksh.rocks->try_read(loc);
     superblock->release();

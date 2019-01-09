@@ -508,7 +508,6 @@ continue_bool_t geo_traversal(
     // duh
     rocksdb::OptimisticTransactionDB *db = rocksh.rocks->db();
 
-    // TODO: Use
     // linux_thread_pool_t::run_in_blocker_pool([&]() {
 
     // We'll overwrite prefixed_pos as we iterate.
@@ -529,6 +528,9 @@ continue_bool_t geo_traversal(
         prefixed_upper_bound_slice = rocksdb::Slice(prefixed_upper_bound);
         opts.iterate_upper_bound = &prefixed_upper_bound_slice;
     }
+
+    // Wait for acquisition of the read lock.
+    superblock->read_acq_signal()->wait_lazily_unordered();
 
     // TODO: Check if we must call NewIterator on the thread pool thread.
     // TODO: Switching threads for every key/value pair is kind of lame.

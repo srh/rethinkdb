@@ -99,6 +99,14 @@ block_id_t real_superblock_t::get_sindex_block_id() {
     return sb_data->sindex_block;
 }
 
+signal_t *real_superblock_t::read_acq_signal() {
+    return sb_buf_.read_acq_signal();
+}
+
+signal_t *real_superblock_t::write_acq_signal() {
+    return sb_buf_.write_acq_signal();
+}
+
 sindex_superblock_t::sindex_superblock_t(buf_lock_t &&sb_buf)
     : sb_buf_(std::move(sb_buf)) {}
 
@@ -138,6 +146,14 @@ block_id_t sindex_superblock_t::get_sindex_block_id() {
         static_cast<const reql_btree_superblock_t *>(read.get_data_read(&sb_size));
     guarantee(sb_size == REQL_BTREE_SUPERBLOCK_SIZE);
     return sb_data->sindex_block;
+}
+
+signal_t *sindex_superblock_t::read_acq_signal() {
+    return sb_buf_.read_acq_signal();
+}
+
+signal_t *sindex_superblock_t::write_acq_signal() {
+    return sb_buf_.write_acq_signal();
 }
 
 // Run backfilling at a reduced priority

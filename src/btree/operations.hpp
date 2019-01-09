@@ -34,6 +34,7 @@ enum cache_snapshotted_t { CACHE_SNAPSHOTTED_NO, CACHE_SNAPSHOTTED_YES };
 This makes it so that the B-tree code doesn't actually have to know about the format of
 the superblock, or about anything else that might be contained in the superblock besides
 the root block ID and the stat block ID. */
+// Under rockstore code, this only serves as a read-write lock (possibly, vestigially).
 class superblock_t {
 public:
     static constexpr std::nullptr_t no_passback = nullptr;
@@ -55,6 +56,9 @@ public:
     virtual buf_parent_t expose_buf() = 0;
 
     cache_t *cache() { return expose_buf().cache(); }
+
+    virtual signal_t *read_acq_signal() = 0;
+    virtual signal_t *write_acq_signal() = 0;
 
 private:
     DISABLE_COPYING(superblock_t);

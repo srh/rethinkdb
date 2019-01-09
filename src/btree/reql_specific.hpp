@@ -25,17 +25,20 @@ public:
     explicit real_superblock_t(buf_lock_t &&sb_buf);
     real_superblock_t(buf_lock_t &&sb_buf, new_semaphore_in_line_t &&write_semaphore_acq);
 
-    void release();
+    void release() override;
     buf_lock_t *get() { return &sb_buf_; }
 
-    block_id_t get_root_block_id();
-    void set_root_block_id(block_id_t new_root_block);
+    block_id_t get_root_block_id() override;
+    void set_root_block_id(block_id_t new_root_block) override;
 
-    block_id_t get_stat_block_id();
+    block_id_t get_stat_block_id() override;
 
     block_id_t get_sindex_block_id();
 
-    buf_parent_t expose_buf() { return buf_parent_t(&sb_buf_); }
+    buf_parent_t expose_buf() override { return buf_parent_t(&sb_buf_); }
+
+    signal_t *read_acq_signal() override;
+    signal_t *write_acq_signal() override;
 
 private:
     /* The write_semaphore_acq_ is empty for reads.
@@ -53,20 +56,23 @@ class sindex_superblock_t : public superblock_t {
 public:
     explicit sindex_superblock_t(buf_lock_t &&sb_buf);
 
-    void release();
+    void release() override;
     buf_lock_t *get() { return &sb_buf_; }
 
-    block_id_t get_root_block_id();
-    void set_root_block_id(block_id_t new_root_block);
+    block_id_t get_root_block_id() override;
+    void set_root_block_id(block_id_t new_root_block) override;
 
-    block_id_t get_stat_block_id();
+    block_id_t get_stat_block_id() override;
 
     /* sindex superblocks shouldn't have a sindex block of their own. But in previous
     versions of RethinkDB they would have an empty sindex block. This is exposed so that
     we can delete such a sindex block when deleting the sindex superblock. */
     block_id_t get_sindex_block_id();
 
-    buf_parent_t expose_buf() { return buf_parent_t(&sb_buf_); }
+    buf_parent_t expose_buf() override { return buf_parent_t(&sb_buf_); }
+
+    signal_t *read_acq_signal() override;
+    signal_t *write_acq_signal() override;
 
 private:
     buf_lock_t sb_buf_;

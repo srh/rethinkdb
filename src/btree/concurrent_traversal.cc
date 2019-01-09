@@ -232,9 +232,10 @@ continue_bool_t rocks_traversal(
     // duh
     rocksdb::OptimisticTransactionDB *db = rocks->db();
 
+    // Acquire read lock on superblock first.
+    superblock->read_acq_signal()->wait_lazily_unordered();
+
     // linux_thread_pool_t::run_in_blocker_pool([&]() {
-    // TODO: Release the superblock after we get a snapshot or something.
-    // (Does making an iterator get us a snapshot?)
 
     // TODO: Check if we use switches for this type in other code.
     if (direction == direction_t::forward) {
