@@ -604,7 +604,6 @@ struct rdb_read_visitor_t : public boost::static_visitor<void> {
             res);
     }
 
-    // TODO: Rocks reading below.
     void operator()(const rget_read_t &rget) {
         response->response = rget_read_response_t();
         auto *res = boost::get<rget_read_response_t>(&response->response);
@@ -661,6 +660,7 @@ struct rdb_read_visitor_t : public boost::static_visitor<void> {
                 release_superblock_t::RELEASE, nullptr);
     }
 
+    // TODO: Rocks reading below.
     void operator()(const distribution_read_t &dg) {
         response->response = distribution_read_response_t();
         distribution_read_response_t *res = boost::get<distribution_read_response_t>(&response->response);
