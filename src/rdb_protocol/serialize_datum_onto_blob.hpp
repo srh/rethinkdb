@@ -2,6 +2,7 @@
 #define RDB_PROTOCOL_SERIALIZE_DATUM_ONTO_BLOB_HPP_
 
 #include "rdb_protocol/serialize_datum.hpp"
+#include "buffer_cache/serialize_onto_blob.hpp"
 
 inline ql::serialization_result_t
 datum_serialize_onto_blob(buf_parent_t parent, blob_t *blob,
@@ -40,8 +41,8 @@ inline void datum_deserialize_from_blob(buf_parent_t parent, blob_t *blob,
     datum_deserialize_from_group(const_view(&group), value_out);
 }
 
-// TODO: Make use fo this.
-inline void datum_deserialize_from_buf(const void *buf, size_t count, ql::datum_t *out) {
+// The name datum_deserialize_from_buf was taken.
+inline void datum_deserialize_from_vec(const void *buf, size_t count, ql::datum_t *out) {
     buffer_group_t group;
     group.add_buffer(count, buf);
     datum_deserialize_from_group(const_view(&group), out);

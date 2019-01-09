@@ -96,7 +96,7 @@ void rdb_get(rockshard rocksh, const store_key_t &store_key,
         response->data = ql::datum_t::null();
     } else {
         ql::datum_t datum;
-        datum_deserialize_from_buf(val.first.data(), val.first.size(), &datum);
+        datum_deserialize_from_vec(val.first.data(), val.first.size(), &datum);
         response->data = std::move(datum);
     }
 }
@@ -1210,11 +1210,7 @@ continue_bool_t rocks_rget_cb::handle_pair(
     io.slice->stats.pm_total_keys_read += 1;
     // We only load the value if we actually use it (`count` does not).
     if (job.accumulator->uses_val() || job.transformers.size() != 0 || sindex) {
-        buffer_group_t buffer_group;
-        buffer_group.add_buffer(value.second, value.first);
-        buffer_group_read_stream_t read_stream(const_view(&buffer_group));
-        archive_result_t res = datum_deserialize(&read_stream, &val);
-        guarantee_deserialization(res, "rocks_rget_cb value");
+        datum_deserialize_from_vec(value.first, value.second, &val);
     }
 
     // Note: Previously (before converting to use with rocksdb, we had a

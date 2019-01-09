@@ -18,6 +18,7 @@
 #include "rdb_protocol/geo/s2/s2latlng.h"
 #include "rdb_protocol/lazy_btree_val.hpp"
 #include "rdb_protocol/profile.hpp"
+#include "rdb_protocol/serialize_datum_onto_blob.hpp"
 
 using geo::S2Point;
 using geo::S2LatLng;
@@ -132,13 +133,7 @@ continue_bool_t geo_intersecting_cb_t::on_candidate(
     }
 
     ql::datum_t val;
-    {
-        buffer_group_t buffer_group;
-        buffer_group.add_buffer(value.second, value.first);
-        buffer_group_read_stream_t read_stream(const_view(&buffer_group));
-        archive_result_t res = datum_deserialize(&read_stream, &val);
-        guarantee_deserialization(res, "geo_intersecting_cb_t::on_candidate value");
-    }
+    datum_deserialize_from_vec(value.first, value.second, &val);
 
     slice->stats.pm_keys_read.record();
     slice->stats.pm_total_keys_read += 1;
