@@ -135,6 +135,7 @@ void rdb_set(rockshard rocksh,
 
 void rdb_set_sindex_for_unittest(
     rockshard rocksh,
+    uuid_u sindex_uuid,
     const store_key_t &key, ql::datum_t data,
     bool overwrite,
     btree_slice_t *slice, repli_timestamp_t timestamp,

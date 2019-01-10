@@ -147,6 +147,7 @@ TPTEST(BTreeSindex, LowLevelOps) {
     }
 }
 
+// TODO: Remove this whole test, it's now stupid.
 TPTEST(BTreeSindex, BtreeStoreAPI) {
     temp_file_t temp_file;
     temp_rockstore temp_rocks;
@@ -269,7 +270,7 @@ TPTEST(BTreeSindex, BtreeStoreAPI) {
 
                 rdb_live_deletion_context_t deletion_context;
                 rdb_set_sindex_for_unittest(
-                    rockshard(io_backender.rocks(), table_id, 0), key, data, true,
+                    rockshard(io_backender.rocks(), table_id, 0), sindex_uuid, key, data, true,
                     store.get_sindex_slice(sindex_uuid),
                     repli_timestamp_t::distant_past,
                     sindex_super_block.get(), &deletion_context, &response,

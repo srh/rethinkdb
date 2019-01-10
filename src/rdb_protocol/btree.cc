@@ -648,6 +648,7 @@ void rdb_set(rockshard rocksh,
 // TODO: Remove this (I wish).
 void rdb_set_sindex_for_unittest(
         rockshard rocksh,
+        uuid_u sindex_uuid,
         const store_key_t &key,
         ql::datum_t data,
         bool overwrite,  /* TODO: Who calls this with and without overwrite? */
@@ -678,7 +679,7 @@ void rdb_set_sindex_for_unittest(
     mod_info->added.first = data;
 
     if (overwrite || !had_value) {
-        std::string rocks_kv_location = rockstore::table_primary_key(rocksh.table_id, rocksh.shard_no, key_to_unescaped_str(key));
+        std::string rocks_kv_location = rockstore::table_secondary_key(rocksh.table_id, rocksh.shard_no, sindex_uuid, key_to_unescaped_str(key));
         // TODO: We don't do kv_location_delete in case of null value?
         ql::serialization_result_t res =
             kv_location_set(rocksh.rocks, rocks_kv_location,
