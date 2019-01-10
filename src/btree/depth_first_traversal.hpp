@@ -63,18 +63,10 @@ public:
     no further method calls will happen and `btree_depth_first_traversal()` will return
     `ABORT`. */
 
-    /* Can be overloaded if you don't want to query a contiguous range of keys, but only
-    parts of it. Both `filter_range()` and `filter_range_ts()` will be called before
-    traversing into any child node; if either sets `*skip_out` to `true`, the range
+    /* Can be overloaded if you don't want to query a contiguous range of keys,
+    but only parts of it. The method `filter_range_ts()` will be called before
+    traversing into any child node; if it sets `*skip_out` to `true`, the range
     will be ignored. */
-    virtual continue_bool_t filter_range(
-            UNUSED const btree_key_t *left_excl_or_null,
-            UNUSED const btree_key_t *right_incl,
-            UNUSED signal_t *interruptor,
-            bool *skip_out) {
-        *skip_out = false;
-        return continue_bool_t::CONTINUE;
-    }
     virtual continue_bool_t filter_range_ts(
             UNUSED const btree_key_t *left_excl_or_null,
             UNUSED const btree_key_t *right_incl,

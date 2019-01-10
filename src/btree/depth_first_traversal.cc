@@ -192,26 +192,20 @@ continue_bool_t btree_depth_first_traversal(
                                 left_excl_or_null, right_incl,
                                 &child_left_excl_or_null, &child_right_incl);
 
-            if (continue_bool_t::ABORT == cb->filter_range(
-                    child_left_excl_or_null, child_right_incl, interruptor, &skip)) {
-                return continue_bool_t::ABORT;
+            counted_t<counted_buf_lock_and_read_t> lock;
+            {
+                PROFILE_STARTER_IF_ENABLED(
+                    cb->get_trace() != nullptr,
+                    "Acquire block for read.",
+                    cb->get_trace());
+                lock = make_counted<counted_buf_lock_and_read_t>(
+                    &block->lock, pair->lnode, access);
+                wait_interruptible(lock->lock.read_acq_signal(), interruptor);
             }
-            if (!skip) {
-                counted_t<counted_buf_lock_and_read_t> lock;
-                {
-                    PROFILE_STARTER_IF_ENABLED(
-                        cb->get_trace() != nullptr,
-                        "Acquire block for read.",
-                        cb->get_trace());
-                    lock = make_counted<counted_buf_lock_and_read_t>(
-                        &block->lock, pair->lnode, access);
-                    wait_interruptible(lock->lock.read_acq_signal(), interruptor);
-                }
-                if (continue_bool_t::ABORT == btree_depth_first_traversal(
-                        std::move(lock), range, cb, access, direction,
-                        child_left_excl_or_null, child_right_incl, interruptor)) {
-                    return continue_bool_t::ABORT;
-                }
+            if (continue_bool_t::ABORT == btree_depth_first_traversal(
+                    std::move(lock), range, cb, access, direction,
+                    child_left_excl_or_null, child_right_incl, interruptor)) {
+                return continue_bool_t::ABORT;
             }
         }
         return continue_bool_t::CONTINUE;
