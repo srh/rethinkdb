@@ -312,15 +312,16 @@ batched_replace_response_t rdb_replace_and_return_superblock(
         info.btree->slice->stats.pm_keys_set.record();
         info.btree->slice->stats.pm_total_keys_set += 1;
 
-        // TODO: Read the old val from rocksdb.
+        std::string rocks_kv_location = rockstore::table_primary_key(rocksh.table_id, rocksh.shard_no, key_to_unescaped_str(*info.key));
+        std::pair<std::string, bool> maybe_value = rocksh.rocks->try_read(rocks_kv_location);
+
         ql::datum_t old_val;
-        if (!kv_location.value.has()) {
+        if (!maybe_value.second) {
             // If there's no entry with this key, pass NULL to the function.
             old_val = ql::datum_t::null();
         } else {
             // Otherwise pass the entry with this key to the function.
-            old_val = get_data(kv_location.value_as<rdb_value_t>(),
-                               buf_parent_t(&kv_location.buf));
+            datum_deserialize_from_vec(maybe_value.first.data(), maybe_value.first.size(), &old_val);
             guarantee(old_val.get_field(primary_key, ql::NOTHROW).has());
         }
         guarantee(old_val.has());
@@ -342,7 +343,6 @@ batched_replace_response_t rdb_replace_and_return_superblock(
                 return resp;
             }
 
-            std::string rocks_kv_location = rockstore::table_primary_key(rocksh.table_id, rocksh.shard_no, key_to_unescaped_str(*info.key));
             /* Now that the change has passed validation, write it to disk */
             if (new_val.get_type() == ql::datum_t::R_NULL) {
                 kv_location_delete(rocksh.rocks, rocks_kv_location,
