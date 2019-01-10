@@ -29,7 +29,7 @@ public:
         }
     }
 
-    continue_bool_t handle_pair(scoped_key_value_t &&keyvalue, signal_t *) {
+    continue_bool_t handle_pair(scoped_key_value_t &&keyvalue, signal_t *) override {
         guarantee(!aborted_);
         guarantee(key_range_.contains_key(
             keyvalue.key()->contents, keyvalue.key()->size));

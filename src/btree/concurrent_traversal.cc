@@ -59,7 +59,7 @@ public:
             const btree_key_t *left_excl_or_null,
             const btree_key_t *right_incl,
             signal_t *,
-            bool *skip_out) {
+            bool *skip_out) override {
         cb_->filter_range(left_excl_or_null, right_incl, skip_out);
         return continue_bool_t::CONTINUE;
     }
@@ -90,7 +90,7 @@ public:
         }
     }
 
-    virtual continue_bool_t handle_pair(scoped_key_value_t &&keyvalue, signal_t *) {
+    virtual continue_bool_t handle_pair(scoped_key_value_t &&keyvalue, signal_t *) override {
         // First thing first: Get in line with the token enforcer.
 
         fifo_enforcer_write_token_t token = source_.enter_write();
@@ -116,7 +116,7 @@ public:
             ? continue_bool_t::ABORT : continue_bool_t::CONTINUE;
     }
 
-    virtual profile::trace_t *get_trace() THROWS_NOTHING {
+    virtual profile::trace_t *get_trace() override THROWS_NOTHING {
         return cb_->get_trace();
     }
 

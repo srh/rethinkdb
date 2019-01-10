@@ -682,7 +682,7 @@ public:
           last_traversed_key(store_key_t::min()) {
         collected_keys.reserve(CHUNK_SIZE);
     }
-    continue_bool_t handle_pair(scoped_key_value_t &&keyvalue, signal_t *) {
+    continue_bool_t handle_pair(scoped_key_value_t &&keyvalue, signal_t *) override {
         store_key_t key(keyvalue.key());
         // Skip keys that are not in the given primary key range.
         // As a special case, we skip calling `extract_primary` if the range

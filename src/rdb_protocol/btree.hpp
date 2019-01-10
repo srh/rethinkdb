@@ -27,6 +27,7 @@ struct sindex_disk_info_t;
 
 bool btree_value_fits(max_block_size_t bs, int data_length, const rdb_value_t *value);
 
+// TODO: Remove
 class rdb_value_sizer_t : public value_sizer_t {
 public:
     explicit rdb_value_sizer_t(max_block_size_t bs);
