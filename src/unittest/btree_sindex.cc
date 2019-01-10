@@ -268,7 +268,8 @@ TPTEST(BTreeSindex, BtreeStoreAPI) {
                 rdb_modification_info_t mod_info;
 
                 rdb_live_deletion_context_t deletion_context;
-                rdb_set(rockshard(io_backender.rocks(), table_id, 0), key, data, true,
+                rdb_set_sindex_for_unittest(
+                    rockshard(io_backender.rocks(), table_id, 0), key, data, true,
                     store.get_sindex_slice(sindex_uuid),
                     repli_timestamp_t::distant_past,
                     sindex_super_block.get(), &deletion_context, &response,
