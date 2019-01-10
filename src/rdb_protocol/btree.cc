@@ -671,19 +671,24 @@ void rdb_set_sindex_for_unittest(
                                      &kv_location, trace, pass_back_superblock);
     slice->stats.pm_keys_set.record();
     slice->stats.pm_total_keys_set += 1;
-    const bool had_value = kv_location.value.has();
+
+    std::string rocks_kv_location = rockstore::table_secondary_key(rocksh.table_id, rocksh.shard_no, sindex_uuid, key_to_unescaped_str(key));
+    std::pair<std::string, bool> maybe_value
+        = rocksh.rocks->try_read(rocks_kv_location);
+
+    const bool had_value = maybe_value.second;
 
     /* update the modification report */
-    if (kv_location.value.has()) {
-        // TODO: Make the reading use rockstore.
-        mod_info->deleted.first = get_data(kv_location.value_as<rdb_value_t>(),
-                                           buf_parent_t(&kv_location.buf));
+    if (maybe_value.second) {
+        ql::datum_t val;
+        datum_deserialize_from_vec(maybe_value.first.data(), maybe_value.first.size(), &val);
+        // TODO: Remove the get_data() function... should be hard to miss.
+        mod_info->deleted.first = val;
     }
 
     mod_info->added.first = data;
 
     if (overwrite || !had_value) {
-        std::string rocks_kv_location = rockstore::table_secondary_key(rocksh.table_id, rocksh.shard_no, sindex_uuid, key_to_unescaped_str(key));
         // TODO: We don't do kv_location_delete in case of null value?
         ql::serialization_result_t res =
             kv_location_set(rocksh.rocks, rocks_kv_location,
