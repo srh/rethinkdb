@@ -148,7 +148,7 @@ void resume_construct_sindex(
 
             secondary_index_t sindex;
             bool found_index =
-                get_secondary_index(&sindex_block, sindex_to_construct, &sindex);
+                get_secondary_index(store->rocksh(), &sindex_block, sindex_to_construct, &sindex);
             if (!found_index || sindex.being_deleted) {
                 // The index was deleted. Abort construction.
                 sindex_block.reset_buf_lock();

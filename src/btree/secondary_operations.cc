@@ -150,41 +150,12 @@ void get_secondary_indexes_internal(
         rockshard rocksh,
         buf_lock_t *sindex_block,
         std::map<sindex_name_t, secondary_index_t> *sindexes_out) {
-    buf_read_t read(sindex_block);
-    const btree_sindex_block_t *data
-        = static_cast<const btree_sindex_block_t *>(read.get_data_read());
+    sindex_block->read_acq_signal()->wait_lazily_unordered();
 
-    blob_t sindex_blob(sindex_block->cache()->max_block_size(),
-                       const_cast<char *>(data->sindex_blob),
-                       btree_sindex_block_t::SINDEX_BLOB_MAXREFLEN);
-    std::map<sindex_name_t, secondary_index_t> sindexes_old;
-    deserialize_for_version_from_blob(sindex_block_version(data),
-                                      buf_parent_t(sindex_block), &sindex_blob, &sindexes_old);
-
-
-    // TODO: Pay attention to locking when removing cache stuff.  We've got read access to the sindex_block buffer here.
     std::string rocks_sindex_blob = rocksh->read(rockstore::table_sindex_map(rocksh.table_id, rocksh.shard_no));
     string_read_stream_t stream(std::move(rocks_sindex_blob), 0);
     archive_result_t res = deserialize<cluster_version_t::v2_4_is_latest_disk>(&stream, sindexes_out);
     guarantee_deserialization(res, "sindex_map");
-
-    // TODO: Compare this (or remove)
-    // guarantee(*sindexes_out == sindexes_old);
-}
-
-// TODO: Remove old version
-void get_secondary_indexes_internal(
-        buf_lock_t *sindex_block,
-        std::map<sindex_name_t, secondary_index_t> *sindexes_out) {
-    buf_read_t read(sindex_block);
-    const btree_sindex_block_t *data
-        = static_cast<const btree_sindex_block_t *>(read.get_data_read());
-
-    blob_t sindex_blob(sindex_block->cache()->max_block_size(),
-                       const_cast<char *>(data->sindex_blob),
-                       btree_sindex_block_t::SINDEX_BLOB_MAXREFLEN);
-    deserialize_for_version_from_blob(sindex_block_version(data),
-                                      buf_parent_t(sindex_block), &sindex_blob, sindexes_out);
 }
 
 void set_secondary_indexes_internal(
@@ -222,11 +193,11 @@ void initialize_secondary_indexes(rockshard rocksh,
                                    std::map<sindex_name_t, secondary_index_t>());
 }
 
-bool get_secondary_index(buf_lock_t *sindex_block, const sindex_name_t &name,
+bool get_secondary_index(rockshard rocksh, buf_lock_t *sindex_block, const sindex_name_t &name,
                          secondary_index_t *sindex_out) {
     std::map<sindex_name_t, secondary_index_t> sindex_map;
 
-    get_secondary_indexes_internal(sindex_block, &sindex_map);
+    get_secondary_indexes_internal(rocksh, sindex_block, &sindex_map);
 
     auto it = sindex_map.find(name);
     if (it != sindex_map.end()) {
@@ -237,11 +208,11 @@ bool get_secondary_index(buf_lock_t *sindex_block, const sindex_name_t &name,
     }
 }
 
-bool get_secondary_index(buf_lock_t *sindex_block, uuid_u id,
+bool get_secondary_index(rockshard rocksh, buf_lock_t *sindex_block, uuid_u id,
                          secondary_index_t *sindex_out) {
     std::map<sindex_name_t, secondary_index_t> sindex_map;
 
-    get_secondary_indexes_internal(sindex_block, &sindex_map);
+    get_secondary_indexes_internal(rocksh, sindex_block, &sindex_map);
     for (auto it = sindex_map.begin(); it != sindex_map.end(); ++it) {
         if (it->second.id == id) {
             *sindex_out = it->second;
@@ -249,11 +220,6 @@ bool get_secondary_index(buf_lock_t *sindex_block, uuid_u id,
         }
     }
     return false;
-}
-
-void get_secondary_indexes(buf_lock_t *sindex_block,
-                           std::map<sindex_name_t, secondary_index_t> *sindexes_out) {
-    get_secondary_indexes_internal(sindex_block, sindexes_out);
 }
 
 void get_secondary_indexes(rockshard rocksh, buf_lock_t *sindex_block,
@@ -283,7 +249,7 @@ void set_secondary_index(rockshard rocksh,
                          buf_lock_t *sindex_block, const sindex_name_t &name,
                          const secondary_index_t &sindex) {
     std::map<sindex_name_t, secondary_index_t> sindex_map;
-    get_secondary_indexes_internal(sindex_block, &sindex_map);
+    get_secondary_indexes_internal(rocksh, sindex_block, &sindex_map);
 
     /* We insert even if it already exists overwriting the old value. */
     sindex_map[name] = sindex;
@@ -294,7 +260,7 @@ void set_secondary_index(rockshard rocksh,
                          buf_lock_t *sindex_block, uuid_u id,
                          const secondary_index_t &sindex) {
     std::map<sindex_name_t, secondary_index_t> sindex_map;
-    get_secondary_indexes_internal(sindex_block, &sindex_map);
+    get_secondary_indexes_internal(rocksh, sindex_block, &sindex_map);
 
     for (auto it = sindex_map.begin(); it != sindex_map.end(); ++it) {
         if (it->second.id == id) {
@@ -308,7 +274,7 @@ void set_secondary_index(rockshard rocksh,
 bool delete_secondary_index(rockshard rocksh,
                             buf_lock_t *sindex_block, const sindex_name_t &name) {
     std::map<sindex_name_t, secondary_index_t> sindex_map;
-    get_secondary_indexes_internal(sindex_block, &sindex_map);
+    get_secondary_indexes_internal(rocksh, sindex_block, &sindex_map);
 
     if (sindex_map.erase(name) == 1) {
         set_secondary_indexes_internal(rocksh, sindex_block, sindex_map);

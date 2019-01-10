@@ -326,7 +326,7 @@ std::map<std::string, std::pair<sindex_config_t, sindex_status_t> > store_t::sin
     superblock->release();
 
     std::map<sindex_name_t, secondary_index_t> secondary_indexes;
-    get_secondary_indexes(&sindex_block, &secondary_indexes);
+    get_secondary_indexes(rocksh(), &sindex_block, &secondary_indexes);
     sindex_block.reset_buf_lock();
 
     std::map<std::string, std::pair<sindex_config_t, sindex_status_t> > results;
@@ -440,7 +440,7 @@ void store_t::sindex_rename_multi(
     for (const auto &pair : name_changes) {
         secondary_index_t definition;
         bool success = get_secondary_index(
-            &sindex_block, sindex_name_t(pair.first), &definition);
+            rocksh(), &sindex_block, sindex_name_t(pair.first), &definition);
         guarantee(success);
         success = delete_secondary_index(rocksh(), &sindex_block, sindex_name_t(pair.first));
         guarantee(success);
@@ -480,7 +480,7 @@ void store_t::sindex_drop(
     superblock->release();
 
     secondary_index_t sindex;
-    bool success = ::get_secondary_index(&sindex_block, sindex_name_t(name), &sindex);
+    bool success = ::get_secondary_index(rocksh(), &sindex_block, sindex_name_t(name), &sindex);
     guarantee(success, "sindex_drop() called on sindex that doesn't exist");
 
     /* Mark the secondary index as deleted */
@@ -641,7 +641,7 @@ optional<uuid_u> store_t::add_sindex_internal(
         const std::vector<char> &opaque_definition,
         buf_lock_t *sindex_block) {
     secondary_index_t sindex;
-    if (::get_secondary_index(sindex_block, name, &sindex)) {
+    if (::get_secondary_index(rocksh(), sindex_block, name, &sindex)) {
         return r_nullopt; // sindex was already created
     } else {
         {
@@ -752,7 +752,7 @@ void store_t::clear_sindex_data(
         superblock->release();
 
         secondary_index_t sindex;
-        bool found = get_secondary_index(&sindex_block, sindex_id, &sindex);
+        bool found = get_secondary_index(rocksh(), &sindex_block, sindex_id, &sindex);
         if (!found) {
             // The index got dropped by someone else. That's ok, there's nothing left
             // to do for us.
@@ -863,7 +863,7 @@ void store_t::drop_sindex(uuid_u sindex_id) THROWS_NOTHING {
     superblock->release();
 
     secondary_index_t sindex;
-    bool found = get_secondary_index(&sindex_block, sindex_id, &sindex);
+    bool found = get_secondary_index(rocksh(), &sindex_block, sindex_id, &sindex);
     if (!found) {
         // The index got dropped by someone else. That's ok, there's nothing left for us
         // to do.
@@ -984,7 +984,7 @@ std::map<sindex_name_t, secondary_index_t> store_t::get_sindexes() const {
         superblock->expose_buf(), superblock->get_sindex_block_id(), access_t::read);
 
     std::map<sindex_name_t, secondary_index_t> sindexes;
-    get_secondary_indexes(&sindex_block, &sindexes);
+    get_secondary_indexes(rocksh(), &sindex_block, &sindexes);
 
     return sindexes;
 }
@@ -994,7 +994,7 @@ bool store_t::mark_index_up_to_date(uuid_u id,
                                     const key_range_t &except_for_remaining_range)
     THROWS_NOTHING {
     secondary_index_t sindex;
-    bool found = ::get_secondary_index(sindex_block, id, &sindex);
+    bool found = ::get_secondary_index(rocksh(), sindex_block, id, &sindex);
 
     if (found) {
         sindex.needs_post_construction_range = except_for_remaining_range;
@@ -1009,7 +1009,7 @@ MUST_USE bool store_t::mark_secondary_index_deleted(
         buf_lock_t *sindex_block,
         const sindex_name_t &name) {
     secondary_index_t sindex;
-    bool success = get_secondary_index(sindex_block, name, &sindex);
+    bool success = get_secondary_index(rocksh(), sindex_block, name, &sindex);
     if (!success) {
         return false;
     }
@@ -1055,7 +1055,7 @@ MUST_USE bool store_t::acquire_sindex_superblock_for_read(
 
     /* Figure out what the superblock for this index is. */
     secondary_index_t sindex;
-    if (!::get_secondary_index(&sindex_block, name, &sindex)) {
+    if (!::get_secondary_index(rocksh(), &sindex_block, name, &sindex)) {
         return false;
     }
 
@@ -1090,7 +1090,7 @@ MUST_USE bool store_t::acquire_sindex_superblock_for_write(
 
     /* Figure out what the superblock for this index is. */
     secondary_index_t sindex;
-    if (!::get_secondary_index(&sindex_block, name, &sindex)) {
+    if (!::get_secondary_index(rocksh(), &sindex_block, name, &sindex)) {
         return false;
     }
     *sindex_uuid_out = sindex.id;
@@ -1151,7 +1151,7 @@ bool store_t::acquire_sindex_superblocks_for_write(
     assert_thread();
 
     std::map<sindex_name_t, secondary_index_t> sindexes;
-    ::get_secondary_indexes(sindex_block, &sindexes);
+    ::get_secondary_indexes(rocksh(), sindex_block, &sindexes);
 
     for (auto it = sindexes.begin(); it != sindexes.end(); ++it) {
         if (sindexes_to_acquire && !std_contains(*sindexes_to_acquire, it->second.id)) {

@@ -39,6 +39,8 @@ TPTEST(BTreeSindex, LowLevelOps) {
     cache_conn_t cache_conn(&cache);
     namespace_id_t table_id = str_to_uuid("12345678-abcd-abcd-abcd-12345678abcd");
 
+    rockshard rocksh(io_backender.rocks(), table_id, 0);
+
     {
         txn_t txn(&cache_conn, write_durability_t::HARD, 1);
         {
@@ -99,7 +101,7 @@ TPTEST(BTreeSindex, LowLevelOps) {
                 superblock->get_sindex_block_id(),
                 access_t::write);
 
-            set_secondary_index(rockshard(io_backender.rocks(), table_id, 0), &sindex_block, name, s);
+            set_secondary_index(rocksh, &sindex_block, name, s);
         }
         txn->commit();
     }
@@ -122,7 +124,7 @@ TPTEST(BTreeSindex, LowLevelOps) {
                 access_t::write);
 
             std::map<sindex_name_t, secondary_index_t> sindexes;
-            get_secondary_indexes(&sindex_block, &sindexes);
+            get_secondary_indexes(rocksh, &sindex_block, &sindexes);
 
             auto it = sindexes.begin();
             auto jt = mirror.begin();
