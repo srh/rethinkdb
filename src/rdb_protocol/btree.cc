@@ -735,9 +735,7 @@ void rdb_delete(rockshard rocksh,
 
     /* Update the modification report. */
     if (exists) {
-        ql::datum_t val;
-        datum_deserialize_from_vec(maybe_value.first.data(), maybe_value.first.size(), &val);
-        mod_info->deleted.first = val;
+        mod_info->deleted.first = datum_deserialize_from_vec(maybe_value.first.data(), maybe_value.first.size());
         kv_location_delete(rocksh.rocks, rocks_kv_location, &kv_location, key, timestamp, deletion_context,
             delete_mode, mod_info);
         guarantee(!mod_info->deleted.second.empty() && mod_info->added.second.empty());
