@@ -17,6 +17,7 @@
 #include "rpc/serialize_macros.hpp"
 
 class buf_parent_t;
+class real_superblock_t;
 class superblock_t;
 class value_sizer_t;
 
@@ -46,7 +47,7 @@ protected:
 };
 
 continue_bool_t btree_send_backfill_pre(
-    superblock_t *superblock,
+    real_superblock_t *superblock,
     release_superblock_t release_superblock,
     value_sizer_t *sizer,
     const key_range_t &range,

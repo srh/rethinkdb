@@ -11,6 +11,7 @@
 release the superblock and start a new transaction. */
 static const int MAX_BACKFILL_ITEMS_PER_TXN = 100;
 
+// TODO: Under rocksdb this type might be useless.  (Right now without timestamps, it is.)
 /* `limiting_btree_backfill_pre_item_consumer_t` accepts `backfill_pre_item_t`s from
 `btree_send_backfill_pre()` and forwards them to the given
 `store_view_t::backfill_pre_item_consumer_t`, but it aborts after it receives a certain

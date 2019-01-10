@@ -5,6 +5,7 @@
 #include "btree/backfill_debug.hpp"
 #include "btree/depth_first_traversal.hpp"
 #include "btree/leaf_node.hpp"
+#include "btree/reql_specific.hpp"
 #include "concurrency/pmap.hpp"
 #include "containers/archive/optional.hpp"
 #include "containers/archive/stl_types.hpp"
@@ -39,7 +40,7 @@ key_range_t convert_to_key_range(
 }
 
 continue_bool_t btree_send_backfill_pre(
-        superblock_t *superblock,
+        real_superblock_t *superblock,
         release_superblock_t release_superblock,
         value_sizer_t *sizer,
         const key_range_t &range,
@@ -48,6 +49,18 @@ continue_bool_t btree_send_backfill_pre(
         signal_t *interruptor) {
     backfill_debug_range(range, strprintf(
         "btree_send_backfill_pre %" PRIu64, reference_timestamp.longtime));
+
+    superblock->read_acq_signal()->wait_lazily_unordered();
+    // We just request the entire range at once, since we lack timestamp data on rocksdb.
+    pre_item_consumer->on_pre_item(backfill_pre_item_t{range});
+    if (release_superblock == release_superblock_t::RELEASE) {
+        superblock->release();
+    }
+    return continue_bool_t::CONTINUE;
+
+    // TODO: When adding back incremental backfilling, look at this code.
+#if 0
+
     class callback_t : public depth_first_traversal_callback_t {
     public:
         continue_bool_t filter_range_ts(
@@ -146,6 +159,7 @@ continue_bool_t btree_send_backfill_pre(
     callback.sizer = sizer;
     return btree_depth_first_traversal(superblock, range, &callback, access_t::read,
         direction_t::forward, release_superblock, interruptor);
+#endif // 0
 }
 
 /* The `backfill_item_loader_t` gets backfill items from the `backfill_item_preparer_t`,
