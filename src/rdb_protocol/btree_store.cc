@@ -4,6 +4,7 @@
 #include <functional>  // NOLINT(build/include_order)
 
 #include "arch/runtime/coroutines.hpp"
+#include "btree/concurrent_traversal.hpp"
 #include "btree/depth_first_traversal.hpp"
 #include "btree/leaf_node.hpp"
 #include "btree/node.hpp"
@@ -674,7 +675,7 @@ sindex_name_t compute_sindex_deletion_name(uuid_u sindex_uuid) {
 }
 
 class clear_sindex_traversal_cb_t
-        : public depth_first_traversal_callback_t {
+        : public rocks_traversal_cb {
 public:
     explicit clear_sindex_traversal_cb_t(const key_range_t &pkey_rng)
         : pkey_range(pkey_rng),
@@ -682,8 +683,12 @@ public:
           last_traversed_key(store_key_t::min()) {
         collected_keys.reserve(CHUNK_SIZE);
     }
-    continue_bool_t handle_pair(scoped_key_value_t &&keyvalue, signal_t *) override {
-        store_key_t key(keyvalue.key());
+    // TODO: Make sindexes not hold a copy of the value.
+    // TODO: Maybe we can load value lazily in rockstore iteration.
+    continue_bool_t handle_pair(
+            std::pair<const char *, size_t> keybuf,
+            UNUSED std::pair<const char *, size_t> value) override {
+        store_key_t key(keybuf.second, reinterpret_cast<const uint8_t *>(keybuf.first));
         // Skip keys that are not in the given primary key range.
         // As a special case, we skip calling `extract_primary` if the range
         // is `universe`. This avoids issues such as
@@ -693,7 +698,7 @@ public:
         if (pkey_range == key_range_t::universe()
             || pkey_range.contains_key(
                    ql::datum_t::extract_primary(key))) {
-            collected_keys.push_back(store_key_t(keyvalue.key()));
+            collected_keys.push_back(key);
         }
         ++num_traversed;
         rassert(key > last_traversed_key);
@@ -769,15 +774,17 @@ void store_t::clear_sindex_data(
         /* 1. Collect a bunch of keys to delete */
         clear_sindex_traversal_cb_t traversal_cb(pkey_range_to_clear);
         try {
+            std::string rocks_sindex_kv_prefix =
+                rockstore::table_secondary_prefix(table_id, shard_no, sindex_id);
             reached_end =
-                (continue_bool_t::CONTINUE == btree_depth_first_traversal(
+                (continue_bool_t::CONTINUE == rocks_traversal(
                     sindex_superblock.get(),
+                    rocks,
+                    rocks_sindex_kv_prefix,
                     remaining_range,
-                    &traversal_cb,
-                    access_t::read,
                     direction_t::forward,
                     release_superblock_t::KEEP,
-                    interruptor));
+                    &traversal_cb));
         } catch (const interrupted_exc_t &) {
             // It's safe to interrupt in the middle of clearing the index.
             sindex_superblock.reset();
