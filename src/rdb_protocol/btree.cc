@@ -2543,7 +2543,7 @@ public:
     continue_bool_t handle_pair(
             scoped_key_value_t &&keyvalue,
             concurrent_traversal_fifo_enforcer_signal_t waiter)
-            THROWS_ONLY(interrupted_exc_t) {
+            THROWS_ONLY(interrupted_exc_t) override {
 
         if (interruptor_->is_pulsed() || on_indexes_deleted_->is_pulsed()) {
             throw interrupted_exc_t();

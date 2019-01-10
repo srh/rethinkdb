@@ -55,15 +55,6 @@ public:
           failure_cond_(failure_cond),
           yield_counter(0) { }
 
-    continue_bool_t filter_range(
-            const btree_key_t *left_excl_or_null,
-            const btree_key_t *right_incl,
-            signal_t *,
-            bool *skip_out) override {
-        cb_->filter_range(left_excl_or_null, right_incl, skip_out);
-        return continue_bool_t::CONTINUE;
-    }
-
     void handle_pair_coro(scoped_key_value_t *fragile_keyvalue,
                           semaphore_acq_t *fragile_acq,
                           fifo_enforcer_write_token_t token,
