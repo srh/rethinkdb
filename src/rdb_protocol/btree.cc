@@ -2310,10 +2310,20 @@ void rdb_update_single_sindex(
                         trace,
                         &return_superblock_local);
 
+                    std::string rocks_secondary_kv_location
+                        = rockstore::table_secondary_key(
+                            rocksh.table_id,
+                            rocksh.shard_no,
+                            sindex->sindex.id,
+                            key_to_unescaped_str(it->first.btree_key()));
+
+                    // TODO: Don't even read the value or test its existence --
+                    // just invoke rockstore remove directly.
+
                     if (kv_location.value.has()) {
                         kv_location_delete(
                             rocksh.rocks,
-                            rockstore::table_secondary_key(rocksh.table_id, rocksh.shard_no, sindex->sindex.id, key_to_unescaped_str(it->first.btree_key())),
+                            rocks_secondary_kv_location,
                             &kv_location,
                             it->first,
                             repli_timestamp_t::distant_past,
@@ -2390,13 +2400,20 @@ void rdb_update_single_sindex(
                         trace,
                         &return_superblock_local);
 
+                    std::string rocks_secondary_kv_location
+                        = rockstore::table_secondary_key(
+                            rocksh.table_id,
+                            rocksh.shard_no,
+                            sindex->sindex.id,
+                            key_to_unescaped_str(it->first.btree_key()));
+
                     // NOTE: We generally need a copy of the value to be available in the secondary index
                     // because the secondary index key can get truncated.  TODO: Make it not get truncated,
                     // so that we can have a reference to the primary key instead.
                     ql::serialization_result_t res =
                         kv_location_set_secondary(
                             rocksh.rocks,
-                            rockstore::table_secondary_key(rocksh.table_id, rocksh.shard_no, sindex->sindex.id, key_to_unescaped_str(it->first.btree_key())),
+                            rocks_secondary_kv_location,
                             modification->info.added.first /* copy of the value here */,
                             &kv_location, it->first,
                             modification->info.added.second,
