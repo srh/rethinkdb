@@ -87,8 +87,23 @@ void detach_rdb_value(buf_parent_t parent, const void *value) {
     blob.detach_subtrees(parent);
 }
 
+void rdb_get_secondary_for_unittest(
+        rockshard rocksh, uuid_u sindex_uuid, const store_key_t &store_key,
+        sindex_superblock_t *superblock, ql::datum_t *out) {
+    superblock->read_acq_signal()->wait_lazily_unordered();
+    std::string loc = rockstore::table_secondary_key(
+        rocksh.table_id, rocksh.shard_no, sindex_uuid, key_to_unescaped_str(store_key));
+    std::pair<std::string, bool> val = rocksh.rocks->try_read(loc);
+    superblock->release();
+    if (!val.second) {
+        *out = ql::datum_t::null();
+    } else {
+        datum_deserialize_from_vec(val.first.data(), val.first.size(), out);
+    }
+}
+
 void rdb_get(rockshard rocksh, const store_key_t &store_key,
-             superblock_t *superblock, point_read_response_t *response) {
+             real_superblock_t *superblock, point_read_response_t *response) {
     superblock->read_acq_signal()->wait_lazily_unordered();
     std::string loc = rockstore::table_primary_key(rocksh.table_id, rocksh.shard_no, key_to_unescaped_str(store_key));
     std::pair<std::string, bool> val = rocksh.rocks->try_read(loc);
@@ -99,24 +114,6 @@ void rdb_get(rockshard rocksh, const store_key_t &store_key,
         ql::datum_t datum;
         datum_deserialize_from_vec(val.first.data(), val.first.size(), &datum);
         response->data = std::move(datum);
-    }
-}
-
-// TODO: Remove when unused.
-void rdb_get(const store_key_t &store_key, btree_slice_t *slice,
-             superblock_t *superblock, point_read_response_t *response,
-             profile::trace_t *trace) {
-    keyvalue_location_t kv_location;
-    rdb_value_sizer_t sizer(superblock->cache()->max_block_size());
-    find_keyvalue_location_for_read(&sizer, superblock,
-                                    store_key.btree_key(), &kv_location,
-                                    &slice->stats, trace);
-
-    if (!kv_location.value.has()) {
-        response->data = ql::datum_t::null();
-    } else {
-        response->data = get_data(static_cast<rdb_value_t *>(kv_location.value.get()),
-                                  buf_parent_t(&kv_location.buf));
     }
 }
 

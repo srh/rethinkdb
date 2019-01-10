@@ -452,7 +452,7 @@ struct rdb_read_visitor_t : public boost::static_visitor<void> {
                                              std::numeric_limits<uint64_t>::max());
             }
             point_read_response_t val;
-            rdb_get(s.key, btree, superblock, &val, trace);
+            rdb_get(store->rocksh(), s.key, superblock, &val);
             vres->initial_val = val.data;
         } else {
             res->resp.reset();

@@ -303,12 +303,13 @@ TPTEST(BTreeSindex, BtreeStoreAPI) {
                 ASSERT_TRUE(sindex_exists);
             }
 
-            point_read_response_t response;
+            ql::datum_t response;
 
-            rdb_get(key, store.get_sindex_slice(sindex_uuid),
-                    sindex_super_block.get(), &response, nullptr);
+            rdb_get_secondary_for_unittest(
+                store.rocksh(), sindex_uuid, key,
+                sindex_super_block.get(), &response);
 
-            ASSERT_EQ(ql::datum_t(1.0), response.data);
+            ASSERT_EQ(ql::datum_t(1.0), response);
         }
     }
 

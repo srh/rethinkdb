@@ -60,16 +60,13 @@ class rdb_modification_report_cb_t;
 void rdb_get(
     rockshard rocksh,
     const store_key_t &store_key,
-    superblock_t *superblock,
+    real_superblock_t *superblock,
     point_read_response_t *response);
 
-// TODO: Remove
-void rdb_get(
-    const store_key_t &key,
-    btree_slice_t *slice,
-    superblock_t *superblock,
-    point_read_response_t *response,
-    profile::trace_t *trace);
+// TODO: Probably, remove at some point.
+void rdb_get_secondary_for_unittest(
+        rockshard rocksh, uuid_u sindex_uuid, const store_key_t &store_key,
+        sindex_superblock_t *superblock, ql::datum_t *out);
 
 struct btree_info_t {
     btree_info_t(btree_slice_t *_slice,
