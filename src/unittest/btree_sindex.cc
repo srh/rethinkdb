@@ -169,7 +169,7 @@ TPTEST(BTreeSindex, BtreeStoreAPI) {
             nullptr,
             &io_backender,
             base_path_t("."),
-            generate_uuid(),
+            table_id,
             update_sindexes_t::UPDATE);
 
     cond_t dummy_interruptor;
