@@ -2,7 +2,7 @@
 #include "rdb_protocol/erase_range.hpp"
 
 #include "buffer_cache/alt.hpp"
-#include "btree/depth_first_traversal.hpp"
+#include "btree/concurrent_traversal.hpp"
 #include "btree/leaf_node.hpp"
 #include "btree/node.hpp"
 #include "btree/operations.hpp"
@@ -13,7 +13,7 @@
 #include "rdb_protocol/lazy_btree_val.hpp"
 #include "rdb_protocol/store.hpp"
 
-class collect_keys_helper_t : public depth_first_traversal_callback_t {
+class collect_keys_helper_t : public rocks_traversal_cb {
 public:
     collect_keys_helper_t(key_tester_t *tester,
                           const key_range_t &key_range,
@@ -29,15 +29,17 @@ public:
         }
     }
 
-    continue_bool_t handle_pair(scoped_key_value_t &&keyvalue, signal_t *) override {
+    // TODO: We don't use value, can we lazy-load it?
+    continue_bool_t handle_pair(
+            std::pair<const char *, size_t> key,
+            UNUSED std::pair<const char *, size_t> value) override {
         guarantee(!aborted_);
-        guarantee(key_range_.contains_key(
-            keyvalue.key()->contents, keyvalue.key()->size));
-        if (!tester_->key_should_be_erased(keyvalue.key())) {
+        store_key_t skey(key.second, reinterpret_cast<const uint8_t *>(key.first));
+        guarantee(key_range_.contains_key(skey.contents(), skey.size()));
+        if (!tester_->key_should_be_erased(skey.btree_key())) {
             return continue_bool_t::CONTINUE;
         }
-        store_key_t key(keyvalue.key());
-        collected_keys_.push_back(key);
+        collected_keys_.push_back(skey);
         if (collected_keys_.size() == max_keys_to_collect_ ||
                 interruptor_->is_pulsed()) {
             aborted_ = true;
@@ -82,18 +84,23 @@ continue_bool_t rdb_erase_small_range(
     rassert(deleted_out != nullptr);
     mod_reports_out->clear();
     *deleted_out = key_range_t::empty();
-    // TODO: Do the reading from rocksdb too.
 
     /* Step 1: Collect all keys that we want to erase using a depth-first traversal. */
     collect_keys_helper_t key_collector(tester, key_range, max_keys_to_erase,
         interruptor);
-    btree_depth_first_traversal(
-        superblock, key_range, &key_collector, access_t::read, direction_t::forward,
-        release_superblock_t::KEEP, interruptor);
+    std::string rocks_kv_prefix =
+        rockstore::table_primary_prefix(rocksh.table_id, rocksh.shard_no);
+    // TODO: All btree_depth_first_traversals took an interruptor.  And that got
+    // dropped for rocks_traversal.  Check all callers of rocks_traversal to see
+    // what to do about that -- here, key_collector takes the interruptor and
+    // uses it to abort the concurrent traversal.
+    rocks_traversal(
+        superblock, rocksh.rocks, rocks_kv_prefix, key_range, direction_t::forward,
+        release_superblock_t::KEEP, &key_collector);
     if (interruptor->is_pulsed()) {
-        /* If the interruptor is pulsed during the depth-first traversal, then the
-        traversal will stop early but not throw an exception. So we have to throw it
-        here. */
+        /* If the interruptor is pulsed during the traversal, then the traversal
+        will stop early but not throw an exception. So we have to throw it here.
+        */
         throw interrupted_exc_t();
     }
 
@@ -118,10 +125,17 @@ continue_bool_t rdb_erase_small_range(
             btree_slice->stats.pm_keys_set.record();
             btree_slice->stats.pm_total_keys_set += 1;
 
+            std::string rocks_kv_location = rockstore::table_primary_key(rocksh.table_id, rocksh.shard_no, key_to_unescaped_str(key));
+            std::pair<std::string, bool> maybe_value
+                = rocksh.rocks->try_read(rocks_kv_location);
+
+            // TODO: Construct the mod report from rocks db data.
+            // It carries the rdb_value_t vector (right now) for the btree's sake.
+
             // We're still holding a write lock on the superblock, so if the value
             // disappeared since we've populated key_collector, something fishy
             // is going on.
-            guarantee(kv_location.value.has());
+            guarantee(maybe_value.second);
 
             // The mod_report we generate is a simple delete. While there is generally
             // a difference between an erase and a delete (deletes get backfilled,
@@ -151,7 +165,6 @@ continue_bool_t rdb_erase_small_range(
                                   delete_mode_t::ERASE);
 
             // Erase the entry from rocksdb.
-            std::string rocks_kv_location = rockstore::table_primary_key(rocksh.table_id, rocksh.shard_no, key_to_unescaped_str(key));
             rocksh->remove(rocks_kv_location, rockstore::write_options::TODO());
         } // kv_location is destroyed here. That's important because sometimes
           // pass_back_superblock_promise isn't pulsed before the kv_location
