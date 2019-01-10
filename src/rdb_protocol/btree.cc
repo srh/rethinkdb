@@ -1702,9 +1702,9 @@ void rdb_distribution_get(rockshard rocksh, int keys_limit,
                           distribution_read_response_t *response) {
     std::vector<store_key_t> key_lowerbounds;
     std::vector<uint64_t> interval_disk_sizes;
-    get_btree_key_distribution(rocksh, key_range, superblock, keys_limit,
-                               &key_lowerbounds, &interval_disk_sizes);
-    // TODO: Return a vec of pairs in get_btree_key_distribution.
+    get_distribution(rocksh, key_range, superblock, keys_limit,
+                    &key_lowerbounds, &interval_disk_sizes);
+    // TODO: Return a vec of pairs in get_distribution.
     guarantee(key_lowerbounds.size() == interval_disk_sizes.size());
 
     // TODO: We're changing from key counts to disk size.  This means a rocksdb

@@ -10,9 +10,9 @@
 class rockshard;
 class superblock_t;
 
-// TODO: Rename this function...?
-void get_btree_key_distribution(rockshard rocksh, key_range_t key_range, superblock_t *superblock, int keys_limit,
-                                std::vector<store_key_t> *keys_out, std::vector<uint64_t> *counts_out);
+void get_distribution(
+    rockshard rocksh, key_range_t key_range, superblock_t *superblock, int keys_limit,
+    std::vector<store_key_t> *keys_out, std::vector<uint64_t> *counts_out);
 
 
 #endif /* BTREE_GET_DISTRIBUTION_HPP_ */
