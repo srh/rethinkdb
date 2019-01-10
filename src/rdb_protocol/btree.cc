@@ -727,14 +727,17 @@ void rdb_delete(rockshard rocksh,
             pass_back_superblock);
     slice->stats.pm_keys_set.record();
     slice->stats.pm_total_keys_set += 1;
-    bool exists = kv_location.value.has();
+
+    std::string rocks_kv_location = rockstore::table_primary_key(rocksh.table_id, rocksh.shard_no, key_to_unescaped_str(key));
+    std::pair<std::string, bool> maybe_value = rocksh.rocks->try_read(rocks_kv_location);
+
+    bool exists = maybe_value.second;
 
     /* Update the modification report. */
     if (exists) {
-        // TODO: Make the reading use rockstore.
-        mod_info->deleted.first = get_data(kv_location.value_as<rdb_value_t>(),
-                                           buf_parent_t(&kv_location.buf));
-        std::string rocks_kv_location = rockstore::table_primary_key(rocksh.table_id, rocksh.shard_no, key_to_unescaped_str(key));
+        ql::datum_t val;
+        datum_deserialize_from_vec(maybe_value.first.data(), maybe_value.first.size(), &val);
+        mod_info->deleted.first = val;
         kv_location_delete(rocksh.rocks, rocks_kv_location, &kv_location, key, timestamp, deletion_context,
             delete_mode, mod_info);
         guarantee(!mod_info->deleted.second.empty() && mod_info->added.second.empty());
