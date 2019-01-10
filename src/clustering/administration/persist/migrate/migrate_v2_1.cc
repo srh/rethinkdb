@@ -44,8 +44,7 @@ void migrate_auth_metadata_v2_1_to_v2_3(metadata_file_t::write_txn_t *txn,
     // in the auth_metadata file yet.  That will be done later and overwrite the
     // default value we write here.
     if (txn->read_maybe(metadata_v2_1::mdkey_auth_semilattices(),
-                        &old_metadata,
-                        interruptor)) {
+                        &old_metadata)) {
         old_auth_key = old_metadata.auth_key.get_ref().key;
         auth_key_ts = old_metadata.auth_key.get_timestamp();
     }

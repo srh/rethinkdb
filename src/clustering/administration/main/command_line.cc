@@ -1080,8 +1080,7 @@ void run_rethinkdb_create(const base_path_t &base_path,
                     auth_semilattice_metadata_t(initial_password), interruptor);
                 write_txn->write(mdkey_heartbeat_semilattices(),
                     heartbeat_semilattice_metadata_t(), interruptor);
-            },
-            &non_interruptor);
+            });
         logINF("Created directory '%s' and a metadata file inside it.\n", base_path.path().c_str());
         *result_out = true;
     } catch (const file_in_use_exc_t &ex) {
@@ -1180,15 +1179,13 @@ void run_rethinkdb_serve(const base_path_t &base_path,
                         auth_semilattice_metadata_t(initial_password), interruptor);
                     write_txn->write(mdkey_heartbeat_semilattices(),
                         heartbeat_semilattice_metadata_t(), interruptor);
-                },
-                &non_interruptor));
+                }));
             guarantee(!static_cast<bool>(total_cache_size), "rethinkdb porcelain should "
                 "have already set up total_cache_size");
         } else {
             metadata_file.init(new metadata_file_t(
                 &io_backender,
-                &metadata_perfmon_collection,
-                &non_interruptor));
+                &metadata_perfmon_collection));
             /* The `metadata_file_t` constructor will migrate the main metadata if it
             exists, but we need to migrate the auth metadata separately */
             serializer_filepath_t auth_path(base_path, "auth_metadata");
@@ -1217,7 +1214,7 @@ void run_rethinkdb_serve(const base_path_t &base_path,
                 /* Apply change to cache size */
                 metadata_file_t::write_txn_t txn(metadata_file.get(), &non_interruptor);
                 server_config_versioned_t config =
-                    txn.read(mdkey_server_config(), &non_interruptor);
+                    txn.read(mdkey_server_config());
                 if (config.config.cache_size_bytes != *total_cache_size) {
                     config.config.cache_size_bytes = *total_cache_size;
                     ++config.version;
@@ -1229,7 +1226,7 @@ void run_rethinkdb_serve(const base_path_t &base_path,
                 /* Apply the initial password if there isn't one already. */
                 metadata_file_t::write_txn_t txn(metadata_file.get(), &non_interruptor);
                 auth_semilattice_metadata_t auth_data =
-                    txn.read(mdkey_auth_semilattices(), &non_interruptor);
+                    txn.read(mdkey_auth_semilattices());
                 auto admin_pair = auth_data.m_users.find(auth::username_t("admin"));
                 /* `admin_pair` should always exist. But in case it somehow doesn't,
                 we still create a new admin user so that people can recover from

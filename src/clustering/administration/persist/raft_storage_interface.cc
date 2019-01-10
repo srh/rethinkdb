@@ -43,12 +43,12 @@ table_raft_storage_interface_t::table_raft_storage_interface_t(
         signal_t *interruptor) :
         file(_file), table_id(_table_id) {
     table_raft_stored_header_t header = txn->read(
-        mdprefix_table_raft_header().suffix(uuid_to_str(table_id)), interruptor);
+        mdprefix_table_raft_header().suffix(uuid_to_str(table_id)));
     state.current_term = header.current_term;
     state.voted_for = header.voted_for;
     state.commit_index = header.commit_index;
     table_raft_stored_snapshot_t snapshot = txn->read(
-        mdprefix_table_raft_snapshot().suffix(uuid_to_str(table_id)), interruptor);
+        mdprefix_table_raft_snapshot().suffix(uuid_to_str(table_id)));
     state.snapshot_state = std::move(snapshot.snapshot_state);
     state.snapshot_config = std::move(snapshot.snapshot_config);
     state.log.prev_index = snapshot.log_prev_index;

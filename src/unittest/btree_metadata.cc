@@ -22,8 +22,7 @@ TPTEST(BtreeMetadata, MetadataTest) {
             &get_global_perfmon_collection(),
             [&](metadata_file_t::write_txn_t *txn, signal_t *interruptor) {
                 txn->write(big_string_key, std::string("small string"), interruptor);
-            },
-            &non_interruptor);
+            });
         metadata_file_t::write_txn_t txn(&file, &non_interruptor);
         txn.write(big_string_key, big_string, &non_interruptor);
         txn.write(int_prefix.suffix("foo"), 101, &non_interruptor);
@@ -34,10 +33,9 @@ TPTEST(BtreeMetadata, MetadataTest) {
     {
         metadata_file_t file(
             &io_backender,
-            &get_global_perfmon_collection(),
-            &non_interruptor);
+            &get_global_perfmon_collection());
         metadata_file_t::read_txn_t txn(&file, &non_interruptor);
-        std::string big_string_2 = txn.read(big_string_key, &non_interruptor);
+        std::string big_string_2 = txn.read(big_string_key);
         EXPECT_EQ(big_string, big_string_2);
         bool found_foo = false, found_bar = false;
         txn.read_many<int>(
@@ -78,8 +76,7 @@ TPTEST(BtreeMetadata, ManyKeysBigValues) {
         metadata_file_t file(
             &io_backender,
             &get_global_perfmon_collection(),
-            [&](metadata_file_t::write_txn_t *, signal_t *) { },
-            &non_interruptor);
+            [&](metadata_file_t::write_txn_t *, signal_t *) { });
         metadata_file_t::write_txn_t txn(&file, &non_interruptor);
         for (const auto &pair : data) {
             txn.write(prefix.suffix(pair.first), pair.second, &non_interruptor);
@@ -90,11 +87,10 @@ TPTEST(BtreeMetadata, ManyKeysBigValues) {
     {
         metadata_file_t file(
             &io_backender,
-            &get_global_perfmon_collection(),
-            &non_interruptor);
+            &get_global_perfmon_collection());
         metadata_file_t::read_txn_t txn(&file, &non_interruptor);
         for (const auto &pair : data) {
-            std::string value = txn.read(prefix.suffix(pair.first), &non_interruptor);
+            std::string value = txn.read(prefix.suffix(pair.first));
             ASSERT_EQ(pair.second, value);
         }
     }

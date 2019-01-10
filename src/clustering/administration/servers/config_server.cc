@@ -18,8 +18,8 @@ server_config_server_t::server_config_server_t(
 {
     cond_t non_interruptor;
     metadata_file_t::read_txn_t read_txn(file, &non_interruptor);
-    my_server_id = read_txn.read(mdkey_server_id(), &non_interruptor);
-    my_config.set_value(read_txn.read(mdkey_server_config(), &non_interruptor));
+    my_server_id = read_txn.read(mdkey_server_id());
+    my_config.set_value(read_txn.read(mdkey_server_config()));
     update_actual_cache_size(my_config.get_ref().config.cache_size_bytes);
 }
 

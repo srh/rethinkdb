@@ -95,12 +95,9 @@ void metadata_file_t::write_txn_t::write_bin(
 
 metadata_file_t::metadata_file_t(
         io_backender_t *io_backender,
-        perfmon_collection_t *perfmon_parent,
-        signal_t *interruptor) :
+        perfmon_collection_t *perfmon_parent) :
     rocks_options(true),
     rocks(io_backender->rocks()) {
-    // TODO: Remove or use interruptor.
-    (void)interruptor;
     // TODO: Make use of perfmon with rockstore, to track metadata writes.
     (void)perfmon_parent;
 
@@ -115,13 +112,10 @@ metadata_file_t::metadata_file_t(
 metadata_file_t::metadata_file_t(
         io_backender_t *io_backender,
         perfmon_collection_t *perfmon_parent,
-        const std::function<void(write_txn_t *, signal_t *)> &initializer,
-        signal_t *interruptor) :
+        const std::function<void(write_txn_t *, signal_t *)> &initializer) :
     rocks_options(true),
     rocks(io_backender->rocks())
 {
-    // TODO: Remove or use interruptor parameter.
-    (void)interruptor;
     // TODO: Make use of perfmon with rockstore, to track metadata writes.
     (void)perfmon_parent;
 

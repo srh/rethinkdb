@@ -126,11 +126,11 @@ bool do_serve(io_backender_t *io_backender,
             guarantee(proxy_initial_password.empty());
             cond_t non_interruptor;
             metadata_file_t::read_txn_t txn(metadata_file, &non_interruptor);
-            cluster_metadata = txn.read(mdkey_cluster_semilattices(), &non_interruptor);
-            auth_metadata = txn.read(mdkey_auth_semilattices(), &non_interruptor);
+            cluster_metadata = txn.read(mdkey_cluster_semilattices());
+            auth_metadata = txn.read(mdkey_auth_semilattices());
             heartbeat_metadata = txn.read(
-                mdkey_heartbeat_semilattices(), &non_interruptor);
-            server_id = txn.read(mdkey_server_id(), &non_interruptor);
+                mdkey_heartbeat_semilattices());
+            server_id = txn.read(mdkey_server_id());
         } else {
             // We are a proxy, generate a temporary proxy server id.
             server_id = server_id_t::generate_proxy_id();

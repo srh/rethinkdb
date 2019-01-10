@@ -40,8 +40,7 @@ raft_persistent_state_t<table_raft_state_t> raft_persistent_state_from_metadata_
 
     metadata_file_t metadata_file(
         &io_backender,
-        &get_global_perfmon_collection(),
-        &non_interruptor);
+        &get_global_perfmon_collection());
     metadata_file_t::read_txn_t read_txn(&metadata_file, &non_interruptor);
 
     return *table_raft_storage_interface_t(
@@ -67,8 +66,7 @@ TPTEST(ClusteringRaft, StorageRoundtrip) {
         metadata_file_t metadata_file(
             &io_backender,
             &get_global_perfmon_collection(),
-            [&](metadata_file_t::write_txn_t *, signal_t *) { },
-            &non_interruptor);
+            [&](metadata_file_t::write_txn_t *, signal_t *) { });
         metadata_file_t::write_txn_t write_txn(&metadata_file, &non_interruptor);
         table_raft_storage_interface_t table_raft_storage_interface(
             &metadata_file,
@@ -102,8 +100,7 @@ TPTEST(ClusteringRaft, StorageErase) {
         metadata_file_t metadata_file(
             &io_backender,
             &get_global_perfmon_collection(),
-            [&](metadata_file_t::write_txn_t *, signal_t *) { },
-            &non_interruptor);
+            [&](metadata_file_t::write_txn_t *, signal_t *) { });
         metadata_file_t::write_txn_t write_txn(&metadata_file, &non_interruptor);
         table_raft_storage_interface_t table_raft_storage_interface(
             &metadata_file,
@@ -118,15 +115,13 @@ TPTEST(ClusteringRaft, StorageErase) {
     {
         metadata_file_t metadata_file(
             &io_backender,
-            &get_global_perfmon_collection(),
-            &non_interruptor);
+            &get_global_perfmon_collection());
         metadata_file_t::read_txn_t read_txn(&metadata_file, &non_interruptor);
 
         table_raft_stored_header_t table_raft_stored_header;
         EXPECT_FALSE(read_txn.read_maybe(
             mdprefix_table_raft_header().suffix(uuid_to_str(table_id)),
-            &table_raft_stored_header,
-            &non_interruptor));
+            &table_raft_stored_header));
     }
 
 }
@@ -153,8 +148,7 @@ TPTEST(ClusteringRaft, StorageWriteCurrentTermAndVotedFor) {
         metadata_file_t metadata_file(
             &io_backender,
             &get_global_perfmon_collection(),
-            [&](metadata_file_t::write_txn_t *, signal_t *) { },
-            &non_interruptor);
+            [&](metadata_file_t::write_txn_t *, signal_t *) { });
         {
             metadata_file_t::write_txn_t write_txn(&metadata_file, &non_interruptor);
             table_raft_storage_interface.init(new table_raft_storage_interface_t(
@@ -197,8 +191,7 @@ TPTEST(ClusteringRaft, StorageWriteCommitIndex) {
         metadata_file_t metadata_file(
             &io_backender,
             &get_global_perfmon_collection(),
-            [&](metadata_file_t::write_txn_t *, signal_t *) { },
-            &non_interruptor);
+            [&](metadata_file_t::write_txn_t *, signal_t *) { });
         {
             metadata_file_t::write_txn_t write_txn(&metadata_file, &non_interruptor);
             table_raft_storage_interface.init(new table_raft_storage_interface_t(
@@ -251,8 +244,7 @@ TPTEST(ClusteringRaft, StorageWriteLogReplaceTail) {
         metadata_file_t metadata_file(
             &io_backender,
             &get_global_perfmon_collection(),
-            [&](metadata_file_t::write_txn_t *, signal_t *) { },
-            &non_interruptor);
+            [&](metadata_file_t::write_txn_t *, signal_t *) { });
         {
             metadata_file_t::write_txn_t write_txn(&metadata_file, &non_interruptor);
             table_raft_storage_interface.init(new table_raft_storage_interface_t(
@@ -300,8 +292,7 @@ TPTEST(ClusteringRaft, StorageWriteLogAppendOne) {
         metadata_file_t metadata_file(
             &io_backender,
             &get_global_perfmon_collection(),
-            [&](metadata_file_t::write_txn_t *, signal_t *) { },
-            &non_interruptor);
+            [&](metadata_file_t::write_txn_t *, signal_t *) { });
         {
             metadata_file_t::write_txn_t write_txn(&metadata_file, &non_interruptor);
             table_raft_storage_interface.init(new table_raft_storage_interface_t(
@@ -345,8 +336,7 @@ TPTEST(ClusteringRaft, StorageWriteSnapshot) {
         metadata_file_t metadata_file(
             &io_backender,
             &get_global_perfmon_collection(),
-            [&](metadata_file_t::write_txn_t *, signal_t *) { },
-            &non_interruptor);
+            [&](metadata_file_t::write_txn_t *, signal_t *) { });
         {
             metadata_file_t::write_txn_t write_txn(&metadata_file, &non_interruptor);
             table_raft_storage_interface.init(new table_raft_storage_interface_t(
