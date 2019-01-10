@@ -142,14 +142,6 @@ void find_keyvalue_location_for_write(
         profile::trace_t *trace,
         promise_t<superblock_t *> *pass_back_superblock) THROWS_NOTHING;
 
-void find_keyvalue_location_for_read(
-        value_sizer_t *sizer,
-        superblock_t *superblock,
-        const btree_key_t *key,
-        keyvalue_location_t *keyvalue_location_out,
-        btree_stats_t *stats,
-        profile::trace_t *trace);
-
 /* `delete_mode_t` controls how `apply_keyvalue_change()` acts when `kv_loc->value` is
 empty. */
 enum class delete_mode_t {
