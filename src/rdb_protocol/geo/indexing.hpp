@@ -5,7 +5,8 @@
 #include <string>
 #include <vector>
 
-#include "btree/concurrent_traversal.hpp"
+#include "btree/keys.hpp"
+#include "btree/types.hpp"
 #include "containers/counted.hpp"
 #include "rdb_protocol/geo/s2/s2cellid.h"
 
@@ -65,8 +66,8 @@ public:
         bool definitely_intersects_if_point)
             THROWS_ONLY(interrupted_exc_t) = 0;
 
-    /* concurrent_traversal_callback_t interface */
-    continue_bool_t handle_pair(std::pair<const char *, size_t> key, std::pair<const char *, size_t> value)
+    continue_bool_t handle_pair(
+        std::pair<const char *, size_t> key, std::pair<const char *, size_t> value)
             THROWS_ONLY(interrupted_exc_t);
 
     const std::vector<geo::S2CellId> &query_cells() const {
@@ -82,8 +83,6 @@ private:
     static bool cell_intersects_with_range(const geo::S2CellId c,
                                            const geo::S2CellId left_min,
                                            const geo::S2CellId right_max);
-    bool any_query_cell_intersects(const btree_key_t *left_excl_or_null,
-                                   const btree_key_t *right_incl) const;
     static bool any_cell_intersects(const std::vector<geo::S2CellId> &cells,
                                     const geo::S2CellId left_min,
                                     const geo::S2CellId right_max);

@@ -355,49 +355,6 @@ geo_index_traversal_helper_t::handle_pair(
     }
 }
 
-// TODO: Remove if unused.
-bool geo_index_traversal_helper_t::any_query_cell_intersects(
-        const btree_key_t *left_excl_or_null, const btree_key_t *right_incl) const {
-    std::pair<S2CellId, bool> left =
-        order_btree_key_relative_to_s2cellid_keys(left_excl_or_null);
-    std::pair<S2CellId, bool> right =
-        order_btree_key_relative_to_s2cellid_keys(right_incl);
-
-    /* This is more conservative than necessary. For example, if `left_excl_or_null` is
-    after the largest possible cell or `right_incl` is before the smallest possible cell,
-    we could shortcut and return `false`, but we don't. Also, if `right.second` were
-    `false`, we could use the cell immediately before `right.first` instead of using
-    `right.first`. But that would be more trouble than it's worth. */
-    S2CellId left_cell = left.first == S2CellId::Sentinel()
-        ? S2CellId::FromFacePosLevel(5, 0, 0) : left.first;
-    S2CellId right_cell = right.first == S2CellId::Sentinel()
-        ? S2CellId::FromFacePosLevel(5, 0, 0) : right.first;
-
-    // Determine a S2CellId range that is a superset of what's intersecting
-    // with anything stored in [left_cell, right_cell].
-    int common_level;
-    if (left_cell.face() != right_cell.face()) {
-        // Case 1: left_cell and right_cell are on different faces of the cube.
-        // In that case [left_cell, right_cell] intersects at most with the full
-        // range of faces in the range [left_cell.face(), right_cell.range()].
-        guarantee(left_cell.face() < right_cell.face());
-        common_level = 0;
-    } else {
-        // Case 2: left_cell and right_cell are on the same face. We locate
-        // their smallest common parent. [left_cell, right_cell] can at most
-        // intersect with anything below their common parent.
-        common_level = std::min(left_cell.level(), right_cell.level());
-        while (left_cell.parent(common_level) != right_cell.parent(common_level)) {
-            guarantee(common_level > 0);
-            --common_level;
-        }
-    }
-    S2CellId range_min = left_cell.parent(common_level).range_min();
-    S2CellId range_max = right_cell.parent(common_level).range_max();
-
-    return any_cell_intersects(query_cells_, range_min, range_max);
-}
-
 bool geo_index_traversal_helper_t::any_cell_intersects(
         const std::vector<S2CellId> &cells,
         const S2CellId left_min, const S2CellId right_max) {
