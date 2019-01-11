@@ -195,8 +195,8 @@ void apply_item_pair(
     rdb_live_deletion_context_t deletion_context;
     mod_reports_out->resize(mod_reports_out->size() + 1);
     mod_reports_out->back().primary_key = pair.key;
-    if (static_cast<bool>(pair.value)) {
-        vector_read_stream_t read_stream(std::move(*pair.value));
+    if (static_cast<bool>(pair.value1)) {
+        vector_read_stream_t read_stream(std::move(*pair.value1));
         ql::datum_t datum;
         archive_result_t res = datum_deserialize(&read_stream, &datum);
         guarantee(res == archive_result_t::SUCCESS);

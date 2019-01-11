@@ -382,7 +382,7 @@ continue_bool_t mock_store_t::send_backfill(
                     backfill_item_t::pair_t pair;
                     pair.key = jt->first;
                     pair.recency = jt->second.first;
-                    pair.value.set(datum_to_vector(jt->second.second));
+                    pair.value1.set(datum_to_vector(jt->second.second));
                     memory_tracker->reserve_memory(pair.get_mem_size());
                     if (memory_tracker->is_limit_exceeded()) {
                         item.range.right = key_range_t::right_bound_t(jt->first);
@@ -428,7 +428,7 @@ continue_bool_t mock_store_t::send_backfill(
                 backfill_item_t::pair_t pair;
                 pair.key = it->first;
                 pair.recency = it->second.first;
-                pair.value.set(datum_to_vector(it->second.second));
+                pair.value1.set(datum_to_vector(it->second.second));
                 memory_tracker->reserve_memory(pair.get_mem_size());
                 if (memory_tracker->is_limit_exceeded()) {
                     return continue_bool_t::ABORT;
@@ -498,9 +498,9 @@ continue_bool_t mock_store_t::receive_backfill(
 
             /* Insert key-value pairs that were stored in the item */
             for (const auto &pair : item.pairs) {
-                guarantee(static_cast<bool>(pair.value));
+                guarantee(static_cast<bool>(pair.value1));
                 table_[pair.key] = std::make_pair(
-                    pair.recency, vector_to_datum(std::vector<char>(*pair.value)));
+                    pair.recency, vector_to_datum(std::vector<char>(*pair.value1)));
             }
         } else {
             cursor = empty_range;

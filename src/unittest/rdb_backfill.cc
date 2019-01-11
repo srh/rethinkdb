@@ -465,7 +465,7 @@ TPTEST(RDBBackfill, SmallValues) {
     run_backfill_test(cfg);
 }
 
-TPTEST(RDBBackfill, LargeTable) {
+TPTEST(RDBBackfill, DISABLED_LargeTable) {
     /* This approximates a realistic backfill scenario. So we insert a relatively large
     number of keys. */
     backfill_test_config_t cfg;

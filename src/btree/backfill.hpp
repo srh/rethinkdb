@@ -18,6 +18,7 @@
 
 class buf_parent_t;
 class real_superblock_t;
+class rockshard;
 class superblock_t;
 class value_sizer_t;
 
@@ -120,7 +121,7 @@ public:
     the B-tree logic. `copy_value()` may block. */
     virtual void copy_value(
         buf_parent_t buf_parent,
-        const void *value_in_leaf_node,
+        bf_value &&value_in_leaf_node,
         signal_t *interruptor,
         std::vector<char> *value_out) = 0;
     /* Similarly `size_value()` is responsible for retrieving the size of a given
@@ -133,15 +134,16 @@ protected:
 };
 
 continue_bool_t btree_send_backfill(
-    superblock_t *superblock,
-    release_superblock_t release_superblock,
-    value_sizer_t *sizer,
-    const key_range_t &range,
-    repli_timestamp_t reference_timestamp,
-    btree_backfill_pre_item_producer_t *pre_item_producer,
-    btree_backfill_item_consumer_t *item_consumer,
-    backfill_item_memory_tracker_t *memory_tracker,
-    signal_t *interruptor);
+        rockshard rocksh,
+        real_superblock_t *superblock,
+        release_superblock_t release_superblock,
+        const key_range_t &range,
+        repli_timestamp_t reference_timestamp,
+        btree_backfill_pre_item_producer_t *pre_item_producer,
+        btree_backfill_item_consumer_t *item_consumer,
+        backfill_item_memory_tracker_t *memory_tracker,
+        signal_t *interruptor);
+
 
 /* There's no such thing as `btree_receive_backfill()`; the RDB protocol code is
 responsible for interpreting the `backfill_item_t`s and translating them into a series
@@ -157,7 +159,7 @@ entries with timestamps earlier than `item.min_deletion_timestamp`. It should be
 for every `backfill_item_t` that's applied to the B-tree, unless `item.is_single_key()`
 returns `true`. */
 void btree_receive_backfill_item_update_deletion_timestamps(
-    superblock_t *superblock,
+    real_superblock_t *superblock,
     release_superblock_t release_superblock,
     value_sizer_t *sizer,
     const backfill_item_t &item,

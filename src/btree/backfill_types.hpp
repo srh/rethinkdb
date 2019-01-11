@@ -8,6 +8,14 @@
 #include "repli_timestamp.hpp"
 #include "rpc/serialize_macros.hpp"
 
+// TODO: Remove.
+struct bf_value {
+    std::vector<char> value;
+};
+
+// TODO: Under rocksdb (and an incompatible cluster protocol),
+// backfill_pre_item_t can hold individual keys.
+
 /* `backfill_pre_item_t` describes a range of keys which have changed on the backfill
 destination since the source and destination diverged. The backfill destination sends
 pre items to the backfill source so that the source knows to re-transmit the values of
@@ -37,11 +45,11 @@ public:
     public:
         store_key_t key;
         repli_timestamp_t recency;
-        optional<std::vector<char> > value;   /* empty indicates deletion */
+        optional<std::vector<char> > value1;   /* empty indicates deletion */
         size_t get_mem_size() const {
             size_t s = sizeof(pair_t);
-            if (static_cast<bool>(value)) {
-                s += value->size();
+            if (static_cast<bool>(value1)) {
+                s += value1->size();
             }
             return s;
         }
@@ -86,6 +94,8 @@ public:
     key_range_t range;
     std::vector<pair_t> pairs;
     repli_timestamp_t min_deletion_timestamp;
+
+    // TODO: This, and update or just plain alter the clustering communication format.
 
     /* TODO: For single-key items, this is not very memory-efficient, because we store
     the key in three places: in `pairs[0].key`, in `range.left`, and in `range.right.key`
