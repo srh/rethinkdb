@@ -19,12 +19,8 @@ class btree_slice_t;
 enum class delete_mode_t;
 class key_tester_t;
 template <class> class promise_t;
-struct rdb_value_t;
 class refcount_superblock_t;
 struct sindex_disk_info_t;
-
-// TODO: Remove all rdb_value_t.
-bool btree_value_fits(max_block_size_t bs, int data_length, const rdb_value_t *value);
 
 struct rdb_modification_info_t;
 struct rdb_modification_report_t;

@@ -27,17 +27,12 @@
 #include "rdb_protocol/blob_wrapper.hpp"
 #include "rdb_protocol/func.hpp"
 #include "rdb_protocol/geo_traversal.hpp"
-#include "rdb_protocol/lazy_btree_val.hpp"
 #include "rdb_protocol/pseudo_geometry.hpp"
 #include "rdb_protocol/serialize_datum_onto_blob.hpp"
 #include "rdb_protocol/shards.hpp"
 #include "rdb_protocol/table_common.hpp"
 
 #include "debug.hpp"
-
-bool btree_value_fits(max_block_size_t bs, int data_length, const rdb_value_t *value) {
-    return blob::ref_fits(bs, data_length, value->value_ref(), blob::btree_maxreflen);
-}
 
 void rdb_get_secondary_for_unittest(
         rockshard rocksh, uuid_u sindex_uuid, const store_key_t &store_key,
