@@ -124,25 +124,15 @@ void kv_location_delete(rockstore::store *rocks,
                         const store_key_t &key,
                         repli_timestamp_t timestamp,
                         const deletion_context_t *deletion_context,
-                        delete_mode_t delete_mode,
-                        rdb_modification_info_t *mod_info_out) {
+                        delete_mode_t delete_mode) {
     // Notice this also implies that buf is valid.
     guarantee(kv_location->value.has());
 
     // As noted above, we can be sure that buf is valid.
     const max_block_size_t block_size = kv_location->buf.cache()->max_block_size();
 
-    if (mod_info_out != nullptr) {
-        guarantee(mod_info_out->deleted.second.empty());
-
-        mod_info_out->deleted.second.assign(
-                kv_location->value_as<rdb_value_t>()->value_ref(),
-                kv_location->value_as<rdb_value_t>()->value_ref()
-                + kv_location->value_as<rdb_value_t>()->inline_size(block_size));
-    }
-
     // Detach/Delete
-    deletion_context->in_tree_deleter()->delete_value(buf_parent_t(&kv_location->buf),
+    deletion_context->primary_deleter()->delete_value(buf_parent_t(&kv_location->buf),
                                                       kv_location->value.get());
 
     kv_location->value.reset();
@@ -178,8 +168,7 @@ kv_location_set(rockstore::store *rocks,
                 const store_key_t &key,
                 ql::datum_t data,
                 repli_timestamp_t timestamp,
-                const deletion_context_t *deletion_context,
-                rdb_modification_info_t *mod_info_out) THROWS_NOTHING {
+                const deletion_context_t *deletion_context) THROWS_NOTHING {
     scoped_malloc_t<rdb_value_t> new_value(blob::btree_maxreflen);
     memset(new_value.get(), 0, blob::btree_maxreflen);
 
@@ -192,22 +181,9 @@ kv_location_set(rockstore::store *rocks,
         if (bad(res)) return res;
     }
 
-    if (mod_info_out) {
-        guarantee(mod_info_out->added.second.empty());
-        mod_info_out->added.second.assign(new_value->value_ref(),
-            new_value->value_ref() + new_value->inline_size(block_size));
-    }
-
     if (kv_location->value.has()) {
-        deletion_context->in_tree_deleter()->delete_value(
+        deletion_context->primary_deleter()->delete_value(
                 buf_parent_t(&kv_location->buf), kv_location->value.get());
-        if (mod_info_out != nullptr) {
-            guarantee(mod_info_out->deleted.second.empty());
-            mod_info_out->deleted.second.assign(
-                    kv_location->value_as<rdb_value_t>()->value_ref(),
-                    kv_location->value_as<rdb_value_t>()->value_ref()
-                    + kv_location->value_as<rdb_value_t>()->inline_size(block_size));
-        }
     }
 
     // Actually update the leaf, if needed.
@@ -326,15 +302,13 @@ batched_replace_response_t rdb_replace_and_return_superblock(
             if (new_val.get_type() == ql::datum_t::R_NULL) {
                 kv_location_delete(rocksh.rocks, rocks_kv_location,
                                    &kv_location, *info.key, info.btree->timestamp,
-                                   deletion_context, delete_mode_t::REGULAR_QUERY,
-                                   mod_info_out);
+                                   deletion_context, delete_mode_t::REGULAR_QUERY);
             } else {
                 r_sanity_check(new_val.get_field(primary_key, ql::NOTHROW).has());
                 ql::serialization_result_t res =
                     kv_location_set(rocksh.rocks, rocks_kv_location,
                                     &kv_location, *info.key, new_val,
-                                    info.btree->timestamp, deletion_context,
-                                    mod_info_out);
+                                    info.btree->timestamp, deletion_context);
                 if (res & ql::serialization_result_t::ARRAY_TOO_BIG) {
                     rfail_typed_target(&new_val, "Array too large for disk writes "
                                        "(limit 100,000 elements).");
@@ -346,17 +320,12 @@ batched_replace_response_t rdb_replace_and_return_superblock(
             }
 
             /* Report the changes for sindex and change-feed purposes */
+            // TODO: Can we just assign R_NULL values to deleted and added?
             if (old_val.get_type() != ql::datum_t::R_NULL) {
-                guarantee(!mod_info_out->deleted.second.empty());
                 mod_info_out->deleted.first = old_val;
-            } else {
-                guarantee(mod_info_out->deleted.second.empty());
             }
             if (new_val.get_type() != ql::datum_t::R_NULL) {
-                guarantee(!mod_info_out->added.second.empty());
                 mod_info_out->added.first = new_val;
-            } else {
-                guarantee(mod_info_out->added.second.empty());
             }
 
             return resp;
@@ -611,8 +580,7 @@ void rdb_set(rockshard rocksh,
         // TODO: We don't do kv_location_delete in case of null value?
         ql::serialization_result_t res =
             kv_location_set(rocksh.rocks, rocks_kv_location,
-                            &kv_location, key, data, timestamp, deletion_context,
-                            mod_info);
+                            &kv_location, key, data, timestamp, deletion_context);
         if (res & ql::serialization_result_t::ARRAY_TOO_BIG) {
             rfail_typed_target(&data, "Array too large for disk writes "
                                "(limit 100,000 elements).");
@@ -621,8 +589,6 @@ void rdb_set(rockshard rocksh,
                                "written to disk.");
         }
         r_sanity_check(!ql::bad(res));
-        guarantee(mod_info->deleted.second.empty() == !had_value &&
-                  !mod_info->added.second.empty());
     }
     response_out->result =
         (had_value ? point_write_result_t::DUPLICATE : point_write_result_t::STORED);
@@ -708,8 +674,7 @@ void rdb_delete(rockshard rocksh,
     if (exists) {
         mod_info->deleted.first = datum_deserialize_from_vec(maybe_value.first.data(), maybe_value.first.size());
         kv_location_delete(rocksh.rocks, rocks_kv_location, &kv_location, key, timestamp, deletion_context,
-            delete_mode, mod_info);
-        guarantee(!mod_info->deleted.second.empty() && mod_info->added.second.empty());
+            delete_mode);
     }
     response->result = (exists ? point_delete_result_t::DELETED : point_delete_result_t::MISSING);
 }
@@ -1754,19 +1719,17 @@ static const int8_t HAS_NO_VALUE = 1;
 template <cluster_version_t W>
 void serialize(write_message_t *wm, const rdb_modification_info_t &info) {
     if (!info.deleted.first.has()) {
-        guarantee(info.deleted.second.empty());
         serialize<W>(wm, HAS_NO_VALUE);
     } else {
         serialize<W>(wm, HAS_VALUE);
-        serialize<W>(wm, info.deleted);
+        serialize<W>(wm, info.deleted.first);
     }
 
     if (!info.added.first.has()) {
-        guarantee(info.added.second.empty());
         serialize<W>(wm, HAS_NO_VALUE);
     } else {
         serialize<W>(wm, HAS_VALUE);
-        serialize<W>(wm, info.added);
+        serialize<W>(wm, info.added.first);
     }
 }
 
@@ -1777,7 +1740,7 @@ archive_result_t deserialize(read_stream_t *s, rdb_modification_info_t *info) {
     if (bad(res)) { return res; }
 
     if (has_value == HAS_VALUE) {
-        res = deserialize<W>(s, &info->deleted);
+        res = deserialize<W>(s, &info->deleted.first);
         if (bad(res)) { return res; }
     }
 
@@ -1785,7 +1748,7 @@ archive_result_t deserialize(read_stream_t *s, rdb_modification_info_t *info) {
     if (bad(res)) { return res; }
 
     if (has_value == HAS_VALUE) {
-        res = deserialize<W>(s, &info->added);
+        res = deserialize<W>(s, &info->added.first);
         if (bad(res)) { return res; }
     }
 
@@ -1934,13 +1897,10 @@ void rdb_modification_report_cb_t::on_mod_report_sub(
     index_vals_t *cfeed_old_keys_out,
     index_vals_t *cfeed_new_keys_out) {
     store_->sindex_queue_push(mod_report, spot);
-    rdb_live_deletion_context_t deletion_context;
     rdb_update_sindexes(rocksh,
                         store_,
                         sindexes_,
                         &mod_report,
-                        sindex_block_->txn(),
-                        &deletion_context,
                         keys_available_cond,
                         cfeed_old_keys_out,
                         cfeed_new_keys_out);
@@ -2240,7 +2200,6 @@ void rdb_update_single_sindex(
     auto cserver = store->changefeed_server(modification->primary_key);
 
     if (modification->info.deleted.first.has()) {
-        guarantee(!modification->info.deleted.second.empty());
         try {
             ql::datum_t deleted = modification->info.deleted.first;
 
@@ -2391,13 +2350,10 @@ void rdb_update_sindexes(
     store_t *store,
     const store_t::sindex_access_vector_t &sindexes,
     const rdb_modification_report_t *modification,
-    txn_t *txn,
-    const deletion_context_t *deletion_context,
     cond_t *keys_available_cond,
     index_vals_t *cfeed_old_keys_out,
     index_vals_t *cfeed_new_keys_out) {
 
-    rdb_noop_deletion_context_t noop_deletion_context;
     {
         auto_drainer_t drainer;
 
@@ -2433,13 +2389,6 @@ void rdb_update_sindexes(
         if (counter == 0 && keys_available_cond != nullptr) {
             keys_available_cond->pulse();
         }
-    }
-
-    /* All of the sindex have been updated now it's time to actually clear the
-     * deleted blob if it exists. */
-    if (modification->info.deleted.first.has()) {
-        deletion_context->post_deleter()->delete_value(buf_parent_t(txn),
-                modification->info.deleted.second.data());
     }
 }
 
@@ -2491,13 +2440,8 @@ public:
         const rdb_value_t *rdb_value =
             static_cast<const rdb_value_t *>(keyvalue.value());
         rdb_modification_report_t mod_report(primary_key);
-        const max_block_size_t block_size =
-            keyvalue.expose_buf().cache()->max_block_size();
-        mod_report.info.added
-            = std::make_pair(
-                get_data(rdb_value, buf_parent_t(keyvalue.expose_buf())),
-                std::vector<char>(rdb_value->value_ref(),
-                    rdb_value->value_ref() + rdb_value->inline_size(block_size)));
+        mod_report.info.added.first
+            = get_data(rdb_value, buf_parent_t(keyvalue.expose_buf()));
 
         // Store the value into the secondary indexes
         {
@@ -2507,13 +2451,10 @@ public:
             // corrupted!).
             new_mutex_acq_t wtxn_acq(&wtxn_lock_, interruptor_);
             guarantee(wtxn_.has());
-            const rdb_post_construction_deletion_context_t deletion_context;
             rdb_update_sindexes(store_->rocksh(),
                                 store_,
                                 sindexes_,
                                 &mod_report,
-                                wtxn_.get(),
-                                &deletion_context,
                                 nullptr,
                                 nullptr,
                                 nullptr);

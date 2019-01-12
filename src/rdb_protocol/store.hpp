@@ -63,11 +63,7 @@ public:
 
     // Applied when deleting or erasing a value from a leaf node
     // (in either secondary index trees or the primary btree)
-    virtual const value_deleter_t *in_tree_deleter() const = 0;
-
-    // Applied after value_deleter() has been applied to all indexes that
-    // reference a value
-    virtual const value_deleter_t *post_deleter() const = 0;
+    virtual const value_deleter_t *primary_deleter() const = 0;
 };
 
 enum class update_sindexes_t {

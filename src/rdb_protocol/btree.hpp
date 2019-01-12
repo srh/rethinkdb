@@ -229,7 +229,8 @@ void rdb_distribution_get(rockshard rocksh, int keys_limit,
 /* Secondary Indexes */
 
 struct rdb_modification_info_t {
-    typedef std::pair<ql::datum_t, std::vector<char> > data_pair_t;
+    // TODO: Remove data_pair_t wrapper.
+    struct data_pair_t { ql::datum_t first; };
     data_pair_t deleted;
     data_pair_t added;
 };
@@ -358,8 +359,6 @@ void rdb_update_sindexes(
     store_t *store,
     const store_t::sindex_access_vector_t &sindexes,
     const rdb_modification_report_t *modification,
-    txn_t *txn,
-    const deletion_context_t *deletion_context,
     cond_t *keys_available_cond,
     index_vals_t *old_keys_out,
     index_vals_t *new_keys_out);
@@ -392,8 +391,7 @@ class rdb_live_deletion_context_t : public deletion_context_t {
 public:
     rdb_live_deletion_context_t() { }
     const value_deleter_t *balancing_detacher() const { return &detacher; }
-    const value_deleter_t *in_tree_deleter() const { return &detacher; }
-    const value_deleter_t *post_deleter() const { return &deleter; }
+    const value_deleter_t *primary_deleter() const { return &deleter; }
 private:
     rdb_value_detacher_t detacher;
     rdb_value_deleter_t deleter;
@@ -406,6 +404,7 @@ public:
     void delete_value(buf_parent_t, const void *) const;
 };
 
+// TODO: Remove, quickly.
 /* Used for operations on secondary indexes that aren't yet post-constructed.
  * Since we don't have any guarantees that referenced blob blocks still exist
  * during that stage, we use noop deleters for everything. */
@@ -413,8 +412,7 @@ class rdb_noop_deletion_context_t : public deletion_context_t {
 public:
     rdb_noop_deletion_context_t() { }
     const value_deleter_t *balancing_detacher() const { return &no_deleter; }
-    const value_deleter_t *in_tree_deleter() const { return &no_deleter; }
-    const value_deleter_t *post_deleter() const { return &no_deleter; }
+    const value_deleter_t *primary_deleter() const { return &no_deleter; }
 private:
     noop_value_deleter_t no_deleter;
 };

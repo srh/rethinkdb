@@ -317,8 +317,6 @@ void post_construct_and_drain_queue(
                                         store,
                                         sindexes,
                                         &mod_report,
-                                        queue_txn.get(),
-                                        &deletion_context,
                                         NULL,
                                         NULL,
                                         NULL);

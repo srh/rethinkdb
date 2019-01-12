@@ -563,6 +563,7 @@ void store_t::update_sindexes(
             buf_lock_t *sindex_block,
             const std::vector<rdb_modification_report_t> &mod_reports,
             bool release_sindex_block) {
+    (void)txn;  // TODO: Remove parameter.
     new_mutex_in_line_t acq = get_in_line_for_sindex_queue(sindex_block);
     {
         sindex_access_vector_t sindexes;
@@ -571,7 +572,6 @@ void store_t::update_sindexes(
             sindex_block->reset_buf_lock();
         }
 
-        rdb_live_deletion_context_t deletion_context;
         for (size_t i = 0; i < mod_reports.size(); ++i) {
             // TODO: What rocksdb transaction is this with?
             // TODO: Inspect all callers of rdb_update_sindexes for transactionality in rocks.
@@ -579,8 +579,6 @@ void store_t::update_sindexes(
                                 this,
                                 sindexes,
                                 &mod_reports[i],
-                                txn,
-                                &deletion_context,
                                 NULL,
                                 NULL,
                                 NULL);

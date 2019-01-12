@@ -71,8 +71,6 @@ void insert_rows(int start, int finish, store_t *store) {
                 store,
                 sindexes,
                 &mod_report,
-                txn.get(),
-                &deletion_context,
                 nullptr,
                 nullptr,
                 nullptr);

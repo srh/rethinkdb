@@ -147,20 +147,17 @@ continue_bool_t rdb_erase_small_range(
             const rdb_value_t *rdb_value = kv_location.value_as<rdb_value_t>();
             mod_report.info.deleted.first = get_data(rdb_value,
                                                      buf_parent_t(&kv_location.buf));
-            // Get the inline value
-            mod_report.info.deleted.second.assign(rdb_value->value_ref(),
-                rdb_value->value_ref() + rdb_value->inline_size(max_block_size));
             mod_reports_out->push_back(mod_report);
 
             // Detach the value
-            deletion_context->in_tree_deleter()->delete_value(
+            deletion_context->balancing_detacher()->delete_value(
                 buf_parent_t(&kv_location.buf), kv_location.value.get());
             // Erase the entry from the leaf node
             kv_location.value.reset();
             null_key_modification_callback_t null_cb;
             apply_keyvalue_change(&sizer, &kv_location, key.btree_key(),
                                   repli_timestamp_t::invalid /* ignored for erase */,
-                                  deletion_context->in_tree_deleter(),
+                                  deletion_context->primary_deleter(),
                                   &null_cb,
                                   delete_mode_t::ERASE);
 
