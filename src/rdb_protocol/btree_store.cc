@@ -845,34 +845,8 @@ void store_t::drop_sindex(uuid_u sindex_id) THROWS_NOTHING {
                                           sindex.superblock, access_t::write);
         sindex_superblock_t sindex_superblock(std::move(sindex_superblock_lock));
         if (sindex_superblock.get_root_block_id() != NULL_BLOCK_ID) {
-            buf_lock_t root_node(sindex_superblock.expose_buf(),
-                                 sindex_superblock.get_root_block_id(),
-                                 access_t::write);
-            {
-                /* Guarantee that the root is actually empty. */
-                buf_read_t rread(&root_node);
-                const node_t *node = static_cast<const node_t *>(
-                        rread.get_data_read());
-                if (node::is_internal(node)) {
-                    const internal_node_t *root_int_node
-                        = static_cast<const internal_node_t *>(
-                            rread.get_data_read());
-                    /* This just prints a warning in release mode for now,
-                    because leaking a few blocks is probably better than
-                    making the database inaccessible. */
-                    rassert(root_int_node->npairs == 0);
-                    if (root_int_node->npairs != 0) {
-                        logWRN("The secondary index tree was not empty after "
-                               "clearing it. We are leaking some data blocks. "
-                               "Please report this issue at "
-                               "https://github.com/rethinkdb/rethinkdb/issues/");
-                    }
-                }
-                /* If the root is a leaf we are good */
-            }
-            /* Delete the root */
-            root_node.write_acq_signal()->wait_lazily_unordered();
-            root_node.mark_deleted();
+            logWRN("The secondary root block id is not NULL_BLOCK_ID, when we "
+                "should have never set it");
         }
         /* Under normal circumstances, sindex superblocks do not have stat or sindex
         blocks. However, we used to create stat and sindex blocks, so some very old

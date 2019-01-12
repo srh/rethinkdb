@@ -3,8 +3,6 @@
 
 #include <stdint.h>
 
-#include "btree/internal_node.hpp"
-#include "btree/leaf_node.hpp"
 #include "buffer_cache/alt.hpp"
 #include "buffer_cache/blob.hpp"
 #include "containers/archive/vector_stream.hpp"

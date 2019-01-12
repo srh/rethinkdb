@@ -11,7 +11,6 @@
 
 #include "arch/runtime/thread_pool.hpp"
 #include "btree/keys.hpp"
-#include "btree/leaf_node.hpp"
 #include "btree/reql_specific.hpp"
 #include "concurrency/interruptor.hpp"
 #include "concurrency/signal.hpp"
