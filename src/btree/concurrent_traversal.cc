@@ -14,7 +14,7 @@
 #include "arch/runtime/coroutines.hpp"
 #include "arch/runtime/thread_pool.hpp"
 #include "btree/keys.hpp"
-#include "btree/superblock.hpp"
+#include "btree/operations.hpp"
 #include "concurrency/auto_drainer.hpp"
 #include "concurrency/semaphore.hpp"
 #include "concurrency/fifo_enforcer.hpp"

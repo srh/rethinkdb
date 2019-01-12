@@ -12,7 +12,7 @@
 #include "btree/get_distribution.hpp"
 #include "btree/operations.hpp"
 #include "btree/reql_specific.hpp"
-#include "btree/superblock.hpp"
+#include "btree/operations.hpp"
 #include "concurrency/coro_pool.hpp"
 #include "concurrency/new_mutex.hpp"
 #include "concurrency/queue/unlimited_fifo.hpp"

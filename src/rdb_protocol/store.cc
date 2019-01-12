@@ -3,7 +3,7 @@
 
 #include "btree/backfill_debug.hpp"
 #include "btree/reql_specific.hpp"
-#include "btree/superblock.hpp"
+#include "btree/operations.hpp"
 #include "concurrency/cross_thread_signal.hpp"
 #include "concurrency/cross_thread_watchable.hpp"
 #include "concurrency/wait_any.hpp"
