@@ -730,7 +730,7 @@ void store_t::clear_sindex_data(
         const key_range_t &pkey_range_to_clear,
         signal_t *interruptor)
         THROWS_ONLY(interrupted_exc_t) {
-    // TODO: Do the rockstore reading for this operation too.
+    (void)sizer, (void)deletion_context;  // TODO: Remove params.
     /* Delete one piece of the secondary index at a time */
     key_range_t remaining_range = key_range_t::universe();
     for (bool reached_end = false; !reached_end; ) {
@@ -771,6 +771,8 @@ void store_t::clear_sindex_data(
         scoped_ptr_t<sindex_superblock_t> sindex_superblock
             = make_scoped<sindex_superblock_t>(std::move(sindex_superblock_lock));
 
+        // TODO: Actually just pass a range delete to rocksdb.
+
         /* 1. Collect a bunch of keys to delete */
         clear_sindex_traversal_cb_t traversal_cb(pkey_range_to_clear);
         try {
@@ -799,45 +801,14 @@ void store_t::clear_sindex_data(
             key_range_t::none,
             store_key_t());
 
+        sindex_superblock->write_acq_signal()->wait_lazily_unordered();
+
         /* 2. Actually delete them */
         const std::vector<store_key_t> &keys = traversal_cb.get_keys();
         for (size_t i = 0; i < keys.size(); ++i) {
-            promise_t<superblock_t *> superblock_promise;
-            {
-                keyvalue_location_t kv_location;
-                find_keyvalue_location_for_write(sizer, sindex_superblock.release(),
-                        keys[i].btree_key(), repli_timestamp_t::distant_past,
-                        deletion_context->balancing_detacher(),
-                        &kv_location, NULL /* trace */,
-                        &superblock_promise);
-
-                if (kv_location.there_originally_was_value) {
-                    deletion_context->in_tree_deleter()->delete_value(
-                        buf_parent_t(&kv_location.buf), kv_location.value.get());
-                    kv_location.value.reset();
-
-                    buf_write_t buf_write(&kv_location.buf);
-                    auto leaf_node = static_cast<leaf_node_t *>(buf_write.get_data_write());
-                    leaf::remove(sizer,
-                                 leaf_node,
-                                 keys[i].btree_key(),
-                                 repli_timestamp_t::distant_past,
-                                 kv_location.buf.get_recency());
-                }
-                check_and_handle_underfull(sizer, &kv_location.buf,
-                        &kv_location.last_buf, kv_location.superblock,
-                        keys[i].btree_key(),
-                        deletion_context->balancing_detacher());
-
-                std::string rocks_kv_location =
-                    rockstore::table_secondary_key(table_id, shard_no, sindex_id, key_to_unescaped_str(keys[i]));
-                rocks->remove(rocks_kv_location, rockstore::write_options::TODO());
-                /* Here kv_location is destructed, which returns the superblock */
-            }
-
-            /* Reclaim the sindex superblock for the next deletion */
-            sindex_superblock.init(static_cast<sindex_superblock_t *>(
-                superblock_promise.wait()));
+            std::string rocks_kv_location =
+                rockstore::table_secondary_key(table_id, shard_no, sindex_id, key_to_unescaped_str(keys[i]));
+            rocks->remove(rocks_kv_location, rockstore::write_options::TODO());
         }
 
         sindex_superblock.reset();

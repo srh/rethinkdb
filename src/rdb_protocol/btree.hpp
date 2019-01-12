@@ -142,9 +142,7 @@ void rdb_set_sindex_for_unittest(
     sindex_superblock_t *superblock,
     const deletion_context_t *deletion_context,
     point_write_response_t *response,
-    rdb_modification_info_t *mod_info,
-    profile::trace_t *trace,
-    promise_t<superblock_t *> *pass_back_superblock);
+    profile::trace_t *trace);
 
 void rdb_delete(rockshard rocksh,
                 const store_key_t &key,
