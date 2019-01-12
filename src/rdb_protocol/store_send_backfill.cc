@@ -175,15 +175,6 @@ public:
         return remaining == 0
             ? continue_bool_t::ABORT : continue_bool_t::CONTINUE;
     }
-    // TODO: Just remove copy_value.
-    void copy_value(
-            buf_parent_t parent,
-            bf_value &&value_in_leaf_node,
-            UNUSED signal_t *interruptor2,
-            std::vector<char> *value_out) override {
-        (void)parent;
-        *value_out = std::move(value_in_leaf_node.value);
-    }
     size_t remaining;
 private:
     store_view_t::backfill_item_consumer_t *const inner;

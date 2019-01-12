@@ -114,15 +114,6 @@ public:
     virtual continue_bool_t on_empty_range(
         const key_range_t::right_bound_t &threshold) = 0;
 
-    /* `copy_value()` is responsible for reading a value out of the leaf node, finding
-    the corresponding blob pages (if it's a large value), and putting the contents into
-    `value_out`. This is because the exact format of the leaf node values is opaque to
-    the B-tree logic. `copy_value()` may block. */
-    virtual void copy_value(
-        buf_parent_t buf_parent,
-        bf_value &&value_in_leaf_node,
-        signal_t *interruptor,
-        std::vector<char> *value_out) = 0;
 protected:
     virtual ~btree_backfill_item_consumer_t() { }
 };
