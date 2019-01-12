@@ -68,25 +68,6 @@ bool btree_value_fits(max_block_size_t bs, int data_length, const rdb_value_t *v
     return blob::ref_fits(bs, data_length, value->value_ref(), blob::btree_maxreflen);
 }
 
-// Remember that secondary indexes and the main btree both point to the same rdb
-// value -- you don't want to double-delete that value!
-void actually_delete_rdb_value(buf_parent_t parent, void *value) {
-    blob_t blob(parent.cache()->max_block_size(),
-                static_cast<rdb_value_t *>(value)->value_ref(),
-                blob::btree_maxreflen);
-    blob.clear(parent);
-}
-
-void detach_rdb_value(buf_parent_t parent, const void *value) {
-    // This const_cast is ok, since `detach_subtrees` is one of the operations
-    // that does not actually change value.
-    void *non_const_value = const_cast<void *>(value);
-    blob_t blob(parent.cache()->max_block_size(),
-                static_cast<rdb_value_t *>(non_const_value)->value_ref(),
-                blob::btree_maxreflen);
-    blob.detach_subtrees(parent);
-}
-
 void rdb_get_secondary_for_unittest(
         rockshard rocksh, uuid_u sindex_uuid, const store_key_t &store_key,
         sindex_superblock_t *superblock, ql::datum_t *out) {
@@ -195,13 +176,13 @@ private:
 };
 
 batched_replace_response_t rdb_replace_and_return_superblock(
-    rockshard rocksh,
-    const btree_loc_info_t &info,
-    const one_replace_t *replacer,
-    const deletion_context_t *deletion_context,
-    promise_t<superblock_t *> *superblock_promise,
-    rdb_modification_info_t *mod_info_out,
-    profile::trace_t *trace) {
+        rockshard rocksh,
+        const btree_loc_info_t &info,
+        const one_replace_t *replacer,
+        promise_t<superblock_t *> *superblock_promise,
+        rdb_modification_info_t *mod_info_out,
+        profile::trace_t *trace) {
+    (void)trace;  // TODO: Use trace?
     const return_changes_t return_changes = replacer->should_return_changes();
     const datum_string_t &primary_key = info.btree->primary_key;
     const store_key_t &key = *info.key;
@@ -372,10 +353,9 @@ void do_a_replace_from_batched_replace(
     info.superblock->get()->write_acq_signal()->wait_lazily_unordered();
     rwlock_in_line_t stamp_spot = mod_cb->get_in_line_for_cfeed_stamp();
 
-    rdb_live_deletion_context_t deletion_context;
     rdb_modification_report_t mod_report(*info.key);
     ql::datum_t res = rdb_replace_and_return_superblock(
-        rocksh, std::move(info), &one_replace, &deletion_context, superblock_promise, &mod_report.info,
+        rocksh, std::move(info), &one_replace, superblock_promise, &mod_report.info,
         trace);
     *stats_out = (*stats_out).merge(res, ql::stats_merge, limits, conditions);
 
@@ -492,11 +472,11 @@ void rdb_set(rockshard rocksh,
              btree_slice_t *slice,
              repli_timestamp_t timestamp,
              real_superblock_t *superblock,
-             const deletion_context_t *deletion_context,
              point_write_response_t *response_out,
              rdb_modification_info_t *mod_info,
              profile::trace_t *trace,
              promise_t<superblock_t *> *pass_back_superblock) {
+    (void)trace;  // TODO: Use trace?
     superblock_passback_guard spb(superblock, pass_back_superblock);
     slice->stats.pm_keys_set.record();
     slice->stats.pm_total_keys_set += 1;
@@ -545,10 +525,9 @@ void rdb_set_sindex_for_unittest(
         btree_slice_t *slice,
         repli_timestamp_t timestamp,
         sindex_superblock_t *superblock,
-        const deletion_context_t *deletion_context,
         point_write_response_t *response_out,
         profile::trace_t *trace) {
-    (void)timestamp, (void)deletion_context, (void)trace;  // TODO: Remove params or delete the unit test.
+    (void)timestamp, (void)trace;  // TODO: Remove params or delete the unit test.
 
     superblock->write_acq_signal()->wait_lazily_unordered();
 
@@ -591,12 +570,12 @@ void rdb_delete(rockshard rocksh,
                 btree_slice_t *slice,
                 repli_timestamp_t timestamp,
                 real_superblock_t *superblock,
-                const deletion_context_t *deletion_context,
                 delete_mode_t delete_mode,
                 point_delete_response_t *response,
                 rdb_modification_info_t *mod_info,
                 profile::trace_t *trace,
                 promise_t<superblock_t *> *pass_back_superblock) {
+    (void)trace;  // TODO: Use trace?
     superblock_passback_guard spb(superblock, pass_back_superblock);
     slice->stats.pm_keys_set.record();
     slice->stats.pm_total_keys_set += 1;
@@ -612,18 +591,6 @@ void rdb_delete(rockshard rocksh,
         kv_location_delete(rocksh.rocks, rocks_kv_location, timestamp, delete_mode);
     }
     response->result = (exists ? point_delete_result_t::DELETED : point_delete_result_t::MISSING);
-}
-
-void rdb_value_deleter_t::delete_value(buf_parent_t parent, const void *value) const {
-    // To not destroy constness, we operate on a copy of the value
-    rdb_value_sizer_t sizer(parent.cache()->max_block_size());
-    scoped_malloc_t<rdb_value_t> value_copy(sizer.max_possible_size());
-    memcpy(value_copy.get(), value, sizer.size(value));
-    actually_delete_rdb_value(parent, value_copy.get());
-}
-
-void rdb_value_detacher_t::delete_value(buf_parent_t parent, const void *value) const {
-    detach_rdb_value(parent, value);
 }
 
 typedef ql::transform_variant_t transform_variant_t;
@@ -2272,5 +2239,3 @@ void post_construct_secondary_index_range(
             key_range_t::bound_t::none, store_key_t());
     }
 }
-
-void noop_value_deleter_t::delete_value(buf_parent_t, const void *) const { }

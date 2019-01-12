@@ -17,7 +17,6 @@
 
 class btree_slice_t;
 enum class delete_mode_t;
-class deletion_context_t;
 class key_tester_t;
 template <class> class promise_t;
 struct rdb_value_t;
@@ -127,7 +126,6 @@ void rdb_set(rockshard rocksh,
              bool overwrite,
              btree_slice_t *slice, repli_timestamp_t timestamp,
              real_superblock_t *superblock,
-             const deletion_context_t *deletion_context,
              point_write_response_t *response,
              rdb_modification_info_t *mod_info,
              profile::trace_t *trace,
@@ -140,7 +138,6 @@ void rdb_set_sindex_for_unittest(
     bool overwrite,
     btree_slice_t *slice, repli_timestamp_t timestamp,
     sindex_superblock_t *superblock,
-    const deletion_context_t *deletion_context,
     point_write_response_t *response,
     profile::trace_t *trace);
 
@@ -149,7 +146,6 @@ void rdb_delete(rockshard rocksh,
                 btree_slice_t *slice,
                 repli_timestamp_t timestamp,
                 real_superblock_t *superblock,
-                const deletion_context_t *deletion_context,
                 delete_mode_t delete_mode,
                 point_delete_response_t *response,
                 rdb_modification_info_t *mod_info,
@@ -370,53 +366,5 @@ void post_construct_secondary_index_range(
         const std::function<bool(int64_t)> &check_should_abort,
         signal_t *interruptor)
     THROWS_ONLY(interrupted_exc_t);
-
-/* This deleter actually deletes the value and all associated blocks. */
-class rdb_value_deleter_t : public value_deleter_t {
-public:
-    void delete_value(buf_parent_t parent, const void *_value) const;
-};
-
-/* A deleter that doesn't actually delete the values. Needed for secondary
- * indexes which only have references. */
-class rdb_value_detacher_t : public value_deleter_t {
-public:
-    void delete_value(buf_parent_t parent, const void *value) const;
-};
-
-/* Used for operations on the live storage.
- * Each value is first detached in all trees, and then actually deleted through
- * the post_deleter. */
-class rdb_live_deletion_context_t : public deletion_context_t {
-public:
-    rdb_live_deletion_context_t() { }
-    const value_deleter_t *balancing_detacher() const { return &detacher; }
-    const value_deleter_t *primary_deleter() const { return &deleter; }
-private:
-    rdb_value_detacher_t detacher;
-    rdb_value_deleter_t deleter;
-};
-
-/* A deleter that does absolutely nothing. */
-class noop_value_deleter_t : public value_deleter_t {
-public:
-    noop_value_deleter_t() { }
-    void delete_value(buf_parent_t, const void *) const;
-};
-
-// TODO: Remove, quickly.
-/* Used for operations on secondary indexes that aren't yet post-constructed.
- * Since we don't have any guarantees that referenced blob blocks still exist
- * during that stage, we use noop deleters for everything. */
-class rdb_noop_deletion_context_t : public deletion_context_t {
-public:
-    rdb_noop_deletion_context_t() { }
-    const value_deleter_t *balancing_detacher() const { return &no_deleter; }
-    const value_deleter_t *primary_deleter() const { return &no_deleter; }
-private:
-    noop_value_deleter_t no_deleter;
-};
-typedef rdb_noop_deletion_context_t rdb_post_construction_deletion_context_t;
-
 
 #endif /* RDB_PROTOCOL_BTREE_HPP_ */

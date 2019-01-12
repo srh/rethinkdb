@@ -54,18 +54,6 @@ protected:
     std::string info;
 };
 
-class deletion_context_t {
-public:
-    virtual ~deletion_context_t() { }
-
-    // Used by btree balancing operations to detach values
-    virtual const value_deleter_t *balancing_detacher() const = 0;
-
-    // Applied when deleting or erasing a value from a leaf node
-    // (in either secondary index trees or the primary btree)
-    virtual const value_deleter_t *primary_deleter() const = 0;
-};
-
 enum class update_sindexes_t {
     UPDATE,
     LEAVE_ALONE
@@ -330,8 +318,6 @@ public:
     // Clears out a slice of a secondary index.
     void clear_sindex_data(
             uuid_u sindex_id,
-            value_sizer_t *sizer,
-            const deletion_context_t *deletion_context,
             const key_range_t &pkey_range_to_clear,
             signal_t *interruptor)
             THROWS_ONLY(interrupted_exc_t);

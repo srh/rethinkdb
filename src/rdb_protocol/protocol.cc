@@ -80,14 +80,8 @@ void resume_construct_sindex(
     /* We start by clearing out any residual data in the index left behind by a previous
     post construction process (if the server got terminated in the middle). */
     try {
-        /* It's safe to use a noop deletion context because this part of the index has
-        never been live. */
-        rdb_noop_deletion_context_t noop_deletion_context;
-        rdb_value_sizer_t sizer(store->cache->max_block_size());
         store->clear_sindex_data(
             sindex_to_construct,
-            &sizer,
-            &noop_deletion_context,
             construct_range,
             store_keepalive.get_drain_signal());
     } catch (const interrupted_exc_t &) {
@@ -312,7 +306,6 @@ void post_construct_and_drain_queue(
                 // has actually been constructed.
                 // If it's in the range that is still to be constructed we ignore it.
                 if (!construction_range_inout->contains_key(mod_report.primary_key)) {
-                    rdb_post_construction_deletion_context_t deletion_context;
                     rdb_update_sindexes(store->rocksh(),
                                         store,
                                         sindexes,

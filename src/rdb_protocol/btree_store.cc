@@ -284,7 +284,6 @@ void store_t::reset_data(
         an inconsistent state. */
         cond_t non_interruptor;
 
-        rdb_live_deletion_context_t deletion_context;
         std::vector<rdb_modification_report_t> mod_reports;
         key_range_t deleted_range;
         done_erasing = rdb_erase_small_range(rocksh(),
@@ -292,7 +291,6 @@ void store_t::reset_data(
                                              &key_tester,
                                              subregion.inner,
                                              superblock.get(),
-                                             &deletion_context,
                                              &non_interruptor,
                                              max_erased_per_pass,
                                              &mod_reports,
@@ -723,12 +721,9 @@ private:
 
 void store_t::clear_sindex_data(
         uuid_u sindex_id,
-        value_sizer_t *sizer,
-        const deletion_context_t *deletion_context,
         const key_range_t &pkey_range_to_clear,
         signal_t *interruptor)
         THROWS_ONLY(interrupted_exc_t) {
-    (void)sizer, (void)deletion_context;  // TODO: Remove params.
     /* Delete one piece of the secondary index at a time */
     key_range_t remaining_range = key_range_t::universe();
     for (bool reached_end = false; !reached_end; ) {

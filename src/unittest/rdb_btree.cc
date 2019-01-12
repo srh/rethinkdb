@@ -53,7 +53,6 @@ void insert_rows(int start, int finish, store_t *store) {
 
             store_key_t pk(ql::datum_t(static_cast<double>(i)).print_primary());
             rdb_modification_report_t mod_report(pk);
-            rdb_live_deletion_context_t deletion_context;
             rapidjson::Document doc;
             doc.Parse(data.c_str());
             rdb_set(
@@ -61,7 +60,7 @@ void insert_rows(int start, int finish, store_t *store) {
                 pk,
                 ql::to_datum(doc, limits, reql_version_t::LATEST),
                 false, store->btree.get(), repli_timestamp_t::distant_past,
-                superblock.get(), &deletion_context, &response, &mod_report.info,
+                superblock.get(), &response, &mod_report.info,
                 static_cast<profile::trace_t *>(NULL), superblock_t::no_passback);
 
             store_t::sindex_access_vector_t sindexes;
@@ -357,7 +356,6 @@ TPTEST(RDBBtree, SindexEraseRange) {
                 super_block->get_sindex_block_id(),
                 access_t::write);
 
-            rdb_live_deletion_context_t deletion_context;
             std::vector<rdb_modification_report_t> mod_reports;
             key_range_t deleted_range;
             rdb_erase_small_range(
@@ -366,7 +364,6 @@ TPTEST(RDBBtree, SindexEraseRange) {
                 &tester,
                 key_range_t::universe(),
                 super_block.get(),
-                &deletion_context,
                 &dummy_interruptor,
                 0,
                 &mod_reports,

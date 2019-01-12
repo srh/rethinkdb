@@ -267,12 +267,11 @@ TPTEST(BTreeSindex, BtreeStoreAPI) {
 
                 point_write_response_t response;
 
-                rdb_live_deletion_context_t deletion_context;
                 rdb_set_sindex_for_unittest(
                     rockshard(io_backender.rocks(), table_id, 0), sindex_uuid, key, data, true,
                     store.get_sindex_slice(sindex_uuid),
                     repli_timestamp_t::distant_past,
-                    sindex_super_block.get(), &deletion_context, &response,
+                    sindex_super_block.get(), &response,
                     static_cast<profile::trace_t *>(nullptr));
             }
             txn->commit();

@@ -12,7 +12,6 @@
 
 struct btree_key_t;
 class btree_slice_t;
-class deletion_context_t;
 struct rdb_modification_report_t;
 class real_superblock_t;
 class rockshard;
@@ -53,7 +52,6 @@ continue_bool_t rdb_erase_small_range(
     key_tester_t *tester,
     const key_range_t &keys,
     real_superblock_t *superblock,
-    const deletion_context_t *deletion_context,
     signal_t *interruptor,
     uint64_t max_keys_to_erase /* 0 = unlimited */,
     std::vector<rdb_modification_report_t> *mod_reports_out,

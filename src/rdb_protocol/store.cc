@@ -105,19 +105,9 @@ void store_t::help_construct_bring_sindexes_up_to_date() {
     auto clear_sindex = [this](uuid_u sindex_id,
                                auto_drainer_t::lock_t store_keepalive) {
         try {
-            // Note that we can safely use a noop deleter here, since the
-            // secondary index cannot be in use at this point and we therefore
-            // don't have to detach anything.
-            // This is in contrast to `delayed_clear_and_drop_sindex()`, where we
-            // have to deal with some parts of the index still potentially being live.
-            rdb_noop_deletion_context_t noop_deletion_context;
-            rdb_value_sizer_t sizer(cache->max_block_size());
-
             /* Clear the sindex. */
             clear_sindex_data(
                 sindex_id,
-                &sizer,
-                &noop_deletion_context,
                 key_range_t::universe(),
                 store_keepalive.get_drain_signal());
 
@@ -896,11 +886,10 @@ struct rdb_write_visitor_t : public boost::static_visitor<void> {
 
         backfill_debug_key(w.key, strprintf("upsert %" PRIu64, timestamp.longtime));
 
-        rdb_live_deletion_context_t deletion_context;
         rdb_modification_report_t mod_report(w.key);
         rdb_set(store->rocksh(),
                 w.key, w.data, w.overwrite, btree, timestamp, superblock.get(),
-                &deletion_context, res, &mod_report.info, trace, superblock_t::no_passback);
+                res, &mod_report.info, trace, superblock_t::no_passback);
 
         update_sindexes(mod_report);
     }
@@ -913,10 +902,9 @@ struct rdb_write_visitor_t : public boost::static_visitor<void> {
 
         backfill_debug_key(d.key, strprintf("delete %" PRIu64, timestamp.longtime));
 
-        rdb_live_deletion_context_t deletion_context;
         rdb_modification_report_t mod_report(d.key);
         rdb_delete(store->rocksh(),
-                d.key, btree, timestamp, superblock.get(), &deletion_context,
+                d.key, btree, timestamp, superblock.get(),
                 delete_mode_t::REGULAR_QUERY, res, &mod_report.info, trace, superblock_t::no_passback);
 
         update_sindexes(mod_report);
@@ -1030,26 +1018,8 @@ void store_t::delayed_clear_and_drop_sindex(
         auto_drainer_t::lock_t store_keepalive)
         THROWS_NOTHING {
     try {
-        rdb_value_sizer_t sizer(cache->max_block_size());
-        /* If the index had been completely constructed, we must
-         * detach its values since snapshots might be accessing it.
-         * If on the other hand the index had not finished post
-         * construction, it would be incorrect to do so.
-         * The reason being that some of the values that the sindex
-         * points to might have been deleted in the meantime
-         * (the deletion would be on the sindex queue, but might
-         * not have found its way into the index tree yet). */
-        rdb_live_deletion_context_t live_deletion_context;
-        rdb_post_construction_deletion_context_t post_con_deletion_context;
-        deletion_context_t *actual_deletion_context =
-            sindex.post_construction_complete()
-            ? static_cast<deletion_context_t *>(&live_deletion_context)
-            : static_cast<deletion_context_t *>(&post_con_deletion_context);
-
         /* Clear the sindex */
         clear_sindex_data(sindex.id,
-                          &sizer,
-                          actual_deletion_context,
                           key_range_t::universe(),
                           store_keepalive.get_drain_signal());
 

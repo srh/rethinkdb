@@ -192,7 +192,6 @@ void apply_item_pair(
         backfill_item_t::pair_t &&pair,
         std::vector<rdb_modification_report_t> *mod_reports_out,
         promise_t<superblock_t *> *pass_back_superblock) {
-    rdb_live_deletion_context_t deletion_context;
     mod_reports_out->resize(mod_reports_out->size() + 1);
     mod_reports_out->back().primary_key = pair.key;
     if (static_cast<bool>(pair.value1)) {
@@ -204,13 +203,13 @@ void apply_item_pair(
         // TODO: For rocks there's transactionality to pass around (related to updating metainfo)
         point_write_response_t dummy_response;
         rdb_set(rocksh, pair.key, datum, true, slice, pair.recency, superblock,
-            &deletion_context, &dummy_response, &mod_reports_out->back().info, nullptr,
+            &dummy_response, &mod_reports_out->back().info, nullptr,
             pass_back_superblock);
     } else {
         // TODO: For rocks there's transactionality to pass around (related to updating metainfo)
         point_delete_response_t dummy_response;
         rdb_delete(rocksh, pair.key, slice, pair.recency, superblock,
-            &deletion_context, delete_mode_t::MAKE_TOMBSTONE, &dummy_response,
+            delete_mode_t::MAKE_TOMBSTONE, &dummy_response,
             &mod_reports_out->back().info, nullptr, pass_back_superblock);
     }
 }
@@ -351,12 +350,11 @@ void apply_multi_key_item(
             `MAX_CHANGES_PER_TXN / 2` changes at once. */
             always_true_key_tester_t key_tester;
             key_range_t range_deleted;
-            rdb_live_deletion_context_t deletion_context;
             // TODO: We need to manage rocks transactionality
             // between erasing range, applying writes, and updating sindex.
             continue_bool_t res = rdb_erase_small_range(
                 rocksh, tokens.info->slice, &key_tester,
-                range_to_delete, superblock.get(), &deletion_context,
+                range_to_delete, superblock.get(),
                 &non_interruptor, MAX_CHANGES_PER_TXN / 2,
                 &mod_reports, &range_deleted);
             guarantee(range_deleted.right == range_to_delete.right
