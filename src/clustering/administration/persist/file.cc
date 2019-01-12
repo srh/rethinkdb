@@ -3,7 +3,6 @@
 
 #include "arch/io/disk.hpp"
 #include "btree/types.hpp"
-#include "buffer_cache/blob.hpp"
 #include "buffer_cache/cache_balancer.hpp"
 #include "config/args.hpp"
 #include "logger.hpp"

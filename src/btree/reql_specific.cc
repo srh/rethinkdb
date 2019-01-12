@@ -4,7 +4,6 @@
 #include "rocksdb/write_batch.h"
 
 #include "btree/secondary_operations.hpp"
-#include "buffer_cache/blob.hpp"
 #include "containers/binary_blob.hpp"
 #include "rockstore/store.hpp"
 
