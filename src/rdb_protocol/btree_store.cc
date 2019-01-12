@@ -5,8 +5,6 @@
 
 #include "arch/runtime/coroutines.hpp"
 #include "btree/concurrent_traversal.hpp"
-#include "btree/depth_first_traversal.hpp"
-#include "btree/leaf_node.hpp"
 #include "btree/node.hpp"
 #include "btree/operations.hpp"
 #include "btree/reql_specific.hpp"

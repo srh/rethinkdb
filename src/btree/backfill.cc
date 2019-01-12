@@ -6,7 +6,6 @@
 #include "arch/runtime/coroutines.hpp"
 #include "arch/runtime/thread_pool.hpp"
 #include "btree/backfill_debug.hpp"
-#include "btree/depth_first_traversal.hpp"
 #include "btree/leaf_node.hpp"
 #include "btree/reql_specific.hpp"
 #include "concurrency/pmap.hpp"
