@@ -2392,7 +2392,7 @@ void rdb_update_sindexes(
     }
 }
 
-class post_construct_traversal_helper_t : public concurrent_traversal_callback_t {
+class post_construct_traversal_helper_t : public rocks_traversal_cb {
 public:
     post_construct_traversal_helper_t(
             store_t *store,
@@ -2422,8 +2422,7 @@ public:
     }
 
     continue_bool_t handle_pair(
-            scoped_key_value_t &&keyvalue,
-            concurrent_traversal_fifo_enforcer_signal_t waiter)
+            std::pair<const char *, size_t> key, std::pair<const char *, size_t> value)
             THROWS_ONLY(interrupted_exc_t) override {
 
         if (interruptor_->is_pulsed() || on_indexes_deleted_->is_pulsed()) {
@@ -2436,12 +2435,10 @@ public:
 
         // Grab the key and value and construct a modification report for the key/value
         // pair.
-        const store_key_t primary_key(keyvalue.key());
-        const rdb_value_t *rdb_value =
-            static_cast<const rdb_value_t *>(keyvalue.value());
+        const store_key_t primary_key(key.second, reinterpret_cast<const uint8_t *>(key.first));
         rdb_modification_report_t mod_report(primary_key);
         mod_report.info.added.first
-            = get_data(rdb_value, buf_parent_t(keyvalue.expose_buf()));
+            = datum_deserialize_from_vec(value.first, value.second);
 
         // Store the value into the secondary indexes
         {
@@ -2468,7 +2465,10 @@ public:
         // key order).
         // This can't be interrupted, because we have already called rdb_update_sindexes,
         // so now we /must/ update traversed_right_bound.
-        waiter.wait();
+
+        // TODO: Concurrent_traversal used to call waiter.wait() here (area
+        // below being in-order mutexed), but now rocks traversal is in-order.
+        // waiter.wait();
         traversed_right_bound_ = primary_key;
 
         // Release the write transaction and secondary index locks once we've reached the
@@ -2637,12 +2637,16 @@ void post_construct_secondary_index_range(
         = txn->cache()->create_cache_account(SINDEX_POST_CONSTRUCTION_CACHE_PRIORITY);
     txn->set_account(&cache_account);
 
-    continue_bool_t cont = btree_concurrent_traversal(
+    rockshard rocksh = store->rocksh();
+    std::string rocks_kv_prefix = rockstore::table_primary_prefix(rocksh.table_id, rocksh.shard_no);
+    continue_bool_t cont = rocks_traversal(
         superblock.get(),
+        rocksh.rocks,
+        rocks_kv_prefix,
         *construction_range_inout,
-        &traversal_cb,
         direction_t::forward,
-        release_superblock_t::RELEASE);
+        release_superblock_t::RELEASE,
+        &traversal_cb);
     if (cont == continue_bool_t::ABORT
         && (interruptor->is_pulsed() || on_index_deleted_interruptor.is_pulsed())) {
         throw interrupted_exc_t();
