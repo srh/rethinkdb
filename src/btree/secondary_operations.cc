@@ -171,11 +171,6 @@ void set_secondary_indexes_internal(
 
 void initialize_secondary_indexes(rockshard rocksh,
                                   buf_lock_t *sindex_block) {
-    buf_write_t write(sindex_block);
-    btree_sindex_block_t *data
-        = static_cast<btree_sindex_block_t *>(write.get_data_write());
-    data->magic = btree_sindex_block_magic_t<cluster_version_t::LATEST_DISK>::value;
-
     set_secondary_indexes_internal(rocksh, sindex_block,
                                    std::map<sindex_name_t, secondary_index_t>());
 }

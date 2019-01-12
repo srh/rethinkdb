@@ -21,30 +21,14 @@ flushing our changes out to disk. This prevents the backfill from using too much
 cache's unsaved data limit, which would slow down queries on other shards. */
 static const int MAX_UNSAVED_CHANGES = 1000;
 
-void flush_cache(cache_conn_t *cache, UNUSED signal_t *interruptor) {
-    scoped_ptr_t<txn_t> txn;
-    {
-        scoped_ptr_t<real_superblock_t> superblock;
-        get_btree_superblock_and_txn_for_writing(cache, nullptr,
-            write_access_t::write, 1, write_durability_t::HARD, &superblock, &txn);
-        buf_write_t write(superblock->get());
-    }
-    /* `commit` will block until all of the transactions that acquired the
-    superblock before we did and modified the metainfo have been flushed to disk. It's a
-    shame we can't wait on `interruptor` using this API. */
-    txn->commit();
-}
-
 class unsaved_data_limiter_t {
 public:
-    explicit unsaved_data_limiter_t(cache_conn_t *_cache) :
-        cache(_cache), semaphore(MAX_UNSAVED_CHANGES)
-        { }
+    unsaved_data_limiter_t() : semaphore(MAX_UNSAVED_CHANGES) { }
 
     /* `prepare_for_changes()` indicates an intention to change `num_changes` keys. If
     there's too much unsaved data already, then it will block until some of the data is
     flushed. */
-    void prepare_for_changes(int num_changes, signal_t *interruptor) {
+    void prepare_for_changes(rockstore::store *rocks, int num_changes, signal_t *interruptor) {
         scoped_ptr_t<new_semaphore_in_line_t> sem_acq =
             make_scoped<new_semaphore_in_line_t>(&semaphore, num_changes);
         wait_interruptible(sem_acq->acquisition_signal(), interruptor);
@@ -56,25 +40,18 @@ public:
         if (unflushed_sem_acq->count() > MAX_UNSAVED_CHANGES / 4) {
             scoped_ptr_t<new_semaphore_in_line_t> temp;
             std::swap(temp, unflushed_sem_acq);
-            coro_t::spawn_sometime(std::bind(&unsaved_data_limiter_t::flush, this,
+            coro_t::spawn_sometime(std::bind(&unsaved_data_limiter_t::flush, this, rocks,
                 std::move(temp), drainer.lock()));
         }
     }
 
 private:
     void flush(
+            rockstore::store *rocks,
             const scoped_ptr_t<new_semaphore_in_line_t> &,
-            auto_drainer_t::lock_t keepalive) {
-        try {
-            flush_cache(cache, keepalive.get_drain_signal());
-        } catch (const interrupted_exc_t &) {
-            /* ignore */
-        }
-        /* Once `flush()` returns, then the `std::bind` will be destroyed, releasing the
-        `new_semaphore_in_line_t`. */
+            UNUSED auto_drainer_t::lock_t keepalive) {
+        rocks->sync(rockstore::write_options(true));
     }
-
-    cache_conn_t *cache;
 
     /* Destructor order matters here. We have to destroy `drainer` first, because that
     will stop the `flush()` coroutines. Then we have to destroy `unflushed_sem_acq`
@@ -242,7 +219,7 @@ void apply_single_key_item(
             deadlocks; acquiring `limiter` only when we also hold `btree_fifo_sink` is
             sufficient to prevent deadlocks. */
             tokens.info->limiter->prepare_for_changes(
-                1, tokens.keepalive.get_drain_signal());
+                rocksh.rocks, 1, tokens.keepalive.get_drain_signal());
 
             get_btree_superblock_and_txn_for_writing(tokens.info->cache_conn, nullptr,
                 write_access_t::write, 1, write_durability_t::SOFT, &superblock, &txn);
@@ -306,7 +283,7 @@ void apply_multi_key_item(
             /* Block until there's not too much unsaved data. Note that
             `MAX_CHANGES_PER_TXN` might be an overestimate, but that's OK. */
             tokens.info->limiter->prepare_for_changes(
-                MAX_CHANGES_PER_TXN, tokens.keepalive.get_drain_signal());
+                rocksh.rocks, MAX_CHANGES_PER_TXN, tokens.keepalive.get_drain_signal());
 
             /* We must not throw within the transaction. So we check the
             drain signal now. */
@@ -397,7 +374,7 @@ continue_bool_t store_t::receive_backfill(
         THROWS_ONLY(interrupted_exc_t) {
     guarantee(_region.beg == get_region().beg && _region.end == get_region().end);
 
-    unsaved_data_limiter_t unsaved_data_limiter(general_cache_conn.get());
+    unsaved_data_limiter_t unsaved_data_limiter;
     receive_backfill_info_t info(
         general_cache_conn.get(), btree.get(), &unsaved_data_limiter);
 
@@ -523,7 +500,7 @@ continue_bool_t store_t::receive_backfill(
     there is data that's not yet safely on disk. The other is to make sure that we don't
     use increasingly large amounts of the unsaved data limit if `receive_backfill()` is
     called repeatedly. */
-    flush_cache(general_cache_conn.get(), interruptor);
+    // TODO: Make sure this affects our rocksdb transaction that we made.
     rocks->sync(rockstore::write_options::TODO());
 
     return result;
