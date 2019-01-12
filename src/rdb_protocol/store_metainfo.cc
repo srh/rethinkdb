@@ -9,7 +9,8 @@
 store_metainfo_manager_t::store_metainfo_manager_t(rockshard rocksh, real_superblock_t *superblock) {
     std::vector<std::pair<std::vector<char>, std::vector<char> > > kv_pairs;
     // TODO: this is inefficient, cut out the middleman (vector)
-    get_superblock_metainfo(rocksh, superblock, &kv_pairs, &cache_version);
+    cluster_version_t version;
+    get_superblock_metainfo(rocksh, superblock, &kv_pairs, &version);
     std::vector<region_t> regions;
     std::vector<binary_blob_t> values;
     for (auto &pair : kv_pairs) {
@@ -30,8 +31,6 @@ store_metainfo_manager_t::store_metainfo_manager_t(rockshard rocksh, real_superb
 region_map_t<binary_blob_t> store_metainfo_manager_t::get(
         real_superblock_t *superblock,
         const region_t &region) const {
-    guarantee(cache_version == cluster_version_t::v2_1,
-              "Old metainfo needs to be migrated before being used.");
     guarantee(superblock != nullptr);
     superblock->get()->read_acq_signal()->wait_lazily_ordered();
     return cache.mask(region);
@@ -41,8 +40,6 @@ void store_metainfo_manager_t::visit(
         real_superblock_t *superblock,
         const region_t &region,
         const std::function<void(const region_t &, const binary_blob_t &)> &cb) const {
-    guarantee(cache_version == cluster_version_t::v2_1,
-              "Old metainfo needs to be migrated before being used.");
     guarantee(superblock != nullptr);
     superblock->get()->read_acq_signal()->wait_lazily_ordered();
     cache.visit(region, cb);
@@ -73,29 +70,5 @@ void store_metainfo_manager_t::update(
             values.push_back(value);
         });
 
-    set_superblock_metainfo(superblock, rocksh, keys, values, cache_version);
-}
-
-// TODO: Is this a real migration now?
-void store_metainfo_manager_t::migrate(
-        real_superblock_t *superblock,
-        rockshard rocksh,
-        cluster_version_t from,
-        cluster_version_t to,
-        const region_t &region, // This should be for all valid ranges for this hash shard
-        const std::function<binary_blob_t(const region_t &, const binary_blob_t &)> &cb) {
-    guarantee(superblock != nullptr);
-    superblock->get()->write_acq_signal()->wait_lazily_ordered();
-
-    guarantee(cache_version == from);
-    region_map_t<binary_blob_t> new_metainfo;
-    {
-        ASSERT_NO_CORO_WAITING;
-        cache.visit(region, [&] (const region_t &r, const binary_blob_t &b) {
-                        new_metainfo.update(r, cb(r, b));
-                    });
-    }
-
-    cache_version = to;
-    update(superblock, rocksh, new_metainfo);
+    set_superblock_metainfo(superblock, rocksh, keys, values);
 }

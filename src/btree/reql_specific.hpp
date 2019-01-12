@@ -162,14 +162,12 @@ void get_superblock_metainfo(
 void set_superblock_metainfo(real_superblock_t *superblock,
                              rockshard rocksh,
                              const std::vector<char> &key,
-                             const binary_blob_t &value,
-                             cluster_version_t version);
+                             const binary_blob_t &value);
 
 void set_superblock_metainfo(real_superblock_t *superblock,
                              rockshard rocksh,
                              const std::vector<std::vector<char> > &keys,
-                             const std::vector<binary_blob_t> &values,
-                             cluster_version_t version);
+                             const std::vector<binary_blob_t> &values);
 
 // Convenience functions for accessing the superblock
 void get_btree_superblock(

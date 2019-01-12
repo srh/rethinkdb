@@ -29,16 +29,7 @@ public:
         rockshard rocksh,
         const region_map_t<binary_blob_t> &new_metainfo);
 
-    void migrate(real_superblock_t *superblock,
-                 rockshard rocksh,
-                 cluster_version_t from,
-                 cluster_version_t to,
-                 const region_t &region,
-                 const std::function<binary_blob_t(const region_t &,
-                                                   const binary_blob_t &)> &cb);
-
 private:
-    cluster_version_t cache_version;
     region_map_t<binary_blob_t> cache;
 };
 

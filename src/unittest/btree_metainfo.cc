@@ -95,8 +95,7 @@ TPTEST(BtreeMetainfo, MetainfoTest) {
                     keys.push_back(string_to_vector(pair.first));
                     values.push_back(string_to_blob(pair.second));
                 }
-                set_superblock_metainfo(superblock.get(), rocksh, keys, values,
-                    cluster_version_t::v2_1);
+                set_superblock_metainfo(superblock.get(), rocksh, keys, values);
             }
             txn->commit();
         }

@@ -25,26 +25,6 @@ ATTR_PACKED(struct reql_btree_superblock_t {
     char metainfo_blob_unused[METAINFO_BLOB_MAXREFLEN];
 });
 
-static const uint32_t REQL_BTREE_SUPERBLOCK_SIZE = sizeof(reql_btree_superblock_t);
-
-template <cluster_version_t>
-struct reql_btree_version_magic_t {
-    static const block_magic_t value;
-};
-
-// All pre-2.1 values are the same, so we treat them all as v2.0.x
-// Versions pre-2.1 store version_range_ts in their metainfo
-template <>
-const block_magic_t
-    reql_btree_version_magic_t<cluster_version_t::v2_0>::value =
-        { { 's', 'u', 'p', 'e' } };
-
-// Versions post-2.1 store version_ts in their metainfo
-template <>
-const block_magic_t
-    reql_btree_version_magic_t<cluster_version_t::v2_1>::value =
-        { { 's', 'u', 'p', 'f' } };
-
 void btree_superblock_ct_asserts() {
     // Just some place to put the CT_ASSERTs
     CT_ASSERT(reql_btree_superblock_t::METAINFO_BLOB_MAXREFLEN > 0);
@@ -120,8 +100,7 @@ void btree_slice_t::init_real_superblock(real_superblock_t *superblock,
                                          const std::vector<char> &metainfo_key,
                                          const binary_blob_t &metainfo_value) {
     superblock->write_acq_signal()->wait_lazily_ordered();
-    set_superblock_metainfo(superblock, rocksh, metainfo_key, metainfo_value,
-                            cluster_version_t::v2_1);
+    set_superblock_metainfo(superblock, rocksh, metainfo_key, metainfo_value);
 
     buf_lock_t sindex_block(superblock->get(), alt_create_t::create);
     initialize_secondary_indexes(rocksh, &sindex_block);
@@ -224,33 +203,19 @@ void get_superblock_metainfo(
 void set_superblock_metainfo(real_superblock_t *superblock,
                              rockshard rocksh,
                              const std::vector<char> &key,
-                             const binary_blob_t &value,
-                             cluster_version_t version) {
+                             const binary_blob_t &value) {
     std::vector<std::vector<char> > keys = {key};
     std::vector<binary_blob_t> values = {value};
-    set_superblock_metainfo(superblock, rocksh, keys, values, version);
+    set_superblock_metainfo(superblock, rocksh, keys, values);
 }
 
 void set_superblock_metainfo(real_superblock_t *superblock,
                              rockshard rocksh,
                              const std::vector<std::vector<char> > &keys,
-                             const std::vector<binary_blob_t> &values,
-                             cluster_version_t version) {
+                             const std::vector<binary_blob_t> &values) {
     // Acquire lock explicitly for rocksdb writing.
     superblock->write_acq_signal()->wait_lazily_ordered();
 
-    buf_write_t write(superblock->get());
-    reql_btree_superblock_t *data
-        = static_cast<reql_btree_superblock_t *>(
-            write.get_data_write(REQL_BTREE_SUPERBLOCK_SIZE));
-
-    if (version == cluster_version_t::v2_0) {
-        data->magic = reql_btree_version_magic_t<cluster_version_t::v2_0>::value;
-    } else if (version == cluster_version_t::v2_1) {
-        data->magic = reql_btree_version_magic_t<cluster_version_t::v2_1>::value;
-    } else {
-        crash("Unsupported version when writing metainfo.");
-    }
     std::vector<char> metainfo;
 
     rassert(keys.size() == values.size());
@@ -281,6 +246,7 @@ void set_superblock_metainfo(real_superblock_t *superblock,
     rocksdb::WriteBatch batch;
     std::string meta_prefix = rockstore::table_metadata_prefix(rocksh.table_id, rocksh.shard_no);
     // TODO: Don't update version if it's already properly set.  (Performance.)
+    // TODO: Just remove the metadata version key...?
     rocksdb::Status status = batch.Put(
         meta_prefix + rockstore::TABLE_METADATA_VERSION_KEY(),
         rockstore::VERSION());
