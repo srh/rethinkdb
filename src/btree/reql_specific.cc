@@ -84,7 +84,7 @@ void real_superblock_t::release() {
 
 // TODO: gross
 block_id_t real_superblock_t::get_sindex_block_id(rockshard rocksh) {
-    read_acq_signal()->wait_lazily_unordered();
+    read_acq_signal()->wait_lazily_ordered();
     return get_rocks_sindex_block_id(rocksh);
 }
 
@@ -218,7 +218,7 @@ void get_superblock_metainfo(
         real_superblock_t *superblock,
         std::vector<std::pair<std::vector<char>, std::vector<char> > > *kv_pairs_out,
         cluster_version_t *version_out) {
-    superblock->read_acq_signal()->wait_lazily_unordered();
+    superblock->read_acq_signal()->wait_lazily_ordered();
 
     std::string meta_prefix = rockstore::table_metadata_prefix(rocksh.table_id, rocksh.shard_no);
     std::string version
@@ -256,7 +256,7 @@ void set_superblock_metainfo(real_superblock_t *superblock,
                              const std::vector<binary_blob_t> &values,
                              cluster_version_t version) {
     // Acquire lock explicitly for rocksdb writing.
-    superblock->write_acq_signal()->wait_lazily_unordered();
+    superblock->write_acq_signal()->wait_lazily_ordered();
 
     buf_write_t write(superblock->get());
     reql_btree_superblock_t *data

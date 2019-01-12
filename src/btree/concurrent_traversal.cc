@@ -44,7 +44,7 @@ continue_bool_t rocks_traversal(
     rocksdb::OptimisticTransactionDB *db = rocks->db();
 
     // Acquire read lock on superblock first.
-    superblock->read_acq_signal()->wait_lazily_unordered();
+    superblock->read_acq_signal()->wait_lazily_ordered();
 
     // linux_thread_pool_t::run_in_blocker_pool([&]() {
 

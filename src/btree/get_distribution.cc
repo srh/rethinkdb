@@ -28,7 +28,7 @@ void get_distribution(
     std::vector<store_key_t> ret;
     std::vector<uint64_t> count_output;
 
-    superblock->read_acq_signal()->wait_lazily_unordered();
+    superblock->read_acq_signal()->wait_lazily_ordered();
     linux_thread_pool_t::run_in_blocker_pool([&]() {
         std::vector<std::string> key_names;
 

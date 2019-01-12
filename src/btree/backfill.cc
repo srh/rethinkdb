@@ -30,7 +30,7 @@ continue_bool_t btree_send_backfill_pre(
     backfill_debug_range(range, strprintf(
         "btree_send_backfill_pre %" PRIu64, reference_timestamp.longtime));
 
-    superblock->read_acq_signal()->wait_lazily_unordered();
+    superblock->read_acq_signal()->wait_lazily_ordered();
     // We just request the entire range at once, since we lack timestamp data on rocksdb.
     continue_bool_t cont = pre_item_consumer->on_pre_item(backfill_pre_item_t{range});
     if (release_superblock == release_superblock_t::RELEASE) {
@@ -66,7 +66,7 @@ continue_bool_t send_all_in_keyrange(
 
     // TODO: Must NewIterator be in a blocker thread?
     // TODO: With all superblock read_acq_signals... use the interruptor?
-    superblock->read_acq_signal()->wait_lazily_unordered();
+    superblock->read_acq_signal()->wait_lazily_ordered();
     repli_timestamp_t max_timestamp = superblock->get()->get_recency();
     scoped_ptr_t<rocksdb::Iterator> iter(db->NewIterator(opts));
     if (release_superblock == release_superblock_t::RELEASE) {

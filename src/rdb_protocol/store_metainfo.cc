@@ -30,7 +30,7 @@ store_metainfo_manager_t::store_metainfo_manager_t(rockshard rocksh, real_superb
 cluster_version_t store_metainfo_manager_t::get_version(
         real_superblock_t *superblock) const {
     guarantee(superblock != nullptr);
-    superblock->get()->read_acq_signal()->wait_lazily_unordered();
+    superblock->get()->read_acq_signal()->wait_lazily_ordered();
     return cache_version;
 }
 
@@ -40,7 +40,7 @@ region_map_t<binary_blob_t> store_metainfo_manager_t::get(
     guarantee(cache_version == cluster_version_t::v2_1,
               "Old metainfo needs to be migrated before being used.");
     guarantee(superblock != nullptr);
-    superblock->get()->read_acq_signal()->wait_lazily_unordered();
+    superblock->get()->read_acq_signal()->wait_lazily_ordered();
     return cache.mask(region);
 }
 
@@ -51,7 +51,7 @@ void store_metainfo_manager_t::visit(
     guarantee(cache_version == cluster_version_t::v2_1,
               "Old metainfo needs to be migrated before being used.");
     guarantee(superblock != nullptr);
-    superblock->get()->read_acq_signal()->wait_lazily_unordered();
+    superblock->get()->read_acq_signal()->wait_lazily_ordered();
     cache.visit(region, cb);
 }
 
@@ -61,7 +61,7 @@ void store_metainfo_manager_t::update(
         const region_map_t<binary_blob_t> &new_values) {
     // TODO: Strip out non-rocks writing (but keep superblock write acquisition waiting).
     guarantee(superblock != nullptr);
-    superblock->get()->write_acq_signal()->wait_lazily_unordered();
+    superblock->get()->write_acq_signal()->wait_lazily_ordered();
 
     cache.update(new_values);
 
@@ -92,7 +92,7 @@ void store_metainfo_manager_t::migrate(
         const region_t &region, // This should be for all valid ranges for this hash shard
         const std::function<binary_blob_t(const region_t &, const binary_blob_t &)> &cb) {
     guarantee(superblock != nullptr);
-    superblock->get()->write_acq_signal()->wait_lazily_unordered();
+    superblock->get()->write_acq_signal()->wait_lazily_ordered();
 
     guarantee(cache_version == from);
     region_map_t<binary_blob_t> new_metainfo;

@@ -791,7 +791,7 @@ void store_t::clear_sindex_data(
             key_range_t::none,
             store_key_t());
 
-        sindex_superblock->write_acq_signal()->wait_lazily_unordered();
+        sindex_superblock->write_acq_signal()->wait_lazily_ordered();
 
         /* 2. Actually delete them */
         const std::vector<store_key_t> &keys = traversal_cb.get_keys();
@@ -844,12 +844,12 @@ void store_t::drop_sindex(uuid_u sindex_id) THROWS_NOTHING {
                                           sindex.superblock, access_t::write);
         sindex_superblock_t sindex_superblock(std::move(sindex_superblock_lock));
         // TODO: It's possible we need to keep the locking here.
-        sindex_superblock.read_acq_signal()->wait_lazily_unordered();
+        sindex_superblock.read_acq_signal()->wait_lazily_ordered();
     }
     /* Now it's safe to completely delete the index */
     buf_lock_t sindex_superblock_lock(buf_parent_t(&sindex_block),
                                       sindex.superblock, access_t::write);
-    sindex_superblock_lock.write_acq_signal()->wait_lazily_unordered();
+    sindex_superblock_lock.write_acq_signal()->wait_lazily_ordered();
     sindex_superblock_lock.mark_deleted();
     ::delete_secondary_index(rocksh(), &sindex_block, compute_sindex_deletion_name(sindex.id));
     size_t num_erased = secondary_index_slices.erase(sindex.id);

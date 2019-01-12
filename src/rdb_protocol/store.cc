@@ -395,7 +395,7 @@ struct rdb_read_visitor_t : public boost::static_visitor<void> {
                                          const store_key_t &read_start) {
         guarantee(!superblock->get()->is_snapshotted());
 
-        superblock->get()->read_acq_signal()->wait_lazily_unordered();
+        superblock->get()->read_acq_signal()->wait_lazily_ordered();
 
         auto cserver = store->changefeed_server(s.region);
         if (cserver.first != nullptr) {
@@ -422,7 +422,7 @@ struct rdb_read_visitor_t : public boost::static_visitor<void> {
     void operator()(const changefeed_point_stamp_t &s) {
         // Need to wait for the superblock to make sure we get the right changefeed
         // stamp.
-        superblock->get()->read_acq_signal()->wait_lazily_unordered();
+        superblock->get()->read_acq_signal()->wait_lazily_ordered();
 
         response->response = changefeed_point_stamp_response_t();
         auto *res = boost::get<changefeed_point_stamp_response_t>(&response->response);

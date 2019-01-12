@@ -35,7 +35,7 @@
 void rdb_get_secondary_for_unittest(
         rockshard rocksh, uuid_u sindex_uuid, const store_key_t &store_key,
         sindex_superblock_t *superblock, ql::datum_t *out) {
-    superblock->read_acq_signal()->wait_lazily_unordered();
+    superblock->read_acq_signal()->wait_lazily_ordered();
     std::string loc = rockstore::table_secondary_key(
         rocksh.table_id, rocksh.shard_no, sindex_uuid, key_to_unescaped_str(store_key));
     std::pair<std::string, bool> val = rocksh.rocks->try_read(loc);
@@ -49,7 +49,7 @@ void rdb_get_secondary_for_unittest(
 
 void rdb_get(rockshard rocksh, const store_key_t &store_key,
              real_superblock_t *superblock, point_read_response_t *response) {
-    superblock->read_acq_signal()->wait_lazily_unordered();
+    superblock->read_acq_signal()->wait_lazily_ordered();
     std::string loc = rockstore::table_primary_key(rocksh.table_id, rocksh.shard_no, key_to_unescaped_str(store_key));
     std::pair<std::string, bool> val = rocksh.rocks->try_read(loc);
     superblock->release();
@@ -313,7 +313,7 @@ void do_a_replace_from_batched_replace(
         batched_replaces_fifo_sink, batched_replaces_fifo_token);
     // We need to get in line for this while still holding the superblock so
     // that stamp read operations can't queue-skip.
-    info.superblock->get()->write_acq_signal()->wait_lazily_unordered();
+    info.superblock->get()->write_acq_signal()->wait_lazily_ordered();
     rwlock_in_line_t stamp_spot = mod_cb->get_in_line_for_cfeed_stamp();
 
     rdb_modification_report_t mod_report(*info.key);
@@ -491,7 +491,7 @@ void rdb_set_sindex_for_unittest(
         profile::trace_t *trace) {
     (void)timestamp, (void)trace;  // TODO: Remove params or delete the unit test.
 
-    superblock->write_acq_signal()->wait_lazily_unordered();
+    superblock->write_acq_signal()->wait_lazily_ordered();
 
     slice->stats.pm_keys_set.record();
     slice->stats.pm_total_keys_set += 1;
@@ -1753,7 +1753,7 @@ void rdb_update_single_sindex(
                         }
                     }, cserver.second);
             }
-            superblock->write_acq_signal()->wait_lazily_unordered();
+            superblock->write_acq_signal()->wait_lazily_ordered();
             for (auto it = keys.begin(); it != keys.end(); ++it) {
                 std::string rocks_secondary_kv_location
                     = rockstore::table_secondary_key(
@@ -1811,7 +1811,7 @@ void rdb_update_single_sindex(
                         }
                     }, cserver.second);
             }
-            superblock->write_acq_signal()->wait_lazily_unordered();
+            superblock->write_acq_signal()->wait_lazily_ordered();
             for (auto it = keys.begin(); it != keys.end(); ++it) {
                 std::string rocks_secondary_kv_location
                     = rockstore::table_secondary_key(

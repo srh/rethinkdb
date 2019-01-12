@@ -82,7 +82,7 @@ continue_bool_t rdb_erase_small_range(
     mod_reports_out->clear();
     *deleted_out = key_range_t::empty();
 
-    superblock->write_acq_signal()->wait_lazily_unordered();
+    superblock->write_acq_signal()->wait_lazily_ordered();
 
     // TODO: Use a rocks iterator, delete the keys while iterating.
 

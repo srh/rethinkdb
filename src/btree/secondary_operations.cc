@@ -149,7 +149,7 @@ void get_secondary_indexes_internal(
         rockshard rocksh,
         buf_lock_t *sindex_block,
         std::map<sindex_name_t, secondary_index_t> *sindexes_out) {
-    sindex_block->read_acq_signal()->wait_lazily_unordered();
+    sindex_block->read_acq_signal()->wait_lazily_ordered();
 
     std::string rocks_sindex_blob = rocksh->read(rockstore::table_sindex_map(rocksh.table_id, rocksh.shard_no));
     string_read_stream_t stream(std::move(rocks_sindex_blob), 0);
@@ -161,7 +161,7 @@ void set_secondary_indexes_internal(
         rockshard rocksh,
         buf_lock_t *sindex_block,
         const std::map<sindex_name_t, secondary_index_t> &sindexes) {
-    sindex_block->write_acq_signal()->wait_lazily_unordered();
+    sindex_block->write_acq_signal()->wait_lazily_ordered();
 
     // TODO: rocksdb transactionality
     std::string sindex_rocks_blob = serialize_to_string<cluster_version_t::LATEST_DISK>(sindexes);

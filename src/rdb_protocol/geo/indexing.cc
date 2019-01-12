@@ -486,7 +486,7 @@ continue_bool_t geo_traversal(
     }
 
     // Wait for acquisition of the read lock.
-    superblock->read_acq_signal()->wait_lazily_unordered();
+    superblock->read_acq_signal()->wait_lazily_ordered();
 
     // TODO: Check if we must call NewIterator on the thread pool thread.
     // TODO: Switching threads for every key/value pair is kind of lame.
