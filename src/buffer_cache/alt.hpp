@@ -57,7 +57,6 @@ public:
 
 private:
     friend class txn_t;
-    friend class buf_write_t;
     friend class buf_lock_t;
 
     alt_snapshot_node_t *matching_snapshot_node_or_null(
@@ -262,8 +261,6 @@ private:
                                                   block_id_t child_id);
     alt::current_page_acq_t *current_page_acq() const;
 
-    friend class buf_write_t;  // for get_held_page_for_write, access_ref_count_.
-
     alt::page_t *get_held_page_for_read();
     alt::page_t *get_held_page_for_write();
 
@@ -321,21 +318,6 @@ private:
     buf_lock_t *lock_or_null_;
 };
 
-class buf_write_t {
-public:
-    explicit buf_write_t(buf_lock_t *lock);
-    ~buf_write_t();
-
-    void *get_data_write(uint32_t block_size);
-    // Equivalent to passing the max_block_size.
-    void *get_data_write();
-
-private:
-    buf_lock_t *lock_;
-    alt::page_acq_t page_acq_;
-
-    DISABLE_COPYING(buf_write_t);
-};
 
 
 #endif  // BUFFER_CACHE_ALT_HPP_

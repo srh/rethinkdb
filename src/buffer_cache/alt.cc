@@ -824,29 +824,3 @@ page_t *buf_lock_t::get_held_page_for_write() {
     guarantee(!empty());
     return current_page_acq_->current_page_for_write(txn()->account());
 }
-
-buf_write_t::buf_write_t(buf_lock_t *lock)
-    : lock_(lock) {
-    guarantee(lock_->access() == access_t::write);
-    lock_->access_ref_count_++;
-}
-
-buf_write_t::~buf_write_t() {
-    guarantee(!lock_->empty());
-    lock_->access_ref_count_--;
-}
-
-void *buf_write_t::get_data_write(uint32_t block_size) {
-    page_t *page = lock_->get_held_page_for_write();
-    if (!page_acq_.has()) {
-        page_acq_.init(page, &lock_->cache()->page_cache_,
-                       lock_->txn()->account());
-    }
-    page_acq_.buf_ready_signal()->wait();
-    return page_acq_.get_buf_write(block_size_t::make_from_cache(block_size));
-}
-
-void *buf_write_t::get_data_write() {
-    return get_data_write(lock_->cache()->max_block_size().value());
-}
-
