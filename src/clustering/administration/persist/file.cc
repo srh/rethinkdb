@@ -5,7 +5,6 @@
 #include "btree/types.hpp"
 #include "buffer_cache/blob.hpp"
 #include "buffer_cache/cache_balancer.hpp"
-#include "buffer_cache/serialize_onto_blob.hpp"
 #include "config/args.hpp"
 #include "logger.hpp"
 #include "paths.hpp"

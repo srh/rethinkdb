@@ -6,7 +6,6 @@
 #include "buffer_cache/alt.hpp"
 #include "buffer_cache/blob.hpp"
 #include "buffer_cache/cache_balancer.hpp"
-#include "buffer_cache/serialize_onto_blob.hpp"
 #include "paths.hpp"
 #include "serializer/log/log_serializer.hpp"
 

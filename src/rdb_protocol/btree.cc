@@ -13,7 +13,6 @@
 #include "btree/operations.hpp"
 #include "btree/reql_specific.hpp"
 #include "btree/superblock.hpp"
-#include "buffer_cache/serialize_onto_blob.hpp"
 #include "concurrency/coro_pool.hpp"
 #include "concurrency/new_mutex.hpp"
 #include "concurrency/queue/unlimited_fifo.hpp"

@@ -4,7 +4,6 @@
 #include "btree/operations.hpp"
 #include "buffer_cache/alt.hpp"
 #include "buffer_cache/blob.hpp"
-#include "buffer_cache/serialize_onto_blob.hpp"
 #include "containers/archive/string_stream.hpp"
 #include "containers/archive/vector_stream.hpp"
 #include "containers/archive/versioned.hpp"
