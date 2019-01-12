@@ -308,7 +308,6 @@ void get_btree_superblock_and_txn_for_backfilling(
     txn->set_account(backfill_account);
 
     get_btree_superblock(txn, access_t::read, got_superblock_out);
-    (*got_superblock_out)->get()->snapshot_subdag();
 }
 
 // KSI: This function is possibly stupid: it's nonsensical to talk about the entire
