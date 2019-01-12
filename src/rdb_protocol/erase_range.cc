@@ -85,6 +85,11 @@ continue_bool_t rdb_erase_small_range(
     mod_reports_out->clear();
     *deleted_out = key_range_t::empty();
 
+    // TODO: This is what we want up here, right??
+    superblock->write_acq_signal()->wait_lazily_unordered();
+
+    // TODO: Use a rocks iterator, delete the keys while iterating.
+
     /* Step 1: Collect all keys that we want to erase using a depth-first traversal. */
     collect_keys_helper_t key_collector(tester, key_range, max_keys_to_erase,
         interruptor);
