@@ -3,11 +3,8 @@
 
 #include <stdint.h>
 
+#include "btree/node.hpp"
 #include "buffer_cache/alt.hpp"
-#include "buffer_cache/blob.hpp"
-#include "containers/archive/vector_stream.hpp"
-#include "rdb_protocol/profile.hpp"
-#include "rdb_protocol/store.hpp"
 
 block_id_t create_stat_block(buf_parent_t parent) {
     buf_lock_t stats_block(parent, alt_create_t::create);

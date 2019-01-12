@@ -7,7 +7,6 @@
 #include <string>
 #include <vector>
 
-#include "btree/node.hpp"
 #include "btree/secondary_operations.hpp"
 #include "buffer_cache/types.hpp"
 #include "concurrency/auto_drainer.hpp"

@@ -20,7 +20,6 @@ class buf_parent_t;
 class real_superblock_t;
 class rockshard;
 class superblock_t;
-class value_sizer_t;
 
 
 /* `btree_send_backfill_pre()` finds all of the keys or ranges of keys that have changed

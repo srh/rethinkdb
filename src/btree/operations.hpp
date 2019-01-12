@@ -6,7 +6,6 @@
 #include <utility>
 #include <vector>
 
-#include "btree/node.hpp"
 #include "btree/stats.hpp"
 #include "buffer_cache/alt.hpp"
 #include "concurrency/fifo_enforcer.hpp"
@@ -24,16 +23,6 @@ namespace profile {
 class trace_t;
 }
 
-<<<<<<< HEAD
-class buf_parent_t;
-class cache_t;
-class value_deleter_t;
-
-||||||| merged common ancestors
-class value_deleter_t;
-
-=======
->>>>>>> Remove check and handle split, underfull, get_root code
 enum cache_snapshotted_t { CACHE_SNAPSHOTTED_NO, CACHE_SNAPSHOTTED_YES };
 
 /* An abstract superblock provides the starting point for performing B-tree operations.

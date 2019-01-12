@@ -13,6 +13,7 @@
 
 #include "arch/runtime/coroutines.hpp"
 #include "arch/runtime/thread_pool.hpp"
+#include "btree/keys.hpp"
 #include "btree/superblock.hpp"
 #include "concurrency/auto_drainer.hpp"
 #include "concurrency/semaphore.hpp"
