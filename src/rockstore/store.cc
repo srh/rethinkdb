@@ -323,6 +323,12 @@ std::string table_metadata_prefix(namespace_id_t id, int shard_no) {
     ret += "metadata/";
     return ret;
 }
+// TODO: Gross, remove.
+std::string table_sindex_block_id_key(namespace_id_t id, int shard_no) {
+    std::string ret = table_metadata_prefix(id, shard_no);
+    ret += "sindex_block_id";
+    return ret;
+}
 std::string table_sindex_map(namespace_id_t id, int shard_no) {
     std::string ret = table_metadata_prefix(id, shard_no);
     ret += "sindex_map";

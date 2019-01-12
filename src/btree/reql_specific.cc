@@ -16,7 +16,7 @@ ATTR_PACKED(struct reql_btree_superblock_t {
     block_magic_t magic;
     block_id_t root_block;
     block_id_t stat_block_unused;
-    block_id_t sindex_block;
+    block_id_t sindex_block_unused;
 
     static const int METAINFO_BLOB_MAXREFLEN
         = from_ser_block_size_t<DEVICE_BLOCK_SIZE>::cache_size - sizeof(block_magic_t)
@@ -52,6 +52,22 @@ void btree_superblock_ct_asserts() {
               == DEVICE_BLOCK_SIZE);
 }
 
+// TODO: Gross, remove this.
+void set_rocks_sindex_block_id(rockshard rocksh, block_id_t sindex_block_id) {
+    std::string key = rockstore::table_sindex_block_id_key(rocksh.table_id, rocksh.shard_no);
+    rocksh.rocks->put(key, strprintf("%" PR_BLOCK_ID, sindex_block_id), rockstore::write_options::TODO());
+}
+
+block_id_t get_rocks_sindex_block_id(rockshard rocksh) {
+    std::string key = rockstore::table_sindex_block_id_key(rocksh.table_id, rocksh.shard_no);
+    std::string value = rocksh.rocks->read(key);
+    block_id_t block_id;
+    bool res = strtou64_strict(value, 10, &block_id);
+    guarantee(res, "rocks sindex block id invalid");
+    return block_id;
+}
+
+
 real_superblock_t::real_superblock_t(buf_lock_t &&sb_buf)
     : sb_buf_(std::move(sb_buf)) {}
 
@@ -73,13 +89,9 @@ void real_superblock_t::set_root_block_id(const block_id_t new_root_block) {
     sb_data->root_block = new_root_block;
 }
 
-block_id_t real_superblock_t::get_sindex_block_id() {
-    buf_read_t read(&sb_buf_);
-    uint32_t sb_size;
-    const reql_btree_superblock_t *sb_data =
-        static_cast<const reql_btree_superblock_t *>(read.get_data_read(&sb_size));
-    guarantee(sb_size == REQL_BTREE_SUPERBLOCK_SIZE);
-    return sb_data->sindex_block;
+block_id_t real_superblock_t::get_sindex_block_id(rockshard rocksh) {
+    read_acq_signal()->wait_lazily_unordered();
+    return get_rocks_sindex_block_id(rocksh);
 }
 
 signal_t *real_superblock_t::read_acq_signal() {
@@ -129,14 +141,15 @@ void btree_slice_t::init_real_superblock(real_superblock_t *superblock,
     sb->magic = reql_btree_version_magic_t<cluster_version_t::v2_1>::value;
     sb->root_block = NULL_BLOCK_ID;
     sb->stat_block_unused = NULL_BLOCK_ID;
-    sb->sindex_block = NULL_BLOCK_ID;
+    sb->sindex_block_unused = NULL_BLOCK_ID;
 
     set_superblock_metainfo(superblock, rocksh, metainfo_key, metainfo_value,
                             cluster_version_t::v2_1);
 
     buf_lock_t sindex_block(superblock->get(), alt_create_t::create);
     initialize_secondary_indexes(rocksh, &sindex_block);
-    sb->sindex_block = sindex_block.block_id();
+    set_rocks_sindex_block_id(rocksh, sindex_block.block_id());
+    sb->sindex_block_unused = sindex_block.block_id();
 }
 
 void btree_slice_t::init_sindex_superblock(sindex_superblock_t *superblock) {
@@ -150,7 +163,7 @@ void btree_slice_t::init_sindex_superblock(sindex_superblock_t *superblock) {
     sb->magic = reql_btree_version_magic_t<cluster_version_t::v2_1>::value;
     sb->root_block = NULL_BLOCK_ID;
     sb->stat_block_unused = NULL_BLOCK_ID;
-    sb->sindex_block = NULL_BLOCK_ID;
+    sb->sindex_block_unused = NULL_BLOCK_ID;
 }
 
 btree_slice_t::btree_slice_t(cache_t *c, perfmon_collection_t *parent,

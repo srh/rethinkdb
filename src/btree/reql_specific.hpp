@@ -30,7 +30,7 @@ public:
 
     void set_root_block_id(block_id_t new_root_block) override;
 
-    block_id_t get_sindex_block_id();
+    block_id_t get_sindex_block_id(rockshard rocksh);
 
     buf_parent_t expose_buf() override { return buf_parent_t(&sb_buf_); }
 
