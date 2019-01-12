@@ -83,6 +83,7 @@ void store_metainfo_manager_t::update(
     set_superblock_metainfo(superblock, rocksh, keys, values, cache_version);
 }
 
+// TODO: Is this a real migration now?
 void store_metainfo_manager_t::migrate(
         real_superblock_t *superblock,
         rockshard rocksh,
