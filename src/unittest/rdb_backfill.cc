@@ -522,7 +522,7 @@ TPTEST(RDBBackfill, FillPreItemQueue) {
     run_backfill_test(cfg);
 }
 
-TPTEST(RDBBackfill, PreemptOften) {
+TPTEST(RDBBackfill, DISABLED_PreemptOften) {
     /* Force the backfill to be preempted after every single backfill item, just to
     stress the system */
     backfill_test_config_t cfg;
@@ -530,7 +530,7 @@ TPTEST(RDBBackfill, PreemptOften) {
     run_backfill_test(cfg);
 }
 
-TPTEST(RDBBackfill, FillBothQueuesAndPreemptOften) {
+TPTEST(RDBBackfill, DISABLED_FillBothQueuesAndPreemptOften) {
     /* Make both the queues very small and also preempt often, just to stress the system.
     */
     backfill_test_config_t cfg;
