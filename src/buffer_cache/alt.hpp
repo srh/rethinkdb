@@ -57,7 +57,6 @@ public:
 
 private:
     friend class txn_t;
-    friend class buf_read_t;
     friend class buf_write_t;
     friend class buf_lock_t;
 
@@ -262,7 +261,6 @@ private:
                                                   block_id_t child_id);
     alt::current_page_acq_t *current_page_acq() const;
 
-    friend class buf_read_t;  // for get_held_page_for_read, access_ref_count_.
     friend class buf_write_t;  // for get_held_page_for_write, access_ref_count_.
 
     alt::page_t *get_held_page_for_read();
@@ -320,26 +318,6 @@ private:
     friend class buf_lock_t;
     txn_t *txn_;
     buf_lock_t *lock_or_null_;
-};
-
-class buf_read_t {
-public:
-    explicit buf_read_t(buf_lock_t *lock);
-    ~buf_read_t();
-
-    const void *get_data_read(uint32_t *block_size_out);
-    const void *get_data_read() {
-        uint32_t block_size;
-        const void *data = get_data_read(&block_size);
-        guarantee(block_size == lock_->cache()->max_block_size().value());
-        return data;
-    }
-
-private:
-    buf_lock_t *lock_;
-    alt::page_acq_t page_acq_;
-
-    DISABLE_COPYING(buf_read_t);
 };
 
 class buf_write_t {
