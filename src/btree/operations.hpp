@@ -81,48 +81,6 @@ public:
     promise_t<superblock_t *> *pass_back_superblock;
 };
 
-class keyvalue_location_t {
-public:
-    keyvalue_location_t()
-        : superblock(nullptr), pass_back_superblock(nullptr),
-          there_originally_was_value(false), stat_block(NULL_BLOCK_ID) { }
-
-    ~keyvalue_location_t() {
-        if (superblock != nullptr) {
-            if (pass_back_superblock != nullptr) {
-                pass_back_superblock->pulse(superblock);
-            } else {
-                superblock->release();
-            }
-        }
-    }
-
-    superblock_t *superblock;
-
-    promise_t<superblock_t *> *pass_back_superblock;
-
-    // The parent buf of buf, if buf is not the root node.  This is hacky.
-    buf_lock_t last_buf;
-
-    // The buf owning the leaf node which contains the value.
-    buf_lock_t buf;
-
-    bool there_originally_was_value;
-    // If the key/value pair was found, a pointer to a copy of the
-    // value, otherwise NULL.
-    scoped_malloc_t<void> value;
-
-    template <class T>
-    T *value_as() { return static_cast<T *>(value.get()); }
-
-    // Stat block when modifications are made using this class the statblock is
-    // update.
-    block_id_t stat_block;
-private:
-
-    DISABLE_COPYING(keyvalue_location_t);
-};
-
 buf_lock_t get_root(value_sizer_t *sizer, superblock_t *sb);
 
 void check_and_handle_split(value_sizer_t *sizer,
@@ -146,19 +104,7 @@ void insert_root(block_id_t root_id, superblock_t *sb);
 `get_stat_block_id()`. */
 block_id_t create_stat_block(buf_parent_t parent);
 
-/* Note that there's no guarantee that `pass_back_superblock` will have been
- * pulsed by the time `find_keyvalue_location_for_write` returns. In some cases,
- * the superblock is returned only when `*keyvalue_location_out` gets destructed. */
-void find_keyvalue_location_for_write(
-        value_sizer_t *sizer,
-        superblock_t *superblock,
-        const btree_key_t *key,
-        repli_timestamp_t timestamp,
-        const value_deleter_t *balancing_detacher,
-        keyvalue_location_t *keyvalue_location_out,
-        profile::trace_t *trace,
-        promise_t<superblock_t *> *pass_back_superblock) THROWS_NOTHING;
-
+// TODO: Remove or make use of.
 /* `delete_mode_t` controls how `apply_keyvalue_change()` acts when `kv_loc->value` is
 empty. */
 enum class delete_mode_t {
@@ -174,13 +120,5 @@ enum class delete_mode_t {
     This mode is used for transferring tombstones from other servers in backfilling. */
     MAKE_TOMBSTONE
 };
-
-void apply_keyvalue_change(
-        value_sizer_t *sizer,
-        keyvalue_location_t *kv_loc,
-        const btree_key_t *key,
-        repli_timestamp_t tstamp,
-        const value_deleter_t *balancing_detacher,
-        delete_mode_t delete_mode);
 
 #endif  // BTREE_OPERATIONS_HPP_
