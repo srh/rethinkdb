@@ -1138,20 +1138,6 @@ void store_t::set_metainfo(const region_map_t<binary_blob_t> &new_metainfo,
     txn->commit();
 }
 
-cluster_version_t store_t::metainfo_version(read_token_t *token,
-                                            signal_t *interruptor) {
-    assert_thread();
-    scoped_ptr_t<txn_t> txn;
-    scoped_ptr_t<real_superblock_t> superblock;
-    acquire_superblock_for_read(token,
-                                &txn, &superblock,
-                                interruptor,
-                                false /* KSI: christ */);
-    superblock->read_acq_signal()->wait_lazily_ordered();
-    // TODO: Remove this entire function.
-    return cluster_version_t::v2_1;
-}
-
 void store_t::migrate_metainfo(
         UNUSED order_token_t order_token, // TODO
         write_token_t *token,
