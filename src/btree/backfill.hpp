@@ -123,6 +123,7 @@ continue_bool_t btree_send_backfill(
         release_superblock_t release_superblock,
         const key_range_t &range,
         repli_timestamp_t reference_timestamp,
+        repli_timestamp_t max_timestamp,
         btree_backfill_pre_item_producer_t *pre_item_producer,
         btree_backfill_item_consumer_t *item_consumer,
         backfill_item_memory_tracker_t *memory_tracker,

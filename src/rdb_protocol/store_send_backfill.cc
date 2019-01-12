@@ -3,6 +3,7 @@
 #include "btree/backfill.hpp"
 #include "btree/reql_specific.hpp"
 #include "btree/operations.hpp"
+#include "clustering/immediate_consistency/history.hpp"  // For to_version_map.
 #include "rdb_protocol/btree.hpp"
 #include "rdb_protocol/store_metainfo.hpp"
 
@@ -227,13 +228,25 @@ continue_bool_t store_t::send_backfill(
 
             region_map_t<binary_blob_t> metainfo_copy =
                 metainfo->get(sb.get(), region_t(pair.first));
-            limiting_btree_backfill_item_consumer_t limiter(
-                item_consumer, &threshold, &metainfo_copy);
 
             key_range_t to_do = pair.first;
             to_do.left = threshold.key();
+
+            // TODO: This knowledge of what the metainfo contains is technically above the store's pay-grade, right?
+            // (And this is a hack to talk backfilling on the old cluster protocol, half-decently.)
+            repli_timestamp_t max_timestamp = repli_timestamp_t::distant_past;
+
+            region_t to_do_region(to_do);
+            metainfo_copy.visit(to_do_region, [&](const region_t &, const binary_blob_t vers) {
+                version_t version = binary_blob_t::get<version_t>(vers);
+                max_timestamp = std::max<repli_timestamp_t>(max_timestamp, version.timestamp.to_repli_timestamp());
+            });
+
+            limiting_btree_backfill_item_consumer_t limiter(
+                item_consumer, &threshold, &metainfo_copy);
+
             continue_bool_t cont = btree_send_backfill(
-                rocksh(), sb.get(), release_superblock_t::RELEASE, to_do, pair.second,
+                rocksh(), sb.get(), release_superblock_t::RELEASE, to_do, pair.second, max_timestamp,
                 &pre_item_adapter, &limiter, memory_tracker, interruptor);
 
             /* Check if the backfill was aborted because of exhausting the memory

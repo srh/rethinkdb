@@ -42,7 +42,9 @@ continue_bool_t btree_send_backfill_pre(
 continue_bool_t send_all_in_keyrange(
         rockshard rocksh, real_superblock_t *superblock, release_superblock_t release_superblock,
         const key_range_t &range,
-        repli_timestamp_t reference_timestamp, btree_backfill_item_consumer_t *item_consumer,
+        repli_timestamp_t reference_timestamp,
+        repli_timestamp_t max_timestamp,
+        btree_backfill_item_consumer_t *item_consumer,
         backfill_item_memory_tracker_t *memory_tracker,
         signal_t *interruptor) {
     // TODO: Use memory_tracker??
@@ -67,7 +69,6 @@ continue_bool_t send_all_in_keyrange(
     // TODO: Must NewIterator be in a blocker thread?
     // TODO: With all superblock read_acq_signals... use the interruptor?
     superblock->read_acq_signal()->wait_lazily_ordered();
-    repli_timestamp_t max_timestamp = superblock->get()->get_recency();
     scoped_ptr_t<rocksdb::Iterator> iter(db->NewIterator(opts));
     if (release_superblock == release_superblock_t::RELEASE) {
         superblock->release();
@@ -166,6 +167,7 @@ continue_bool_t btree_send_backfill(
         release_superblock_t release_superblock,
         const key_range_t &range,
         repli_timestamp_t reference_timestamp,
+        repli_timestamp_t max_timestamp,
         btree_backfill_pre_item_producer_t *pre_item_producer,
         btree_backfill_item_consumer_t *item_consumer,
         backfill_item_memory_tracker_t *memory_tracker,
@@ -178,7 +180,8 @@ continue_bool_t btree_send_backfill(
     ignore_all_pre_items(drainer.lock(), range, pre_item_producer);
 
     continue_bool_t cont = send_all_in_keyrange(
-        rocksh, superblock, release_superblock, range, reference_timestamp, item_consumer,
+        rocksh, superblock, release_superblock, range, reference_timestamp,
+        max_timestamp, item_consumer,
         memory_tracker, interruptor);
 
     drainer.drain();
