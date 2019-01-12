@@ -111,6 +111,7 @@ signal_t *sindex_superblock_t::write_acq_signal() {
     return sb_buf_.write_acq_signal();
 }
 
+// TODO: Remove
 // Run backfilling at a reduced priority
 #define BACKFILL_CACHE_PRIORITY 10
 
@@ -118,39 +119,19 @@ void btree_slice_t::init_real_superblock(real_superblock_t *superblock,
                                          rockshard rocksh,
                                          const std::vector<char> &metainfo_key,
                                          const binary_blob_t &metainfo_value) {
-    buf_write_t sb_write(superblock->get());
-    auto sb = static_cast<reql_btree_superblock_t *>(
-            sb_write.get_data_write(REQL_BTREE_SUPERBLOCK_SIZE));
-
-    // Properly zero the superblock, zeroing sb->metainfo_blob, in particular.
-    memset(sb, 0, REQL_BTREE_SUPERBLOCK_SIZE);
-
-    sb->magic = reql_btree_version_magic_t<cluster_version_t::v2_1>::value;
-    sb->root_block = NULL_BLOCK_ID;
-    sb->stat_block_unused = NULL_BLOCK_ID;
-    sb->sindex_block_unused = NULL_BLOCK_ID;
-
+    superblock->write_acq_signal()->wait_lazily_ordered();
     set_superblock_metainfo(superblock, rocksh, metainfo_key, metainfo_value,
                             cluster_version_t::v2_1);
 
     buf_lock_t sindex_block(superblock->get(), alt_create_t::create);
     initialize_secondary_indexes(rocksh, &sindex_block);
     set_rocks_sindex_block_id(rocksh, sindex_block.block_id());
-    sb->sindex_block_unused = sindex_block.block_id();
 }
 
 void btree_slice_t::init_sindex_superblock(sindex_superblock_t *superblock) {
-    buf_write_t sb_write(superblock->get());
-    auto sb = static_cast<reql_btree_superblock_t *>(
-            sb_write.get_data_write(REQL_BTREE_SUPERBLOCK_SIZE));
-
-    // Properly zero the superblock, zeroing sb->metainfo_blob, in particular.
-    memset(sb, 0, REQL_BTREE_SUPERBLOCK_SIZE);
-
-    sb->magic = reql_btree_version_magic_t<cluster_version_t::v2_1>::value;
-    sb->root_block = NULL_BLOCK_ID;
-    sb->stat_block_unused = NULL_BLOCK_ID;
-    sb->sindex_block_unused = NULL_BLOCK_ID;
+    superblock->write_acq_signal()->wait_lazily_ordered();
+    // Nothing to do.
+    // TODO: Just get rid of the locking logic, this function entirely?
 }
 
 btree_slice_t::btree_slice_t(cache_t *c, perfmon_collection_t *parent,

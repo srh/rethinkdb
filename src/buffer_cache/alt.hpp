@@ -235,6 +235,7 @@ public:
     cache_t *cache() const { return txn_->cache(); }
 
 private:
+    static void apply_buf_write(buf_lock_t *lock, alt_create_t);
     void help_construct(buf_parent_t parent, block_id_t block_id, access_t access);
     void help_construct(
         buf_parent_t parent,

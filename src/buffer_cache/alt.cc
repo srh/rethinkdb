@@ -35,6 +35,30 @@ const int64_t INDEX_CHANGES_LIMIT_FACTOR = 5;
 // page cache, which often may need to load or evict blocks, which may involve a
 // spawn_now call.
 
+void buf_lock_t::apply_buf_write(buf_lock_t *lock, alt_create_t) {
+    // We're copy/pasting the internals of buf_write_t because this function
+    // was added during a rebase where we know we'll drop buf_write_t at some point.
+
+    // buf_write_t ctor
+    alt::page_acq_t page_acq;
+    guarantee(lock->access() == access_t::write);
+    lock->access_ref_count_++;
+
+    // buf_write_t::get_data_write
+    block_size_t block_size = lock->cache()->max_block_size();
+    page_t *page = lock->get_held_page_for_write();
+    if (!page_acq.has()) {
+        page_acq.init(page, &lock->cache()->page_cache_,
+                       lock->txn()->account());
+    }
+    page_acq.buf_ready_signal()->wait();
+    page_acq.get_buf_write(block_size);
+
+    // buf_write_t dtor (including page_acq destruction)
+    guarantee(!lock->empty());
+    lock->access_ref_count_--;
+}
+
 
 // The intrusive list of alt_snapshot_node_t contains all the snapshot nodes for a
 // given block id, in order by version. (See cache_t::snapshot_nodes_by_block_id_.)
@@ -524,6 +548,7 @@ buf_lock_t::buf_lock_t(txn_t *_txn,
       snapshot_node_(nullptr),
       access_ref_count_(0) {
     help_construct(buf_parent_t(_txn), _block_id, create);
+    apply_buf_write(this, create);
 }
 
 buf_lock_t::buf_lock_t(buf_parent_t parent,
@@ -534,6 +559,7 @@ buf_lock_t::buf_lock_t(buf_parent_t parent,
       snapshot_node_(nullptr),
       access_ref_count_(0) {
     help_construct(parent, _block_id, create);
+    apply_buf_write(this, create);
 }
 
 void buf_lock_t::mark_deleted() {
@@ -603,6 +629,7 @@ buf_lock_t::buf_lock_t(buf_parent_t parent,
       snapshot_node_(nullptr),
       access_ref_count_(0) {
     help_construct(parent, create, block_type);
+    apply_buf_write(this, create);
 }
 
 buf_lock_t::buf_lock_t(buf_lock_t *parent,
@@ -613,6 +640,7 @@ buf_lock_t::buf_lock_t(buf_lock_t *parent,
       snapshot_node_(nullptr),
       access_ref_count_(0) {
     help_construct(buf_parent_t(parent), create, block_type);
+    apply_buf_write(this, create);
 }
 
 buf_lock_t::~buf_lock_t() {
