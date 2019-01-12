@@ -27,13 +27,6 @@ store_metainfo_manager_t::store_metainfo_manager_t(rockshard rocksh, real_superb
     rassert(cache.get_domain() == region_t::universe());
 }
 
-cluster_version_t store_metainfo_manager_t::get_version(
-        real_superblock_t *superblock) const {
-    guarantee(superblock != nullptr);
-    superblock->get()->read_acq_signal()->wait_lazily_ordered();
-    return cache_version;
-}
-
 region_map_t<binary_blob_t> store_metainfo_manager_t::get(
         real_superblock_t *superblock,
         const region_t &region) const {

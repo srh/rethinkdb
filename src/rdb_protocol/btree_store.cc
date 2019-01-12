@@ -21,6 +21,7 @@
 #include "rdb_protocol/btree.hpp"
 #include "rdb_protocol/erase_range.hpp"
 #include "rdb_protocol/protocol.hpp"
+#include "rdb_protocol/store_metainfo.hpp"
 #include "stl_utils.hpp"
 
 // The maximal number of writes that can be in line for a superblock acquisition
@@ -1146,7 +1147,9 @@ cluster_version_t store_t::metainfo_version(read_token_t *token,
                                 &txn, &superblock,
                                 interruptor,
                                 false /* KSI: christ */);
-    return metainfo->get_version(superblock.get());
+    superblock->read_acq_signal()->wait_lazily_ordered();
+    // TODO: Remove this entire function.
+    return cluster_version_t::v2_1;
 }
 
 void store_t::migrate_metainfo(

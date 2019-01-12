@@ -14,6 +14,7 @@
 #include "rdb_protocol/erase_range.hpp"
 #include "rdb_protocol/func.hpp"
 #include "rdb_protocol/shards.hpp"
+#include "rdb_protocol/store_metainfo.hpp"
 #include "rdb_protocol/table_common.hpp"
 
 void store_t::note_reshard(const region_t &shard_region) {

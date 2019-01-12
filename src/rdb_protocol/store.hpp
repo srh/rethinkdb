@@ -22,13 +22,13 @@
 #include "protocol_api.hpp"
 #include "rdb_protocol/changefeed.hpp"
 #include "rdb_protocol/protocol.hpp"
-#include "rdb_protocol/store_metainfo.hpp"
 #include "rockstore/store.hpp"
 #include "rpc/mailbox/typed.hpp"
 #include "store_view.hpp"
 #include "utils.hpp"
 
 class store_t;
+class store_metainfo_manager_t;
 class btree_slice_t;
 class cache_conn_t;
 class cache_t;

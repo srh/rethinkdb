@@ -4,6 +4,7 @@
 #include "btree/reql_specific.hpp"
 #include "rdb_protocol/btree.hpp"
 #include "rdb_protocol/serialize_datum.hpp"
+#include "rdb_protocol/store_metainfo.hpp"
 
 /* `MAX_CONCURRENT_BACKFILL_ITEMS` is the maximum number of coroutines we'll spawn in
 parallel to apply backfill items to the B-tree. */

@@ -4,6 +4,7 @@
 #include "btree/reql_specific.hpp"
 #include "btree/operations.hpp"
 #include "rdb_protocol/btree.hpp"
+#include "rdb_protocol/store_metainfo.hpp"
 
 /* After every `MAX_BACKFILL_ITEMS_PER_TXN` backfill items or backfill pre-items, we'll
 release the superblock and start a new transaction. */

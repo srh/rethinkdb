@@ -37,8 +37,6 @@ public:
                  const std::function<binary_blob_t(const region_t &,
                                                    const binary_blob_t &)> &cb);
 
-    cluster_version_t get_version(real_superblock_t *superblock) const;
-
 private:
     cluster_version_t cache_version;
     region_map_t<binary_blob_t> cache;
