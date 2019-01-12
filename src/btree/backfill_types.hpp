@@ -8,11 +8,6 @@
 #include "repli_timestamp.hpp"
 #include "rpc/serialize_macros.hpp"
 
-// TODO: Remove.
-struct bf_value {
-    std::vector<char> value;
-};
-
 // TODO: Under rocksdb (and an incompatible cluster protocol),
 // backfill_pre_item_t can hold individual keys.
 
