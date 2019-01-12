@@ -23,35 +23,8 @@ struct rdb_value_t;
 class refcount_superblock_t;
 struct sindex_disk_info_t;
 
-
+// TODO: Remove all rdb_value_t.
 bool btree_value_fits(max_block_size_t bs, int data_length, const rdb_value_t *value);
-
-// TODO: Remove
-class rdb_value_sizer_t : public value_sizer_t {
-public:
-    explicit rdb_value_sizer_t(max_block_size_t bs);
-
-    static const rdb_value_t *as_rdb(const void *p);
-
-    int size(const void *value) const;
-
-    bool fits(const void *value, int length_available) const;
-
-    int max_possible_size() const;
-
-    static block_magic_t leaf_magic();
-
-    block_magic_t btree_leaf_magic() const;
-
-    max_block_size_t block_size() const;
-
-private:
-    // The block size.  It's convenient for leaf node code and for
-    // some subclasses, too.
-    max_block_size_t block_size_;
-
-    DISABLE_COPYING(rdb_value_sizer_t);
-};
 
 struct rdb_modification_info_t;
 struct rdb_modification_report_t;

@@ -96,11 +96,10 @@ continue_bool_t store_t::send_backfill_pre(
             limiting_btree_backfill_pre_item_consumer_t
                 limiter(pre_item_consumer, &threshold);
 
-            rdb_value_sizer_t sizer(cache->max_block_size());
             key_range_t to_do = pair.first;
             to_do.left = threshold.key();
             continue_bool_t cont = btree_send_backfill_pre(sb.get(),
-                release_superblock_t::RELEASE, &sizer, to_do, pair.second, &limiter,
+                release_superblock_t::RELEASE, to_do, pair.second, &limiter,
                 interruptor);
             guarantee(threshold <= pair.first.right);
             if (limiter.inner_aborted) {
@@ -240,7 +239,6 @@ continue_bool_t store_t::send_backfill(
             limiting_btree_backfill_item_consumer_t limiter(
                 item_consumer, &threshold, &metainfo_copy);
 
-            rdb_value_sizer_t sizer(cache->max_block_size());
             key_range_t to_do = pair.first;
             to_do.left = threshold.key();
             continue_bool_t cont = btree_send_backfill(

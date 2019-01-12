@@ -327,9 +327,8 @@ void apply_multi_key_item(
             "conservative" operation, so it's safe if we affect parts of the key-space
             that we don't actually call `commit_cb()` for. */
             if (is_first) {
-                rdb_value_sizer_t sizer(superblock->cache()->max_block_size());
                 btree_receive_backfill_item_update_deletion_timestamps(
-                    superblock.get(), release_superblock_t::KEEP, &sizer, item,
+                    superblock.get(), item,
                     &non_interruptor);
                 is_first = false;
             }

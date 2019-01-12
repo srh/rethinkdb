@@ -35,35 +35,6 @@
 
 #include "debug.hpp"
 
-rdb_value_sizer_t::rdb_value_sizer_t(max_block_size_t bs) : block_size_(bs) { }
-
-const rdb_value_t *rdb_value_sizer_t::as_rdb(const void *p) {
-    return reinterpret_cast<const rdb_value_t *>(p);
-}
-
-int rdb_value_sizer_t::size(const void *value) const {
-    return as_rdb(value)->inline_size(block_size_);
-}
-
-bool rdb_value_sizer_t::fits(const void *value, int length_available) const {
-    return btree_value_fits(block_size_, length_available, as_rdb(value));
-}
-
-int rdb_value_sizer_t::max_possible_size() const {
-    return blob::btree_maxreflen;
-}
-
-block_magic_t rdb_value_sizer_t::leaf_magic() {
-    block_magic_t magic = { { 'r', 'd', 'b', 'l' } };
-    return magic;
-}
-
-block_magic_t rdb_value_sizer_t::btree_leaf_magic() const {
-    return leaf_magic();
-}
-
-max_block_size_t rdb_value_sizer_t::block_size() const { return block_size_; }
-
 bool btree_value_fits(max_block_size_t bs, int data_length, const rdb_value_t *value) {
     return blob::ref_fits(bs, data_length, value->value_ref(), blob::btree_maxreflen);
 }

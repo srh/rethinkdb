@@ -23,14 +23,12 @@ values from the leaf nodes. */
 continue_bool_t btree_send_backfill_pre(
         real_superblock_t *superblock,
         release_superblock_t release_superblock,
-        value_sizer_t *sizer,
         const key_range_t &range,
         repli_timestamp_t reference_timestamp,
         btree_backfill_pre_item_consumer_t *pre_item_consumer,
         signal_t *interruptor) {
-    (void)sizer;  // TODO remove param
     (void)reference_timestamp;  // TODO!?
-    (void)interruptor;  // TODO remove param
+    (void)interruptor;  // TODO remove param?  Or no, use param?
     backfill_debug_range(range, strprintf(
         "btree_send_backfill_pre %" PRIu64, reference_timestamp.longtime));
 
@@ -190,56 +188,15 @@ continue_bool_t btree_send_backfill(
     return cont;
 }
 
-// TODO: Remove.. all these functions.
-
-class backfill_deletion_timestamp_updater_t : public depth_first_traversal_callback_t {
-public:
-    backfill_deletion_timestamp_updater_t(value_sizer_t *s, repli_timestamp_t mdt) :
-        sizer(s), min_deletion_timestamp(mdt) { }
-    continue_bool_t handle_pre_leaf(
-            const counted_t<counted_buf_lock_and_read_t> &buf,
-            UNUSED const btree_key_t *left_excl_or_null,
-            UNUSED const btree_key_t *right_incl,
-            signal_t *,
-            bool *skip_out) override {
-        *skip_out = true;
-        buf_write_t buf_write(&buf->lock);
-        leaf_node_t *lnode = static_cast<leaf_node_t *>(buf_write.get_data_write());
-        leaf::erase_deletions(sizer, lnode,
-                              make_optional(min_deletion_timestamp));
-        buf->lock.set_recency(superceding_recency(
-            min_deletion_timestamp, buf->lock.get_recency()));
-        return continue_bool_t::CONTINUE;
-    }
-    continue_bool_t handle_pre_internal(
-            const counted_t<counted_buf_lock_and_read_t> &buf,
-            UNUSED const btree_key_t *left_excl_or_null,
-            UNUSED const btree_key_t *right_incl,
-            signal_t *) override {
-        buf->lock.set_recency(superceding_recency(
-            min_deletion_timestamp, buf->lock.get_recency()));
-        return continue_bool_t::CONTINUE;
-    }
-    continue_bool_t handle_pair(scoped_key_value_t &&, signal_t *) override {
-        unreachable();
-    }
-private:
-    value_sizer_t *sizer;
-    repli_timestamp_t min_deletion_timestamp;
-};
 
 void btree_receive_backfill_item_update_deletion_timestamps(
         real_superblock_t *superblock,
-        release_superblock_t release_superblock,
-        value_sizer_t *sizer,
         const backfill_item_t &item,
         signal_t *interruptor) {
+    (void)superblock, (void)item, (void)interruptor;
     backfill_debug_range(item.range, strprintf(
         "b.r.b.i.u.d.t. %" PRIu64, item.min_deletion_timestamp.longtime));
-    backfill_deletion_timestamp_updater_t updater(sizer, item.min_deletion_timestamp);
-    continue_bool_t res = btree_depth_first_traversal(
-        superblock, item.range, &updater, access_t::write, direction_t::forward, release_superblock,
-        interruptor);
-    guarantee(res == continue_bool_t::CONTINUE);
+    // TODO: Might there be some rocks version of this?
+
 }
 
