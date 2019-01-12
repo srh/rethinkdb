@@ -8,6 +8,8 @@
 #include "containers/binary_blob.hpp"
 #include "rockstore/store.hpp"
 
+
+// TODO: Remove this struct (reql_btree_superblock_t) entirely.S
 /* This is the actual structure stored on disk for the superblock of a table's primary or
 sindex B-tree. Both of them use the exact same format, but the sindex B-trees don't make
 use of the `sindex_block` or `metainfo_blob` fields. */
@@ -21,7 +23,7 @@ ATTR_PACKED(struct reql_btree_superblock_t {
         = from_ser_block_size_t<DEVICE_BLOCK_SIZE>::cache_size - sizeof(block_magic_t)
                                                                - 3 * sizeof(block_id_t);
 
-    char metainfo_blob[METAINFO_BLOB_MAXREFLEN];
+    char metainfo_blob_unused[METAINFO_BLOB_MAXREFLEN];
 });
 
 static const uint32_t REQL_BTREE_SUPERBLOCK_SIZE = sizeof(reql_btree_superblock_t);
@@ -299,6 +301,7 @@ void set_superblock_metainfo(real_superblock_t *superblock,
                              const std::vector<std::vector<char> > &keys,
                              const std::vector<binary_blob_t> &values,
                              cluster_version_t version) {
+    // Acquire lock explicitly for rocksdb writing.
     superblock->write_acq_signal()->wait_lazily_unordered();
 
     buf_write_t write(superblock->get());
@@ -313,11 +316,6 @@ void set_superblock_metainfo(real_superblock_t *superblock,
     } else {
         crash("Unsupported version when writing metainfo.");
     }
-
-    blob_t blob(superblock->get()->cache()->max_block_size(),
-                data->metainfo_blob, reql_btree_superblock_t::METAINFO_BLOB_MAXREFLEN);
-    blob.clear(buf_parent_t(superblock->get()));
-
     std::vector<char> metainfo;
 
     rassert(keys.size() == values.size());
@@ -342,24 +340,12 @@ void set_superblock_metainfo(real_superblock_t *superblock,
             static_cast<const uint8_t *>(value_it->data()) + value_it->size());
     }
 
-    blob.append_region(buf_parent_t(superblock->get()), metainfo.size());
-
-    {
-        blob_acq_t acq;
-        buffer_group_t write_group;
-        blob.expose_all(buf_parent_t(superblock->get()), access_t::write,
-                        &write_group, &acq);
-
-        buffer_group_t group_cpy;
-        group_cpy.add_buffer(metainfo.size(), metainfo.data());
-
-        buffer_group_copy_data(&write_group, const_view(&group_cpy));
-    }
+    // TODO: buffer_group_copy_data -- does anybody use it?
 
     // Rocksdb metadata.
     rocksdb::WriteBatch batch;
     std::string meta_prefix = rockstore::table_metadata_prefix(rocksh.table_id, rocksh.shard_no);
-    // TODO: Don't update version if it's already properly set.
+    // TODO: Don't update version if it's already properly set.  (Performance.)
     rocksdb::Status status = batch.Put(
         meta_prefix + rockstore::TABLE_METADATA_VERSION_KEY(),
         rockstore::VERSION());
