@@ -131,8 +131,7 @@ continue_bool_t geo_intersecting_cb_t::on_candidate(
         return continue_bool_t::CONTINUE;
     }
 
-    ql::datum_t val;
-    datum_deserialize_from_vec(value.first, value.second, &val);
+    ql::datum_t val = datum_deserialize_from_vec(value.first, value.second);
 
     slice->stats.pm_keys_read.record();
     slice->stats.pm_total_keys_read += 1;

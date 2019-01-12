@@ -43,7 +43,7 @@ void rdb_get_secondary_for_unittest(
     if (!val.second) {
         *out = ql::datum_t::null();
     } else {
-        datum_deserialize_from_vec(val.first.data(), val.first.size(), out);
+        *out = datum_deserialize_from_vec(val.first.data(), val.first.size());
     }
 }
 
@@ -56,8 +56,7 @@ void rdb_get(rockshard rocksh, const store_key_t &store_key,
     if (!val.second) {
         response->data = ql::datum_t::null();
     } else {
-        ql::datum_t datum;
-        datum_deserialize_from_vec(val.first.data(), val.first.size(), &datum);
+        ql::datum_t datum = datum_deserialize_from_vec(val.first.data(), val.first.size());
         response->data = std::move(datum);
     }
 }
@@ -165,7 +164,7 @@ batched_replace_response_t rdb_replace_and_return_superblock(
             old_val = ql::datum_t::null();
         } else {
             // Otherwise pass the entry with this key to the function.
-            datum_deserialize_from_vec(maybe_value.first.data(), maybe_value.first.size(), &old_val);
+            old_val = datum_deserialize_from_vec(maybe_value.first.data(), maybe_value.first.size());
             guarantee(old_val.get_field(primary_key, ql::NOTHROW).has());
         }
         guarantee(old_val.has());
@@ -453,8 +452,7 @@ void rdb_set(rockshard rocksh,
 
     /* update the modification report */
     if (maybe_value.second) {
-        ql::datum_t val;
-        datum_deserialize_from_vec(maybe_value.first.data(), maybe_value.first.size(), &val);
+        ql::datum_t val = datum_deserialize_from_vec(maybe_value.first.data(), maybe_value.first.size());
         mod_info->deleted.first = val;
     }
 
@@ -503,12 +501,6 @@ void rdb_set_sindex_for_unittest(
         = rocksh.rocks->try_read(rocks_kv_location);
 
     const bool had_value = maybe_value.second;
-
-    /* update the modification report */
-    if (maybe_value.second) {
-        ql::datum_t val;
-        datum_deserialize_from_vec(maybe_value.first.data(), maybe_value.first.size(), &val);
-    }
 
     if (overwrite || !had_value) {
         // TODO: We don't do kv_location_delete in case of null value?
@@ -747,7 +739,7 @@ continue_bool_t rocks_rget_cb::handle_pair(
     io.slice->stats.pm_total_keys_read += 1;
     // We only load the value if we actually use it (`count` does not).
     if (job.accumulator->uses_val() || job.transformers.size() != 0 || sindex) {
-        datum_deserialize_from_vec(value.first, value.second, &val);
+        val = datum_deserialize_from_vec(value.first, value.second);
     }
 
     // Note: Previously (before converting to use with rocksdb, we had a

@@ -14,13 +14,6 @@ inline void datum_deserialize_from_group(const const_buffer_group_t *group,
 }
 
 // The name datum_deserialize_from_buf was taken.
-// TODO: Remove this.
-inline void datum_deserialize_from_vec(const void *buf, size_t count, ql::datum_t *out) {
-    buffer_group_t group;
-    group.add_buffer(count, buf);
-    datum_deserialize_from_group(const_view(&group), out);
-}
-
 inline ql::datum_t datum_deserialize_from_vec(const void *buf, size_t count) {
     buffer_group_t group;
     group.add_buffer(count, buf);

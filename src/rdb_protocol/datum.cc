@@ -35,6 +35,8 @@
 #include "parsing/utf8.hpp"
 #include "stl_utils.hpp"
 
+// TODO: Check for likely functions only used with buffer cache blobs.
+
 namespace ql {
 
 // The minimum amount of stack space we require to be available on a coroutine
