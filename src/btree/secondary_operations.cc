@@ -214,24 +214,6 @@ void get_secondary_indexes(rockshard rocksh, buf_lock_t *sindex_block,
     get_secondary_indexes_internal(rocksh, sindex_block, sindexes_out);
 }
 
-void migrate_secondary_index_block(
-        rockshard rocksh,
-        buf_lock_t *sindex_block) {
-    cluster_version_t block_version;
-    {
-        buf_read_t read(sindex_block);
-        const btree_sindex_block_t *data
-            = static_cast<const btree_sindex_block_t *>(read.get_data_read());
-        block_version = sindex_block_version(data);
-    }
-
-    std::map<sindex_name_t, secondary_index_t> sindexes;
-    get_secondary_indexes_internal(rocksh, sindex_block, &sindexes);
-    if (block_version != cluster_version_t::LATEST_DISK) {
-        set_secondary_indexes_internal(rocksh, sindex_block, sindexes);
-    }
-}
-
 void set_secondary_index(rockshard rocksh,
                          buf_lock_t *sindex_block, const sindex_name_t &name,
                          const secondary_index_t &sindex) {

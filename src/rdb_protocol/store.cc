@@ -99,9 +99,6 @@ void store_t::help_construct_bring_sindexes_up_to_date() {
 
     superblock.reset();
 
-    // Migrate the secondary index block
-    migrate_secondary_index_block(rocksh(), &sindex_block);
-
     auto clear_sindex = [this](uuid_u sindex_id,
                                auto_drainer_t::lock_t store_keepalive) {
         try {
