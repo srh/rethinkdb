@@ -82,13 +82,7 @@ void real_superblock_t::release() {
     write_semaphore_acq_.reset();
 }
 
-void real_superblock_t::set_root_block_id(const block_id_t new_root_block) {
-    buf_write_t write(&sb_buf_);
-    reql_btree_superblock_t *sb_data = static_cast<reql_btree_superblock_t *>(
-        write.get_data_write(REQL_BTREE_SUPERBLOCK_SIZE));
-    sb_data->root_block = new_root_block;
-}
-
+// TODO: gross
 block_id_t real_superblock_t::get_sindex_block_id(rockshard rocksh) {
     read_acq_signal()->wait_lazily_unordered();
     return get_rocks_sindex_block_id(rocksh);
@@ -107,13 +101,6 @@ sindex_superblock_t::sindex_superblock_t(buf_lock_t &&sb_buf)
 
 void sindex_superblock_t::release() {
     sb_buf_.reset_buf_lock();
-}
-
-void sindex_superblock_t::set_root_block_id(const block_id_t new_root_block) {
-    buf_write_t write(&sb_buf_);
-    reql_btree_superblock_t *sb_data = static_cast<reql_btree_superblock_t *>(
-        write.get_data_write(REQL_BTREE_SUPERBLOCK_SIZE));
-    sb_data->root_block = new_root_block;
 }
 
 signal_t *sindex_superblock_t::read_acq_signal() {

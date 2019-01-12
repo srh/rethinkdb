@@ -39,8 +39,6 @@ public:
     // Release the superblock if possible (otherwise do nothing)
     virtual void release() = 0;
 
-    virtual void set_root_block_id(block_id_t new_root_block) = 0;
-
     virtual buf_parent_t expose_buf() = 0;
 
     cache_t *cache() { return expose_buf().cache(); }
