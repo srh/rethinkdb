@@ -565,7 +565,6 @@ void rdb_set_sindex_for_unittest(
     if (maybe_value.second) {
         ql::datum_t val;
         datum_deserialize_from_vec(maybe_value.first.data(), maybe_value.first.size(), &val);
-        // TODO: Remove the get_data() function... should be hard to miss.
     }
 
     if (overwrite || !had_value) {

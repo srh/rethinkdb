@@ -11,6 +11,7 @@
 #include "concurrency/promise.hpp"
 #include "rdb_protocol/btree.hpp"
 #include "rdb_protocol/lazy_btree_val.hpp"
+#include "rdb_protocol/serialize_datum_onto_blob.hpp"
 #include "rdb_protocol/store.hpp"
 
 class collect_keys_helper_t : public rocks_traversal_cb {
@@ -85,7 +86,6 @@ continue_bool_t rdb_erase_small_range(
     mod_reports_out->clear();
     *deleted_out = key_range_t::empty();
 
-    // TODO: This is what we want up here, right??
     superblock->write_acq_signal()->wait_lazily_unordered();
 
     // TODO: Use a rocks iterator, delete the keys while iterating.
@@ -114,62 +114,32 @@ continue_bool_t rdb_erase_small_range(
     const max_block_size_t max_block_size = superblock->cache()->max_block_size();
     rdb_value_sizer_t sizer(max_block_size);
     for (const auto &key : key_collector.get_collected_keys()) {
-        promise_t<superblock_t *> pass_back_superblock_promise;
-        {
-            keyvalue_location_t kv_location;
-            find_keyvalue_location_for_write(
-                &sizer,
-                superblock,
-                key.btree_key(),
-                /* don't update subtree recencies as we traverse the tree */
-                repli_timestamp_t::distant_past,
-                deletion_context->balancing_detacher(),
-                &kv_location,
-                NULL /* profile::trace_t */,
-                &pass_back_superblock_promise);
-            btree_slice->stats.pm_keys_set.record();
-            btree_slice->stats.pm_total_keys_set += 1;
+        btree_slice->stats.pm_keys_set.record();
+        btree_slice->stats.pm_total_keys_set += 1;
 
-            std::string rocks_kv_location = rockstore::table_primary_key(rocksh.table_id, rocksh.shard_no, key_to_unescaped_str(key));
-            std::pair<std::string, bool> maybe_value
-                = rocksh.rocks->try_read(rocks_kv_location);
+        std::string rocks_kv_location = rockstore::table_primary_key(rocksh.table_id, rocksh.shard_no, key_to_unescaped_str(key));
+        std::pair<std::string, bool> maybe_value
+            = rocksh.rocks->try_read(rocks_kv_location);
 
-            // TODO: Construct the mod report from rocks db data.
-            // It carries the rdb_value_t vector (right now) for the btree's sake.
+        // We're still holding a write lock on the superblock, so if the value
+        // disappeared since we've populated key_collector, something fishy
+        // is going on.
+        guarantee(maybe_value.second);
 
-            // We're still holding a write lock on the superblock, so if the value
-            // disappeared since we've populated key_collector, something fishy
-            // is going on.
-            guarantee(maybe_value.second);
+        // The mod_report we generate is a simple delete. While there is generally
+        // a difference between an erase and a delete (deletes get backfilled,
+        // while an erase is as if the value had never existed), that
+        // difference is irrelevant in the case of secondary indexes.
+        rdb_modification_report_t mod_report;
+        mod_report.primary_key = key;
+        // Get the full data
+        mod_report.info.deleted.first = datum_deserialize_from_vec(maybe_value.first.data(), maybe_value.first.size());
+        mod_reports_out->push_back(mod_report);
 
-            // The mod_report we generate is a simple delete. While there is generally
-            // a difference between an erase and a delete (deletes get backfilled,
-            // while an erase is as if the value had never existed), that
-            // difference is irrelevant in the case of secondary indexes.
-            rdb_modification_report_t mod_report;
-            mod_report.primary_key = key;
-            // Get the full data
-            const rdb_value_t *rdb_value = kv_location.value_as<rdb_value_t>();
-            mod_report.info.deleted.first = get_data(rdb_value,
-                                                     buf_parent_t(&kv_location.buf));
-            mod_reports_out->push_back(mod_report);
-
-            // Detach the value
-            deletion_context->balancing_detacher()->delete_value(
-                buf_parent_t(&kv_location.buf), kv_location.value.get());
-            // Erase the entry from the leaf node
-            kv_location.value.reset();
-            apply_keyvalue_change(&sizer, &kv_location, key.btree_key(),
-                                  repli_timestamp_t::invalid /* ignored for erase */,
-                                  deletion_context->primary_deleter(),
-                                  delete_mode_t::ERASE);
-
-            // Erase the entry from rocksdb.
-            rocksh->remove(rocks_kv_location, rockstore::write_options::TODO());
-        } // kv_location is destroyed here. That's important because sometimes
-          // pass_back_superblock_promise isn't pulsed before the kv_location
-          // gets deleted.
-        guarantee(pass_back_superblock_promise.wait() == superblock);
+        // TODO: repli_timestamp_t::invalid, delete_mode_t::ERASE was used.
+        // Maybe kv_location_delete should be called, for good form?
+        // Erase the entry from rocksdb.
+        rocksh->remove(rocks_kv_location, rockstore::write_options::TODO());
 
         guarantee(key >= deleted_out->right.key());
         *deleted_out = key_range_t(key_range_t::closed, key_range.left,

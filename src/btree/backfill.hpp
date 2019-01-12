@@ -124,11 +124,6 @@ public:
         bf_value &&value_in_leaf_node,
         signal_t *interruptor,
         std::vector<char> *value_out) = 0;
-    /* Similarly `size_value()` is responsible for retrieving the size of a given
-    value in the leaf node. */
-    virtual int64_t size_value(
-        buf_parent_t buf_parent,
-        const void *value_in_leaf_node) = 0;
 protected:
     virtual ~btree_backfill_item_consumer_t() { }
 };

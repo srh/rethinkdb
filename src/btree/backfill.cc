@@ -163,6 +163,7 @@ void ignore_all_pre_items(
     });
 }
 
+// TODO: Rename (drop the btree prefix)
 continue_bool_t btree_send_backfill(
         rockshard rocksh,
         real_superblock_t *superblock,

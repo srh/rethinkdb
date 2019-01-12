@@ -5,7 +5,6 @@
 #include "btree/operations.hpp"
 #include "rdb_protocol/blob_wrapper.hpp"
 #include "rdb_protocol/btree.hpp"
-#include "rdb_protocol/lazy_btree_val.hpp"
 
 /* After every `MAX_BACKFILL_ITEMS_PER_TXN` backfill items or backfill pre-items, we'll
 release the superblock and start a new transaction. */
@@ -154,7 +153,7 @@ public:
             const region_map_t<binary_blob_t> *_metainfo_ptr) :
         remaining(MAX_BACKFILL_ITEMS_PER_TXN), inner(_inner),
         threshold_ptr(_threshold_ptr), metainfo_ptr(_metainfo_ptr) { }
-    continue_bool_t on_item(backfill_item_t &&item) {
+    continue_bool_t on_item(backfill_item_t &&item) override {
         rassert(remaining > 0);
         --remaining;
         rassert(key_range_t::right_bound_t(item.range.left) >=
@@ -168,7 +167,7 @@ public:
             ? continue_bool_t::ABORT : continue_bool_t::CONTINUE;
     }
     continue_bool_t on_empty_range(
-            const key_range_t::right_bound_t &new_threshold) {
+            const key_range_t::right_bound_t &new_threshold) override {
         rassert(remaining > 0);
         --remaining;
         rassert(new_threshold >= *threshold_ptr);
@@ -182,20 +181,9 @@ public:
             buf_parent_t parent,
             bf_value &&value_in_leaf_node,
             UNUSED signal_t *interruptor2,
-            std::vector<char> *value_out) {
+            std::vector<char> *value_out) override {
         (void)parent;
         *value_out = std::move(value_in_leaf_node.value);
-    }
-    int64_t size_value(
-            buf_parent_t parent,
-            const void *value_in_leaf_node) {
-        const rdb_value_t *v =
-            static_cast<const rdb_value_t *>(value_in_leaf_node);
-        rdb_blob_wrapper_t blob_wrapper(
-            parent.cache()->max_block_size(),
-            const_cast<rdb_value_t *>(v)->value_ref(),
-            blob::btree_maxreflen);
-        return blob_wrapper.valuesize();
     }
     size_t remaining;
 private:
