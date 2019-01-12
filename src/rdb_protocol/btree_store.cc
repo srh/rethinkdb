@@ -846,17 +846,6 @@ void store_t::drop_sindex(uuid_u sindex_id) THROWS_NOTHING {
         // TODO: It's possible we need to keep the locking here.
         sindex_superblock.read_acq_signal()->wait_lazily_unordered();
 
-        /* Under normal circumstances, sindex superblocks do not have stat or sindex
-        blocks. However, we used to create stat and sindex blocks, so some very old
-        secondary indexes may still have them. Here we check for them and delete them
-        if they are present. */
-        if (sindex_superblock.get_stat_block_id() != NULL_BLOCK_ID) {
-            buf_lock_t stat_block(sindex_superblock.expose_buf(),
-                                  sindex_superblock.get_stat_block_id(),
-                                  access_t::write);
-            stat_block.write_acq_signal()->wait_lazily_unordered();
-            stat_block.mark_deleted();
-        }
         if (sindex_superblock.get_sindex_block_id() != NULL_BLOCK_ID) {
             buf_lock_t sind_block(sindex_superblock.expose_buf(),
                                   sindex_superblock.get_sindex_block_id(),

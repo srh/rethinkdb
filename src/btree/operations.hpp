@@ -41,12 +41,6 @@ public:
 
     virtual void set_root_block_id(block_id_t new_root_block) = 0;
 
-    /* If stats collection is desired, create a stat block with `create_stat_block()` and
-    store its ID on the superblock, then return it from `get_stat_block_id()`. If stats
-    collection is not desired, `get_stat_block_id()` can always return `NULL_BLOCK_ID`.
-    */
-    virtual block_id_t get_stat_block_id() = 0;
-
     virtual buf_parent_t expose_buf() = 0;
 
     cache_t *cache() { return expose_buf().cache(); }
@@ -75,10 +69,6 @@ public:
     promise_t<superblock_t *> *pass_back_superblock;
 };
 
-
-/* Create a stat block suitable for storing in a superblock and returning from
-`get_stat_block_id()`. */
-block_id_t create_stat_block(buf_parent_t parent);
 
 // TODO: Remove or make use of.
 /* `delete_mode_t` controls how `apply_keyvalue_change()` acts when `kv_loc->value` is

@@ -8,14 +8,14 @@
 #include "rockstore/store.hpp"
 
 
-// TODO: Remove this struct (reql_btree_superblock_t) entirely.S
+// TODO: Remove this struct (reql_btree_superblock_t) entirely.
 /* This is the actual structure stored on disk for the superblock of a table's primary or
 sindex B-tree. Both of them use the exact same format, but the sindex B-trees don't make
 use of the `sindex_block` or `metainfo_blob` fields. */
 ATTR_PACKED(struct reql_btree_superblock_t {
     block_magic_t magic;
     block_id_t root_block;
-    block_id_t stat_block;
+    block_id_t stat_block_unused;
     block_id_t sindex_block;
 
     static const int METAINFO_BLOB_MAXREFLEN
@@ -73,15 +73,6 @@ void real_superblock_t::set_root_block_id(const block_id_t new_root_block) {
     sb_data->root_block = new_root_block;
 }
 
-block_id_t real_superblock_t::get_stat_block_id() {
-    buf_read_t read(&sb_buf_);
-    uint32_t sb_size;
-    const reql_btree_superblock_t *sb_data =
-        static_cast<const reql_btree_superblock_t *>(read.get_data_read(&sb_size));
-    guarantee(sb_size == REQL_BTREE_SUPERBLOCK_SIZE);
-    return sb_data->stat_block;
-}
-
 block_id_t real_superblock_t::get_sindex_block_id() {
     buf_read_t read(&sb_buf_);
     uint32_t sb_size;
@@ -111,15 +102,6 @@ void sindex_superblock_t::set_root_block_id(const block_id_t new_root_block) {
     reql_btree_superblock_t *sb_data = static_cast<reql_btree_superblock_t *>(
         write.get_data_write(REQL_BTREE_SUPERBLOCK_SIZE));
     sb_data->root_block = new_root_block;
-}
-
-block_id_t sindex_superblock_t::get_stat_block_id() {
-    buf_read_t read(&sb_buf_);
-    uint32_t sb_size;
-    const reql_btree_superblock_t *sb_data =
-        static_cast<const reql_btree_superblock_t *>(read.get_data_read(&sb_size));
-    guarantee(sb_size == REQL_BTREE_SUPERBLOCK_SIZE);
-    return sb_data->stat_block;
 }
 
 block_id_t sindex_superblock_t::get_sindex_block_id() {
@@ -155,7 +137,7 @@ void btree_slice_t::init_real_superblock(real_superblock_t *superblock,
 
     sb->magic = reql_btree_version_magic_t<cluster_version_t::v2_1>::value;
     sb->root_block = NULL_BLOCK_ID;
-    sb->stat_block = create_stat_block(buf_parent_t(superblock->get()->txn()));
+    sb->stat_block_unused = NULL_BLOCK_ID;
     sb->sindex_block = NULL_BLOCK_ID;
 
     set_superblock_metainfo(superblock, rocksh, metainfo_key, metainfo_value,
@@ -176,7 +158,7 @@ void btree_slice_t::init_sindex_superblock(sindex_superblock_t *superblock) {
 
     sb->magic = reql_btree_version_magic_t<cluster_version_t::v2_1>::value;
     sb->root_block = NULL_BLOCK_ID;
-    sb->stat_block = NULL_BLOCK_ID;
+    sb->stat_block_unused = NULL_BLOCK_ID;
     sb->sindex_block = NULL_BLOCK_ID;
 }
 
