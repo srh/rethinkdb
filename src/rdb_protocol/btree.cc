@@ -117,29 +117,12 @@ void rdb_get(rockshard rocksh, const store_key_t &store_key,
     }
 }
 
-// TODO: Remove this.
 void kv_location_delete(rockstore::store *rocks,
                         const std::string &rocks_kv_location,
-                        keyvalue_location_t *kv_location,
-                        const store_key_t &key,
                         repli_timestamp_t timestamp,
-                        const deletion_context_t *deletion_context,
                         delete_mode_t delete_mode) {
-    // Notice this also implies that buf is valid.
-    guarantee(kv_location->value.has());
-
-    // As noted above, we can be sure that buf is valid.
-    const max_block_size_t block_size = kv_location->buf.cache()->max_block_size();
-
-    // Detach/Delete
-    deletion_context->primary_deleter()->delete_value(buf_parent_t(&kv_location->buf),
-                                                      kv_location->value.get());
-
-    kv_location->value.reset();
-    rdb_value_sizer_t sizer(block_size);
-    apply_keyvalue_change(&sizer, kv_location, key.btree_key(), timestamp,
-            deletion_context->balancing_detacher(), delete_mode);
-
+    (void)timestamp;  // TODO: Use with WAL?
+    (void)delete_mode;  // TODO: Use this with WAL?
     // TODO: We need to update the rocks secondary indexes (after primary key deletion), _transactionally_.
     rocks->remove(rocks_kv_location, rockstore::write_options::TODO());
 }
@@ -301,8 +284,8 @@ batched_replace_response_t rdb_replace_and_return_superblock(
             /* Now that the change has passed validation, write it to disk */
             if (new_val.get_type() == ql::datum_t::R_NULL) {
                 kv_location_delete(rocksh.rocks, rocks_kv_location,
-                                   &kv_location, *info.key, info.btree->timestamp,
-                                   deletion_context, delete_mode_t::REGULAR_QUERY);
+                                   info.btree->timestamp,
+                                   delete_mode_t::REGULAR_QUERY);
             } else {
                 r_sanity_check(new_val.get_field(primary_key, ql::NOTHROW).has());
                 ql::serialization_result_t res =
@@ -657,11 +640,7 @@ void rdb_delete(rockshard rocksh,
                 rdb_modification_info_t *mod_info,
                 profile::trace_t *trace,
                 promise_t<superblock_t *> *pass_back_superblock) {
-    keyvalue_location_t kv_location;
-    rdb_value_sizer_t sizer(superblock->cache()->max_block_size());
-    find_keyvalue_location_for_write(&sizer, superblock, key.btree_key(), timestamp,
-            deletion_context->balancing_detacher(), &kv_location, trace,
-            pass_back_superblock);
+    superblock_passback_guard spb(superblock, pass_back_superblock);
     slice->stats.pm_keys_set.record();
     slice->stats.pm_total_keys_set += 1;
 
@@ -673,8 +652,7 @@ void rdb_delete(rockshard rocksh,
     /* Update the modification report. */
     if (exists) {
         mod_info->deleted.first = datum_deserialize_from_vec(maybe_value.first.data(), maybe_value.first.size());
-        kv_location_delete(rocksh.rocks, rocks_kv_location, &kv_location, key, timestamp, deletion_context,
-            delete_mode);
+        kv_location_delete(rocksh.rocks, rocks_kv_location, timestamp, delete_mode);
     }
     response->result = (exists ? point_delete_result_t::DELETED : point_delete_result_t::MISSING);
 }
