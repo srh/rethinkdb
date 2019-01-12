@@ -197,22 +197,10 @@ public:
     bool is_snapshotted() const;
     void snapshot_subdag();
 
-    void detach_child(block_id_t child_id);
-
     block_id_t block_id() const {
         guarantee(txn_ != nullptr);
         return current_page_acq()->block_id();
     }
-
-    // It is illegal to call this on a buf lock that has been mark_deleted, or that
-    // is a lock on an aux block.  This never returns repli_timestamp_t::invalid.
-    repli_timestamp_t get_recency() const;
-
-    // Sets the buf's recency to `superceding_recency`, which must be greater than or
-    // equal to its current recency. Operations that add or modify entries to the leaf
-    // nodes of the B-tree should call this for every node in the path from the root to
-    // the leaf.
-    void set_recency(repli_timestamp_t superceding_recency);
 
     access_t access() const {
         guarantee(!empty());
@@ -261,9 +249,6 @@ private:
                                                   block_id_t child_id);
     alt::current_page_acq_t *current_page_acq() const;
 
-    alt::page_t *get_held_page_for_read();
-    alt::page_t *get_held_page_for_write();
-
     txn_t *txn_;
 
     scoped_ptr_t<alt::current_page_acq_t> current_page_acq_;
@@ -291,12 +276,6 @@ public:
     explicit buf_parent_t(txn_t *_txn)
         : txn_(_txn), lock_or_null_(nullptr) {
         rassert(_txn != NULL);
-    }
-
-    void detach_child(block_id_t child_id) {
-        if (lock_or_null_ != nullptr) {
-            lock_or_null_->detach_child(child_id);
-        }
     }
 
     bool empty() const {

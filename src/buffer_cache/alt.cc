@@ -46,7 +46,18 @@ void buf_lock_t::apply_buf_write(buf_lock_t *lock, alt_create_t) {
 
     // buf_write_t::get_data_write
     block_size_t block_size = lock->cache()->max_block_size();
-    page_t *page = lock->get_held_page_for_write();
+
+    // buf_lock_t::get_held_page_for_write
+    page_t *page;
+    guarantee(!lock->empty());
+    rassert(lock->snapshot_node_ == nullptr);
+    // We only wait here so that we can guarantee(!empty()) after it's pulsed.
+    lock->current_page_acq_->write_acq_signal()->wait();
+
+    ASSERT_FINITE_CORO_WAITING;
+    guarantee(!lock->empty());
+    page = lock->current_page_acq_->current_page_for_write(lock->txn()->account());
+
     if (!page_acq.has()) {
         page_acq.init(page, &lock->cache()->page_cache_,
                        lock->txn()->account());
@@ -744,83 +755,4 @@ current_page_acq_t *buf_lock_t::current_page_acq() const {
     } else {
         return current_page_acq_.get();
     }
-}
-
-void buf_lock_t::detach_child(block_id_t child_id) {
-    ASSERT_FINITE_CORO_WAITING;
-    guarantee(!empty());
-    guarantee(access() == access_t::write);
-
-    // _This_ txn isn't loading the page, so use the default reads account.
-    buf_lock_t::create_child_snapshot_attachments(
-            cache(),
-            current_page_acq()->block_version(),
-            block_id(),
-            child_id);
-}
-
-repli_timestamp_t buf_lock_t::get_recency() const {
-    guarantee(!empty());
-    current_page_acq_t *cpa = current_page_acq();
-    guarantee(cpa != nullptr);
-
-    // Emulate the cpa->recency() waiting behavior.  We only do this waiting here so
-    // that we can guarantee(!empty()) after it's pulsed.  (FYI: We and the
-    // page_cache wait for the write_acq_signal() so that a write acquirer can't see
-    // its recency change before/after the write_acq_signal() gets pulsed.)
-    if (access() == access_t::read) {
-        cpa->read_acq_signal()->wait();
-    } else {
-        cpa->write_acq_signal()->wait();
-    }
-
-    ASSERT_FINITE_CORO_WAITING;
-    guarantee(!empty());
-    repli_timestamp_t ret = cpa->recency();
-    // You may not call this on a buf lock that was marked deleted, and you
-    // shouldn't call it on an aux block either.
-    guarantee(ret != repli_timestamp_t::invalid);
-    return ret;
-}
-
-void buf_lock_t::set_recency(repli_timestamp_t recency) {
-    guarantee(!empty());
-    // You should never need to set the recency of an aux block. It will be
-    // discarded anyway.
-    guarantee(!is_aux_block_id(block_id()));
-    rassert(snapshot_node_ == nullptr);
-
-    // We only wait here so that we can guarantee(!empty()) after it's pulsed.
-    current_page_acq_->write_acq_signal()->wait();
-
-    ASSERT_FINITE_CORO_WAITING;
-    guarantee(!empty());
-    {
-        repli_timestamp_t s = superceding_recency(current_page_acq_->recency(), recency);
-        guarantee(s == recency);
-    }
-    current_page_acq_->set_recency(recency);
-}
-
-page_t *buf_lock_t::get_held_page_for_read() {
-    guarantee(!empty());
-    current_page_acq_t *cpa = current_page_acq();
-    guarantee(cpa != nullptr);
-    // We only wait here so that we can guarantee(!empty()) after it's pulsed.
-    cpa->read_acq_signal()->wait();
-
-    ASSERT_FINITE_CORO_WAITING;
-    guarantee(!empty());
-    return cpa->current_page_for_read(txn()->account());
-}
-
-page_t *buf_lock_t::get_held_page_for_write() {
-    guarantee(!empty());
-    rassert(snapshot_node_ == nullptr);
-    // We only wait here so that we can guarantee(!empty()) after it's pulsed.
-    current_page_acq_->write_acq_signal()->wait();
-
-    ASSERT_FINITE_CORO_WAITING;
-    guarantee(!empty());
-    return current_page_acq_->current_page_for_write(txn()->account());
 }
