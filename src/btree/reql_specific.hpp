@@ -30,7 +30,7 @@ public:
 
     block_id_t get_sindex_block_id(rockshard rocksh);
 
-    buf_parent_t expose_buf() override { return buf_parent_t(&sb_buf_); }
+    buf_parent_t expose_buf() { return buf_parent_t(&sb_buf_); }
 
     signal_t *read_acq_signal() override;
     signal_t *write_acq_signal() override;
@@ -52,9 +52,6 @@ public:
     explicit sindex_superblock_t(buf_lock_t &&sb_buf);
 
     void release() override;
-    buf_lock_t *get() { return &sb_buf_; }
-
-    buf_parent_t expose_buf() override { return buf_parent_t(&sb_buf_); }
 
     signal_t *read_acq_signal() override;
     signal_t *write_acq_signal() override;

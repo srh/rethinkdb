@@ -31,7 +31,7 @@ region_map_t<binary_blob_t> store_metainfo_manager_t::get(
         real_superblock_t *superblock,
         const region_t &region) const {
     guarantee(superblock != nullptr);
-    superblock->get()->read_acq_signal()->wait_lazily_ordered();
+    superblock->read_acq_signal()->wait_lazily_ordered();
     return cache.mask(region);
 }
 
@@ -40,7 +40,7 @@ void store_metainfo_manager_t::visit(
         const region_t &region,
         const std::function<void(const region_t &, const binary_blob_t &)> &cb) const {
     guarantee(superblock != nullptr);
-    superblock->get()->read_acq_signal()->wait_lazily_ordered();
+    superblock->read_acq_signal()->wait_lazily_ordered();
     cache.visit(region, cb);
 }
 
@@ -50,7 +50,7 @@ void store_metainfo_manager_t::update(
         const region_map_t<binary_blob_t> &new_values) {
     // TODO: Strip out non-rocks writing (but keep superblock write acquisition waiting).
     guarantee(superblock != nullptr);
-    superblock->get()->write_acq_signal()->wait_lazily_ordered();
+    superblock->write_acq_signal()->wait_lazily_ordered();
 
     cache.update(new_values);
 
