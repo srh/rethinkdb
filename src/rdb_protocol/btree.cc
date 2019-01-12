@@ -23,7 +23,6 @@
 #include "containers/scoped.hpp"
 #include "rdb_protocol/geo/exceptions.hpp"
 #include "rdb_protocol/geo/indexing.hpp"
-#include "rdb_protocol/blob_wrapper.hpp"
 #include "rdb_protocol/func.hpp"
 #include "rdb_protocol/geo_traversal.hpp"
 #include "rdb_protocol/pseudo_geometry.hpp"
