@@ -63,11 +63,12 @@ template <> archive_result_t deserialize<cluster_version_t::v2_1>(
 
 RDB_IMPL_SERIALIZABLE_2_SINCE_v1_13(sindex_name_t, name, being_deleted);
 
+// TODO: We'll be removing this struct entirely.
 ATTR_PACKED(struct btree_sindex_block_t {
     static const int SINDEX_BLOB_MAXREFLEN = 4076;
 
     block_magic_t magic;
-    char sindex_blob[SINDEX_BLOB_MAXREFLEN];
+    char sindex_blob_unused[SINDEX_BLOB_MAXREFLEN];
 });
 
 template <cluster_version_t W>
@@ -162,18 +163,7 @@ void set_secondary_indexes_internal(
         rockshard rocksh,
         buf_lock_t *sindex_block,
         const std::map<sindex_name_t, secondary_index_t> &sindexes) {
-    buf_write_t write(sindex_block);
-    btree_sindex_block_t *data
-        = static_cast<btree_sindex_block_t *>(write.get_data_write());
-
-    blob_t sindex_blob(sindex_block->cache()->max_block_size(),
-                       data->sindex_blob,
-                       btree_sindex_block_t::SINDEX_BLOB_MAXREFLEN);
-    // There's just one field in btree_sindex_block_t, sindex_blob.  So we set
-    // the magic to the latest value and serialize with the latest version.
-    data->magic = btree_sindex_block_magic_t<cluster_version_t::LATEST_DISK>::value;
-    serialize_onto_blob<cluster_version_t::LATEST_DISK>(
-            buf_parent_t(sindex_block), &sindex_blob, sindexes);
+    sindex_block->write_acq_signal()->wait_lazily_unordered();
 
     // TODO: rocksdb transactionality
     std::string sindex_rocks_blob = serialize_to_string<cluster_version_t::LATEST_DISK>(sindexes);
@@ -187,7 +177,6 @@ void initialize_secondary_indexes(rockshard rocksh,
     btree_sindex_block_t *data
         = static_cast<btree_sindex_block_t *>(write.get_data_write());
     data->magic = btree_sindex_block_magic_t<cluster_version_t::LATEST_DISK>::value;
-    memset(data->sindex_blob, 0, btree_sindex_block_t::SINDEX_BLOB_MAXREFLEN);
 
     set_secondary_indexes_internal(rocksh, sindex_block,
                                    std::map<sindex_name_t, secondary_index_t>());
