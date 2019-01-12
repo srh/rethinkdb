@@ -9,8 +9,7 @@
 store_metainfo_manager_t::store_metainfo_manager_t(rockshard rocksh, real_superblock_t *superblock) {
     std::vector<std::pair<std::vector<char>, std::vector<char> > > kv_pairs;
     // TODO: this is inefficient, cut out the middleman (vector)
-    cluster_version_t version;
-    get_superblock_metainfo(rocksh, superblock, &kv_pairs, &version);
+    get_superblock_metainfo(rocksh, superblock, &kv_pairs);
     std::vector<region_t> regions;
     std::vector<binary_blob_t> values;
     for (auto &pair : kv_pairs) {

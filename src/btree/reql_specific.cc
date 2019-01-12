@@ -176,8 +176,7 @@ void superblock_metainfo_iterator_t::operator++() {
 void get_superblock_metainfo(
         rockshard rocksh,
         real_superblock_t *superblock,
-        std::vector<std::pair<std::vector<char>, std::vector<char> > > *kv_pairs_out,
-        cluster_version_t *version_out) {
+        std::vector<std::pair<std::vector<char>, std::vector<char> > > *kv_pairs_out) {
     superblock->read_acq_signal()->wait_lazily_ordered();
 
     std::string meta_prefix = rockstore::table_metadata_prefix(rocksh.table_id, rocksh.shard_no);
@@ -186,11 +185,9 @@ void get_superblock_metainfo(
     std::string metainfo
         = rocksh.rocks->read(meta_prefix + rockstore::TABLE_METADATA_METAINFO_KEY());
 
-    if (version == rockstore::VERSION()) {
-        // TODO: Yeah, we output v2_1 for some reason.
-        *version_out = cluster_version_t::v2_1;
-    } else {
-        crash("Unrecognized reql_btree_superblock_t::magic found.");
+    // TODO: Do we even need this field?
+    if (version != rockstore::VERSION()) {
+        crash("Unrecognized metainfo version found.");
     }
 
     for (superblock_metainfo_iterator_t kv_iter(metainfo.data(), metainfo.data() + metainfo.size()); !kv_iter.is_end(); ++kv_iter) {

@@ -156,8 +156,7 @@ private:
 void get_superblock_metainfo(
     rockshard rocksh,
     real_superblock_t *superblock,
-    std::vector< std::pair<std::vector<char>, std::vector<char> > > *kv_pairs_out,
-    cluster_version_t *version_out);
+    std::vector< std::pair<std::vector<char>, std::vector<char> > > *kv_pairs_out);
 
 void set_superblock_metainfo(real_superblock_t *superblock,
                              rockshard rocksh,

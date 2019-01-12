@@ -104,9 +104,8 @@ TPTEST(BtreeMetainfo, MetainfoTest) {
             scoped_ptr_t<real_superblock_t> superblock;
             get_btree_superblock_and_txn_for_reading(
                 &cache_conn, CACHE_SNAPSHOTTED_NO, &superblock, &txn);
-            cluster_version_t version;
             std::vector<std::pair<std::vector<char>, std::vector<char> > > read_back;
-            get_superblock_metainfo(rocksh, superblock.get(), &read_back, &version);
+            get_superblock_metainfo(rocksh, superblock.get(), &read_back);
             std::set<std::string> seen;
             for (const auto &pair : read_back) {
                 std::string key = vector_to_string(pair.first);
@@ -115,7 +114,6 @@ TPTEST(BtreeMetainfo, MetainfoTest) {
                 seen.insert(key);
                 ASSERT_EQ(metainfo[key], value);
             }
-            ASSERT_EQ(version, cluster_version_t::v2_1);
             ASSERT_EQ(metainfo.size(), seen.size());
         }
     }
