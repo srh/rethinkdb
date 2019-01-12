@@ -845,14 +845,6 @@ void store_t::drop_sindex(uuid_u sindex_id) THROWS_NOTHING {
         sindex_superblock_t sindex_superblock(std::move(sindex_superblock_lock));
         // TODO: It's possible we need to keep the locking here.
         sindex_superblock.read_acq_signal()->wait_lazily_unordered();
-
-        if (sindex_superblock.get_sindex_block_id() != NULL_BLOCK_ID) {
-            buf_lock_t sind_block(sindex_superblock.expose_buf(),
-                                  sindex_superblock.get_sindex_block_id(),
-                                  access_t::write);
-            sind_block.write_acq_signal()->wait_lazily_unordered();
-            sind_block.mark_deleted();
-        }
     }
     /* Now it's safe to completely delete the index */
     buf_lock_t sindex_superblock_lock(buf_parent_t(&sindex_block),

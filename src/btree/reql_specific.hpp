@@ -58,11 +58,6 @@ public:
 
     void set_root_block_id(block_id_t new_root_block) override;
 
-    /* sindex superblocks shouldn't have a sindex block of their own. But in previous
-    versions of RethinkDB they would have an empty sindex block. This is exposed so that
-    we can delete such a sindex block when deleting the sindex superblock. */
-    block_id_t get_sindex_block_id();
-
     buf_parent_t expose_buf() override { return buf_parent_t(&sb_buf_); }
 
     signal_t *read_acq_signal() override;
