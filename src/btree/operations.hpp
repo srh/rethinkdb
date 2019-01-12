@@ -39,7 +39,6 @@ public:
     // Release the superblock if possible (otherwise do nothing)
     virtual void release() = 0;
 
-    virtual block_id_t get_root_block_id() = 0;
     virtual void set_root_block_id(block_id_t new_root_block) = 0;
 
     /* If stats collection is desired, create a stat block with `create_stat_block()` and

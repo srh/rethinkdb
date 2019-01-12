@@ -18,10 +18,6 @@ public:
         }
     }
 
-    block_id_t get_root_block_id() {
-        return sub_superblock->get_root_block_id();
-    }
-
     void set_root_block_id(block_id_t new_root_block) {
         sub_superblock->set_root_block_id(new_root_block);
     }

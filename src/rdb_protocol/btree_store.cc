@@ -843,10 +843,9 @@ void store_t::drop_sindex(uuid_u sindex_id) THROWS_NOTHING {
         buf_lock_t sindex_superblock_lock(buf_parent_t(&sindex_block),
                                           sindex.superblock, access_t::write);
         sindex_superblock_t sindex_superblock(std::move(sindex_superblock_lock));
-        if (sindex_superblock.get_root_block_id() != NULL_BLOCK_ID) {
-            logWRN("The secondary root block id is not NULL_BLOCK_ID, when we "
-                "should have never set it");
-        }
+        // TODO: It's possible we need to keep the locking here.
+        sindex_superblock.read_acq_signal()->wait_lazily_unordered();
+
         /* Under normal circumstances, sindex superblocks do not have stat or sindex
         blocks. However, we used to create stat and sindex blocks, so some very old
         secondary indexes may still have them. Here we check for them and delete them

@@ -28,7 +28,6 @@ public:
     void release() override;
     buf_lock_t *get() { return &sb_buf_; }
 
-    block_id_t get_root_block_id() override;
     void set_root_block_id(block_id_t new_root_block) override;
 
     block_id_t get_stat_block_id() override;
@@ -59,7 +58,6 @@ public:
     void release() override;
     buf_lock_t *get() { return &sb_buf_; }
 
-    block_id_t get_root_block_id() override;
     void set_root_block_id(block_id_t new_root_block) override;
 
     block_id_t get_stat_block_id() override;
