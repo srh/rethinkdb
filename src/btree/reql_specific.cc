@@ -207,8 +207,8 @@ btree_slice_t::btree_slice_t(cache_t *c, perfmon_collection_t *parent,
 
 btree_slice_t::~btree_slice_t() { }
 
-void superblock_metainfo_iterator_t::advance(char * p) {
-    char* cur = p;
+void superblock_metainfo_iterator_t::advance(const char *p) {
+    const char *cur = p;
     if (cur == end) {
         goto check_failed;
     }
@@ -216,7 +216,7 @@ void superblock_metainfo_iterator_t::advance(char * p) {
     if (end - cur < static_cast<ptrdiff_t>(sizeof(sz_t))) {
         goto check_failed;
     }
-    key_size = *reinterpret_cast<sz_t*>(cur);
+    key_size = *reinterpret_cast<const sz_t *>(cur);
     cur += sizeof(sz_t);
 
     rassert(end - cur >= static_cast<int64_t>(key_size), "Superblock metainfo data is corrupted: walked past the end off the buffer");
@@ -230,7 +230,7 @@ void superblock_metainfo_iterator_t::advance(char * p) {
     if (end - cur < static_cast<ptrdiff_t>(sizeof(sz_t))) {
         goto check_failed;
     }
-    value_size = *reinterpret_cast<sz_t*>(cur);
+    value_size = *reinterpret_cast<const sz_t *>(cur);
     cur += sizeof(sz_t);
 
     rassert(end - cur >= static_cast<int64_t>(value_size), "Superblock metainfo data is corrupted: walked past the end off the buffer");
@@ -258,42 +258,23 @@ void superblock_metainfo_iterator_t::operator++() {
 }
 
 void get_superblock_metainfo(
+        rockshard rocksh,
         real_superblock_t *superblock,
         std::vector<std::pair<std::vector<char>, std::vector<char> > > *kv_pairs_out,
         cluster_version_t *version_out) {
-    std::vector<char> metainfo;
-    {
-        buf_read_t read(superblock->get());
-        uint32_t sb_size;
-        const reql_btree_superblock_t *data
-            = static_cast<const reql_btree_superblock_t *>(read.get_data_read(&sb_size));
-        guarantee(sb_size == REQL_BTREE_SUPERBLOCK_SIZE);
+    superblock->read_acq_signal()->wait_lazily_unordered();
 
-        if (data->magic == reql_btree_version_magic_t<cluster_version_t::v2_1>::value) {
-            *version_out = cluster_version_t::v2_1;
-        } else if (data->magic == reql_btree_version_magic_t<cluster_version_t::v2_0>::value) {
-            *version_out = cluster_version_t::v2_0;
-        } else {
-            crash("Unrecognized reql_btree_superblock_t::magic found.");
-        }
+    std::string meta_prefix = rockstore::table_metadata_prefix(rocksh.table_id, rocksh.shard_no);
+    std::string version
+        = rocksh.rocks->read(meta_prefix + rockstore::TABLE_METADATA_VERSION_KEY());
+    std::string metainfo
+        = rocksh.rocks->read(meta_prefix + rockstore::TABLE_METADATA_METAINFO_KEY());
 
-        // The const cast is okay because we access the data with access_t::read
-        // and don't write to the blob.
-        blob_t blob(superblock->get()->cache()->max_block_size(),
-                    const_cast<char *>(data->metainfo_blob),
-                    reql_btree_superblock_t::METAINFO_BLOB_MAXREFLEN);
-        blob_acq_t acq;
-        buffer_group_t group;
-        blob.expose_all(buf_parent_t(superblock->get()), access_t::read,
-                        &group, &acq);
-
-        const int64_t group_size = group.get_size();
-        metainfo.resize(group_size);
-
-        buffer_group_t group_cpy;
-        group_cpy.add_buffer(group_size, metainfo.data());
-
-        buffer_group_copy_data(&group_cpy, const_view(&group));
+    if (version == rockstore::VERSION()) {
+        // TODO: Yeah, we output v2_1 for some reason.
+        *version_out = cluster_version_t::v2_1;
+    } else {
+        crash("Unrecognized reql_btree_superblock_t::magic found.");
     }
 
     for (superblock_metainfo_iterator_t kv_iter(metainfo.data(), metainfo.data() + metainfo.size()); !kv_iter.is_end(); ++kv_iter) {
@@ -318,6 +299,8 @@ void set_superblock_metainfo(real_superblock_t *superblock,
                              const std::vector<std::vector<char> > &keys,
                              const std::vector<binary_blob_t> &values,
                              cluster_version_t version) {
+    superblock->write_acq_signal()->wait_lazily_unordered();
+
     buf_write_t write(superblock->get());
     reql_btree_superblock_t *data
         = static_cast<reql_btree_superblock_t *>(

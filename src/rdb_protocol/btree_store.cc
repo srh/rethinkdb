@@ -150,7 +150,7 @@ store_t::store_t(const region_t &_region,
                                     &dummy_interruptor,
                                     false /* don't use snapshot */ );
 
-        metainfo.init(new store_metainfo_manager_t(superblock.get()));
+        metainfo.init(new store_metainfo_manager_t(rocksh(), superblock.get()));
 
         buf_lock_t sindex_block(superblock->expose_buf(),
                                 superblock->get_sindex_block_id(),

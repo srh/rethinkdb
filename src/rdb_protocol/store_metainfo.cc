@@ -6,10 +6,10 @@
 #include "containers/archive/vector_stream.hpp"
 #include "rockstore/rockshard.hpp"
 
-store_metainfo_manager_t::store_metainfo_manager_t(real_superblock_t *superblock) {
+store_metainfo_manager_t::store_metainfo_manager_t(rockshard rocksh, real_superblock_t *superblock) {
     std::vector<std::pair<std::vector<char>, std::vector<char> > > kv_pairs;
     // TODO: this is inefficient, cut out the middleman (vector)
-    get_superblock_metainfo(superblock, &kv_pairs, &cache_version);
+    get_superblock_metainfo(rocksh, superblock, &kv_pairs, &cache_version);
     std::vector<region_t> regions;
     std::vector<binary_blob_t> values;
     for (auto &pair : kv_pairs) {

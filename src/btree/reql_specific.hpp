@@ -135,10 +135,10 @@ private:
  */
 struct superblock_metainfo_iterator_t {
     typedef uint32_t sz_t;  // be careful: the values of this type get casted to int64_t in checks, so it must fit
-    typedef std::pair<sz_t, char *> key_t;
-    typedef std::pair<sz_t, char *> value_t;
+    typedef std::pair<sz_t, const char *> key_t;
+    typedef std::pair<sz_t, const char *> value_t;
 
-    superblock_metainfo_iterator_t(char *metainfo, char *metainfo_end) : end(metainfo_end) { advance(metainfo); }
+    superblock_metainfo_iterator_t(const char *metainfo, const char *metainfo_end) : end(metainfo_end) { advance(metainfo); }
 
     bool is_end() { return pos == end; }
 
@@ -150,25 +150,26 @@ struct superblock_metainfo_iterator_t {
     key_t key() { return std::make_pair(key_size, key_ptr); }
     value_t value() { return std::make_pair(value_size, value_ptr); }
 
-    char *record_ptr() { return pos; }
-    char *next_record_ptr() { return next_pos; }
-    char *end_ptr() { return end; }
-    sz_t *value_size_ptr() { return reinterpret_cast<sz_t*>(value_ptr) - 1; }
+    const char *record_ptr() { return pos; }
+    const char *next_record_ptr() { return next_pos; }
+    const char *end_ptr() { return end; }
+    const sz_t *value_size_ptr() { return reinterpret_cast<const sz_t*>(value_ptr) - 1; }
 private:
-    void advance(char *p);
+    void advance(const char *p);
 
-    char *pos;
-    char *next_pos;
-    char *end;
+    const char *pos;
+    const char *next_pos;
+    const char *end;
     sz_t key_size;
-    char *key_ptr;
+    const char *key_ptr;
     sz_t value_size;
-    char *value_ptr;
+    const char *value_ptr;
 };
 
 
 // Metainfo functions
 void get_superblock_metainfo(
+    rockshard rocksh,
     real_superblock_t *superblock,
     std::vector< std::pair<std::vector<char>, std::vector<char> > > *kv_pairs_out,
     cluster_version_t *version_out);

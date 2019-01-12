@@ -107,7 +107,7 @@ TPTEST(BtreeMetainfo, MetainfoTest) {
                 &cache_conn, CACHE_SNAPSHOTTED_NO, &superblock, &txn);
             cluster_version_t version;
             std::vector<std::pair<std::vector<char>, std::vector<char> > > read_back;
-            get_superblock_metainfo(superblock.get(), &read_back, &version);
+            get_superblock_metainfo(rocksh, superblock.get(), &read_back, &version);
             std::set<std::string> seen;
             for (const auto &pair : read_back) {
                 std::string key = vector_to_string(pair.first);
