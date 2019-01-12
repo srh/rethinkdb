@@ -38,7 +38,6 @@ template <class> class clone_ptr_t;
 template <class> class cross_thread_watchable_variable_t;
 class cross_thread_signal_t;
 struct secondary_index_t;
-class traversal_progress_combiner_t;
 template <class> class watchable_t;
 
 enum class profile_bool_t {

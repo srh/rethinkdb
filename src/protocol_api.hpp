@@ -35,7 +35,6 @@ struct read_t;
 struct read_response_t;
 class store_t;
 class store_view_t;
-class traversal_progress_combiner_t;
 struct write_t;
 struct write_response_t;
 
