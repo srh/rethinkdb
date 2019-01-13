@@ -982,6 +982,9 @@ public:
         default: unreachable();
         }
         size_t n = spec->limit - item_queue->size();
+        // TODO: Maybe with this ref stuff, we could keep a rocksdb iterator and
+        // use a snapshot instead of holding the superblock (but this is
+        // changefeed code, there's stamping, so maybe not.)
         rdb_rget_slice(
             rocksh,
             ref.btree,

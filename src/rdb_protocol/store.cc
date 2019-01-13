@@ -285,7 +285,6 @@ void do_read(rockshard rocksh,
 
 // TODO: get rid of this extra response_t copy on the stack
 struct rdb_read_visitor_t : public boost::static_visitor<void> {
-    // TODO: Implement rocks reading here?
     void operator()(const changefeed_subscribe_t &s) {
         auto cserver = store->get_or_make_changefeed_server(s.shard_region);
         guarantee(cserver.first != nullptr);
@@ -297,7 +296,6 @@ struct rdb_read_visitor_t : public boost::static_visitor<void> {
         res->addrs.insert(cserver.first->get_stop_addr());
     }
 
-    // TODO: Implement rocks reading here?
     void operator()(const changefeed_limit_subscribe_t &s) {
         ql::env_t env(
             ctx,
@@ -390,7 +388,6 @@ struct rdb_read_visitor_t : public boost::static_visitor<void> {
         response->response = changefeed_limit_subscribe_response_t(1, std::move(vec));
     }
 
-    // TODO: Implement rocks reading here?
     changefeed_stamp_response_t do_stamp(const changefeed_stamp_t &s,
                                          const region_t &current_shard,
                                          const store_key_t &read_start) {
@@ -414,12 +411,10 @@ struct rdb_read_visitor_t : public boost::static_visitor<void> {
         return changefeed_stamp_response_t();
     }
 
-    // TODO: Implement rocks reading here?
     void operator()(const changefeed_stamp_t &s) {
         response->response = do_stamp(s, s.region, s.region.inner.left);
     }
 
-    // TODO: Implement rocks reading here?
     void operator()(const changefeed_point_stamp_t &s) {
         // Need to wait for the superblock to make sure we get the right changefeed
         // stamp.

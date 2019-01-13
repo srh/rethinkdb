@@ -1000,6 +1000,8 @@ void rdb_rget_slice(
     continue_bool_t cont = continue_bool_t::CONTINUE;
     std::string rocks_kv_prefix = rockstore::table_primary_prefix(rocksh.table_id, rocksh.shard_no);
     if (primary_keys.has_value()) {
+        // TODO: Instead of holding onto the superblock, we could make an iterator once,
+        // or hold a rocksdb snapshot once, out here.
         auto cb = [&](const std::pair<store_key_t, uint64_t> &pair, bool is_last) {
             rocks_rget_cb_wrapper wrapper(&callback, pair.second, r_nullopt);
             return rocks_traversal(
@@ -1089,6 +1091,8 @@ void rdb_rget_secondary_slice(
 
     std::string rocks_kv_prefix = rockstore::table_secondary_prefix(rocksh.table_id, rocksh.shard_no, sindex_uuid);
 
+    // TODO: We could make a rocksdb snapshot here, and iterate through that,
+    // instead of holding a superblock.
     direction_t direction = reversed(sorting) ? direction_t::backward : direction_t::forward;
     auto cb = [&](const std::pair<ql::datum_range_t, uint64_t> &pair, bool is_last) {
         key_range_t sindex_keyrange =
