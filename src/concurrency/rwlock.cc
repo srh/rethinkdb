@@ -66,12 +66,13 @@ rwlock_in_line_t::rwlock_in_line_t()
     : lock_(nullptr), access_(valgrind_undefined(access_t::read)) { }
 
 rwlock_in_line_t::rwlock_in_line_t(rwlock_t *lock, access_t access)
-    : lock_(lock), access_(access) {
-    lock_->add_acq(this);
+    : lock_(nullptr), access_(valgrind_undefined(access_t::read)) {
+    init(lock, access);
 }
 
 rwlock_in_line_t::rwlock_in_line_t(rwlock_in_line_t &&other)
-    : lock_(other.lock_),
+    : intrusive_list_node_t<rwlock_in_line_t>(std::move(other)),
+      lock_(other.lock_),
       access_(other.access_),
       read_cond_(std::move(other.read_cond_)),
       write_cond_(std::move(other.write_cond_)) {
@@ -79,6 +80,12 @@ rwlock_in_line_t::rwlock_in_line_t(rwlock_in_line_t &&other)
     other.access_ = valgrind_undefined(access_t::read);
 }
 
+void rwlock_in_line_t::init(rwlock_t *lock, access_t access) {
+    rassert(lock_ == nullptr);
+    lock_ = lock;
+    access_ = access;
+    lock_->add_acq(this);
+}
 
 rwlock_in_line_t::~rwlock_in_line_t() {
     reset();

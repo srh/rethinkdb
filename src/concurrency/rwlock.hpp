@@ -43,6 +43,8 @@ public:
 
     rwlock_in_line_t(rwlock_in_line_t &&other);
 
+    void init(rwlock_t *lock, access_t access);
+
     const signal_t *read_signal() const { return &read_cond_; }
     const signal_t *write_signal() const {
         guarantee(access_ == access_t::write);

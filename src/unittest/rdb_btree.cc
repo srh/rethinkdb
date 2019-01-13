@@ -43,9 +43,8 @@ void insert_rows(int start, int finish, store_t *store) {
             store->acquire_superblock_for_write(
                 1, write_durability_t::SOFT,
                 &token, &txn, &superblock, &dummy_interruptor);
-            sindex_block_lock_t sindex_block(
+            sindex_block_lock sindex_block(
                 superblock->get(),
-                superblock->get_sindex_block_id(store->rocksh()),
                 access_t::write);
 
             std::string data = strprintf("{\"id\" : %d, \"sid\" : %d}", i, i * i);
@@ -351,9 +350,8 @@ TPTEST(RDBBtree, SindexEraseRange) {
 
             const hash_region_t<key_range_t> test_range = hash_region_t<key_range_t>::universe();
             rdb_protocol::range_key_tester_t tester(&test_range);
-            sindex_block_lock_t sindex_block(
+            sindex_block_lock sindex_block(
                 super_block->get(),
-                super_block->get_sindex_block_id(store.rocksh()),
                 access_t::write);
 
             std::vector<rdb_modification_report_t> mod_reports;

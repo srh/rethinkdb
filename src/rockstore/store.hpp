@@ -127,8 +127,6 @@ store create_rockstore(const base_path_t &base_path);
 
 std::string table_prefix(namespace_id_t id, int shard_no);
 std::string table_metadata_prefix(namespace_id_t id, int shard_no);
-// TODO: Remove
-std::string table_sindex_block_id_key(namespace_id_t id, int shard_no);
 std::string table_sindex_map(namespace_id_t id, int shard_no);
 std::string table_secondary_prefix(namespace_id_t id, int shard_no, uuid_u index_id);
 std::string table_secondary_key(

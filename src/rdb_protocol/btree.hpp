@@ -303,7 +303,7 @@ class rdb_modification_report_cb_t final {
 public:
     rdb_modification_report_cb_t(
             store_t *store,
-            sindex_block_lock_t *sindex_block,
+            sindex_block_lock *sindex_block,
             auto_drainer_t::lock_t lock);
     ~rdb_modification_report_cb_t();
 
@@ -332,7 +332,7 @@ private:
     /* Fields initialized by the constructor. */
     auto_drainer_t::lock_t lock_;
     store_t *store_;
-    sindex_block_lock_t *sindex_block_;
+    sindex_block_lock *sindex_block_;
 
     /* Fields initialized by calls to on_mod_report */
     store_t::sindex_access_vector_t sindexes_;

@@ -27,7 +27,8 @@
 #include "store_view.hpp"
 #include "utils.hpp"
 
-class sindex_block_lock_t;
+class real_superblock_lock;
+class sindex_block_lock;
 class store_t;
 class store_metainfo_manager_t;
 class btree_slice_t;
@@ -174,7 +175,7 @@ public:
             signal_t *interruptor)
             THROWS_ONLY(interrupted_exc_t);
 
-    new_mutex_in_line_t get_in_line_for_sindex_queue(sindex_block_lock_t *sindex_block);
+    new_mutex_in_line_t get_in_line_for_sindex_queue(sindex_block_lock *sindex_block);
     rwlock_in_line_t get_in_line_for_cfeed_stamp(access_t access);
 
     void register_sindex_queue(
@@ -193,7 +194,7 @@ public:
     // queues of non-live indexes.
     void update_sindexes(
             txn_t *txn,
-            sindex_block_lock_t *sindex_block,
+            sindex_block_lock *sindex_block,
             const std::vector<rdb_modification_report_t> &mod_reports,
             bool release_sindex_block);
 
@@ -209,13 +210,13 @@ public:
     MUST_USE optional<uuid_u> add_sindex_internal(
         const sindex_name_t &name,
         const std::vector<char> &opaque_definition,
-        sindex_block_lock_t *sindex_block);
+        sindex_block_lock *sindex_block);
 
     std::map<sindex_name_t, secondary_index_t> get_sindexes() const;
 
     bool mark_index_up_to_date(
         uuid_u id,
-        sindex_block_lock_t *sindex_block,
+        sindex_block_lock *sindex_block,
         const key_range_t &except_for_remaining_range)
     THROWS_NOTHING;
 
@@ -253,19 +254,18 @@ public:
     typedef std::vector<scoped_ptr_t<sindex_access_t> > sindex_access_vector_t;
 
     void acquire_all_sindex_superblocks_for_write(
-            block_id_t sindex_block_id,
-            buf_parent_t parent,
+            real_superblock_lock *parent,
             sindex_access_vector_t *sindex_sbs_out)
         THROWS_ONLY(sindex_not_ready_exc_t);
 
     void acquire_all_sindex_superblocks_for_write(
-            sindex_block_lock_t *sindex_block,
+            sindex_block_lock *sindex_block,
             sindex_access_vector_t *sindex_sbs_out)
         THROWS_ONLY(sindex_not_ready_exc_t);
 
     bool acquire_sindex_superblocks_for_write(
             optional<std::set<uuid_u> > sindexes_to_acquire, //none means acquire all sindexes
-            sindex_block_lock_t *sindex_block,
+            sindex_block_lock *sindex_block,
             sindex_access_vector_t *sindex_sbs_out)
     THROWS_ONLY(sindex_not_ready_exc_t);
 
@@ -328,7 +328,7 @@ private:
     void help_construct_bring_sindexes_up_to_date();
 
     MUST_USE bool mark_secondary_index_deleted(
-            sindex_block_lock_t *sindex_block,
+            sindex_block_lock *sindex_block,
             const sindex_name_t &name);
 
 public:

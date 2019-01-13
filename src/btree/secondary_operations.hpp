@@ -22,7 +22,7 @@ table's primary superblock.
 `btree/` directory that know about ReQL-specific concepts such as metainfo and sindexes.
 They should probably be moved out of the `btree/` directory. */
 
-class sindex_block_lock_t;
+class sindex_block_lock;
 
 struct secondary_index_t {
     secondary_index_t()
@@ -100,30 +100,30 @@ RDB_DECLARE_SERIALIZABLE(sindex_name_t);
  * will leak blocks (and also make those secondary indexes unusable.) There's
  * no reason to ever do this. */
 void initialize_secondary_indexes(
-    rockshard rocksh, sindex_block_lock_t *sindex_block);
+    rockshard rocksh, sindex_block_lock *sindex_block);
 
-bool get_secondary_index(rockshard rocksh, sindex_block_lock_t *sindex_block,
+bool get_secondary_index(rockshard rocksh, sindex_block_lock *sindex_block,
                          const sindex_name_t &name,
                          secondary_index_t *sindex_out);
 
-bool get_secondary_index(rockshard rocksh, sindex_block_lock_t *sindex_block, uuid_u id,
+bool get_secondary_index(rockshard rocksh, sindex_block_lock *sindex_block, uuid_u id,
                          secondary_index_t *sindex_out);
 
-void get_secondary_indexes(rockshard rocksh, sindex_block_lock_t *sindex_block,
+void get_secondary_indexes(rockshard rocksh, sindex_block_lock *sindex_block,
                            std::map<sindex_name_t, secondary_index_t> *sindexes_out);
 
 /* Overwrites existing values with the same id. */
-void set_secondary_index(rockshard rocksh, sindex_block_lock_t *sindex_block,
+void set_secondary_index(rockshard rocksh, sindex_block_lock *sindex_block,
                          const sindex_name_t &name, const secondary_index_t &sindex);
 
 /* Must be used to overwrite an already existing sindex. */
 // TODO: Unclear why we have redundant id/sindex.id parameters.
-void set_secondary_index(rockshard rocksh, sindex_block_lock_t *sindex_block, uuid_u id,
+void set_secondary_index(rockshard rocksh, sindex_block_lock *sindex_block, uuid_u id,
                          const secondary_index_t &sindex);
 
 // XXX note this just drops the entry. It doesn't cleanup the btree that it points
 // to. `drop_sindex` Does both and should be used publicly.
 bool delete_secondary_index(rockshard rocksh,
-                            sindex_block_lock_t *sindex_block, const sindex_name_t &name);
+                            sindex_block_lock *sindex_block, const sindex_name_t &name);
 
 #endif /* BTREE_SECONDARY_OPERATIONS_HPP_ */

@@ -22,13 +22,11 @@ class binary_blob_t;
 /* `real_superblock_t` represents the superblock for the primary B-tree of a table. */
 class real_superblock_t : public superblock_t {
 public:
-    explicit real_superblock_t(real_superblock_lock_t &&sb_buf);
-    real_superblock_t(real_superblock_lock_t &&sb_buf, new_semaphore_in_line_t &&write_semaphore_acq);
+    explicit real_superblock_t(real_superblock_lock &&sb_buf);
+    real_superblock_t(real_superblock_lock &&sb_buf, new_semaphore_in_line_t &&write_semaphore_acq);
 
     void release() override;
-    real_superblock_lock_t *get() { return &sb_buf_; }
-
-    block_id_t get_sindex_block_id(rockshard rocksh);
+    real_superblock_lock *get() { return &sb_buf_; }
 
     const signal_t *read_acq_signal() override;
     const signal_t *write_acq_signal() override;
@@ -41,13 +39,13 @@ private:
     for correctness. */
     new_semaphore_in_line_t write_semaphore_acq_;
 
-    real_superblock_lock_t sb_buf_;
+    real_superblock_lock sb_buf_;
 };
 
 /* `sindex_superblock_t` represents the superblock for a sindex B-tree. */
 class sindex_superblock_t : public superblock_t {
 public:
-    explicit sindex_superblock_t(sindex_superblock_lock_t &&sb_buf);
+    explicit sindex_superblock_t(sindex_superblock_lock &&sb_buf);
 
     void release() override;
 
@@ -55,7 +53,7 @@ public:
     const signal_t *write_acq_signal() override;
 
 private:
-    sindex_superblock_lock_t sb_buf_;
+    sindex_superblock_lock sb_buf_;
 };
 
 enum class index_type_t {

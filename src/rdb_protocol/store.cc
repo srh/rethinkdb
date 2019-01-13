@@ -46,7 +46,7 @@ void store_t::note_reshard(const region_t &shard_region) {
 reql_version_t update_sindex_last_compatible_version(
         rockshard rocksh,
         secondary_index_t *sindex,
-        sindex_block_lock_t *sindex_block) {
+        sindex_block_lock *sindex_block) {
     sindex_disk_info_t sindex_info;
     deserialize_sindex_info_or_crash(sindex->opaque_definition, &sindex_info);
 
@@ -94,9 +94,8 @@ void store_t::help_construct_bring_sindexes_up_to_date() {
                                  &superblock,
                                  &dummy_interruptor);
 
-    sindex_block_lock_t sindex_block(
+    sindex_block_lock sindex_block(
         superblock->get(),
-        superblock->get_sindex_block_id(rocksh()),
         access_t::write);
 
     superblock.reset();
@@ -500,8 +499,6 @@ struct rdb_read_visitor_t : public boost::static_visitor<void> {
     changefeed_stamp_response_t do_stamp(const changefeed_stamp_t &s,
                                          const region_t &current_shard,
                                          const store_key_t &read_start) {
-        guarantee(!superblock->get()->is_snapshotted());
-
         superblock->get()->read_acq_signal()->wait_lazily_ordered();
 
         auto cserver = store->changefeed_server(s.region);
@@ -1068,7 +1065,6 @@ struct rdb_write_visitor_t : public boost::static_visitor<void> {
         sampler(_sampler),
         trace(_trace),
         sindex_block(superblock->get(),
-                     superblock->get_sindex_block_id(store->rocksh()),
                      access_t::write) {
     }
 
@@ -1092,7 +1088,7 @@ private:
     const repli_timestamp_t timestamp;
     profile::sampler_t *const sampler;
     profile::trace_t *const trace;
-    sindex_block_lock_t sindex_block;
+    sindex_block_lock sindex_block;
     profile::event_log_t event_log_out;
 
     DISABLE_COPYING(rdb_write_visitor_t);

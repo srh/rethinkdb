@@ -43,7 +43,7 @@ TPTEST(BTreeSindex, LowLevelOps) {
     {
         txn_t txn(&cache_conn, write_durability_t::HARD, 1);
         {
-            real_superblock_lock_t sb_lock(&txn, SUPERBLOCK_ID, alt_create_t::create);
+            real_superblock_lock sb_lock(&txn, access_t::write);
             real_superblock_t superblock(std::move(sb_lock));
             btree_slice_t::init_real_superblock(
                 &superblock, rockshard(io_backender.rocks(), table_id, 0), std::vector<char>(), binary_blob_t());
@@ -64,9 +64,7 @@ TPTEST(BTreeSindex, LowLevelOps) {
                 write_durability_t::SOFT,
                 &superblock, &txn);
 
-            sindex_block_lock_t sindex_block(superblock->get(),
-                superblock->get_sindex_block_id(rocksh),
-                access_t::write);
+            sindex_block_lock sindex_block(superblock->get(), access_t::write);
 
             initialize_secondary_indexes(rockshard(io_backender.rocks(), table_id, 0), &sindex_block);
         }
@@ -95,9 +93,8 @@ TPTEST(BTreeSindex, LowLevelOps) {
                 write_durability_t::SOFT,
                 &superblock,
                 &txn);
-            sindex_block_lock_t sindex_block(
+            sindex_block_lock sindex_block(
                 superblock->get(),
-                superblock->get_sindex_block_id(rocksh),
                 access_t::write);
 
             set_secondary_index(rocksh, &sindex_block, name, s);
@@ -117,9 +114,8 @@ TPTEST(BTreeSindex, LowLevelOps) {
                 write_durability_t::SOFT,
                 &superblock,
                 &txn);
-            sindex_block_lock_t sindex_block(
+            sindex_block_lock sindex_block(
                 superblock->get(),
-                superblock->get_sindex_block_id(rocksh),
                 access_t::write);
 
             std::map<sindex_name_t, secondary_index_t> sindexes;

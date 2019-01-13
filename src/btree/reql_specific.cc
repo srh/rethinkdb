@@ -32,27 +32,12 @@ void btree_superblock_ct_asserts() {
               == DEVICE_BLOCK_SIZE);
 }
 
-// TODO: Gross, remove this.
-void set_rocks_sindex_block_id(rockshard rocksh, block_id_t sindex_block_id) {
-    std::string key = rockstore::table_sindex_block_id_key(rocksh.table_id, rocksh.shard_no);
-    rocksh.rocks->put(key, strprintf("%" PR_BLOCK_ID, sindex_block_id), rockstore::write_options::TODO());
-}
 
-block_id_t get_rocks_sindex_block_id(rockshard rocksh) {
-    std::string key = rockstore::table_sindex_block_id_key(rocksh.table_id, rocksh.shard_no);
-    std::string value = rocksh.rocks->read(key);
-    block_id_t block_id;
-    bool res = strtou64_strict(value, 10, &block_id);
-    guarantee(res, "rocks sindex block id invalid");
-    return block_id;
-}
-
-
-real_superblock_t::real_superblock_t(real_superblock_lock_t &&sb_buf)
+real_superblock_t::real_superblock_t(real_superblock_lock &&sb_buf)
     : sb_buf_(std::move(sb_buf)) {}
 
 real_superblock_t::real_superblock_t(
-        real_superblock_lock_t &&sb_buf,
+        real_superblock_lock &&sb_buf,
         new_semaphore_in_line_t &&write_semaphore_acq)
     : write_semaphore_acq_(std::move(write_semaphore_acq)),
       sb_buf_(std::move(sb_buf)) {}
@@ -60,12 +45,6 @@ real_superblock_t::real_superblock_t(
 void real_superblock_t::release() {
     sb_buf_.reset_buf_lock();
     write_semaphore_acq_.reset();
-}
-
-// TODO: gross
-block_id_t real_superblock_t::get_sindex_block_id(rockshard rocksh) {
-    read_acq_signal()->wait_lazily_ordered();
-    return get_rocks_sindex_block_id(rocksh);
 }
 
 const signal_t *real_superblock_t::read_acq_signal() {
@@ -76,7 +55,7 @@ const signal_t *real_superblock_t::write_acq_signal() {
     return sb_buf_.write_acq_signal();
 }
 
-sindex_superblock_t::sindex_superblock_t(sindex_superblock_lock_t &&sb_buf)
+sindex_superblock_t::sindex_superblock_t(sindex_superblock_lock &&sb_buf)
     : sb_buf_(std::move(sb_buf)) {}
 
 void sindex_superblock_t::release() {
@@ -102,9 +81,8 @@ void btree_slice_t::init_real_superblock(real_superblock_t *superblock,
     superblock->write_acq_signal()->wait_lazily_ordered();
     set_superblock_metainfo(superblock, rocksh, metainfo_key, metainfo_value);
 
-    sindex_block_lock_t sindex_block(superblock->get(), alt_create_t::create);
+    sindex_block_lock sindex_block(superblock->get(), access_t::write);
     initialize_secondary_indexes(rocksh, &sindex_block);
-    set_rocks_sindex_block_id(rocksh, sindex_block.block_id());
 }
 
 void btree_slice_t::init_sindex_superblock(sindex_superblock_t *superblock) {
@@ -259,7 +237,7 @@ void get_btree_superblock(
         txn_t *txn,
         access_t access,
         scoped_ptr_t<real_superblock_t> *got_superblock_out) {
-    real_superblock_lock_t tmp_buf(buf_parent_t(txn), SUPERBLOCK_ID, access);
+    real_superblock_lock tmp_buf(txn, access);
     scoped_ptr_t<real_superblock_t> tmp_sb(new real_superblock_t(std::move(tmp_buf)));
     *got_superblock_out = std::move(tmp_sb);
 }
@@ -270,7 +248,7 @@ void get_btree_superblock(
         UNUSED write_access_t access,
         new_semaphore_in_line_t &&write_sem_acq,
         scoped_ptr_t<real_superblock_t> *got_superblock_out) {
-    real_superblock_lock_t tmp_buf(buf_parent_t(txn), SUPERBLOCK_ID, access_t::write);
+    real_superblock_lock tmp_buf(txn, access_t::write);
     scoped_ptr_t<real_superblock_t> tmp_sb(
         new real_superblock_t(std::move(tmp_buf), std::move(write_sem_acq)));
     *got_superblock_out = std::move(tmp_sb);
