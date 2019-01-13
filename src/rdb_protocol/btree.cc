@@ -2068,7 +2068,7 @@ private:
 
         // Acquire the sindex block and release the superblock.
         const block_id_t sindex_block_id = superblock->get_sindex_block_id(store_->rocksh());
-        sindex_block_lock_t sindex_block(superblock->expose_buf(), sindex_block_id,
+        sindex_block_lock_t sindex_block(superblock->get(), sindex_block_id,
                                 access_t::write);
         superblock.reset();
         store_t::sindex_access_vector_t all_sindexes;

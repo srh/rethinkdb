@@ -5,10 +5,13 @@
 #include <map>
 #include <vector>
 #include <utility>
+#include <unordered_map>
 
 #include "buffer_cache/page_cache.hpp"
 #include "buffer_cache/types.hpp"
+#include "concurrency/rwlock.hpp"
 #include "containers/two_level_array.hpp"
+#include "containers/uuid.hpp"
 #include "repli_timestamp.hpp"
 
 class serializer_t;
@@ -39,6 +42,13 @@ private:
     DISABLE_COPYING(alt_txn_throttler_t);
 };
 
+class lock_state {
+public:
+    rwlock_t real_superblock_lock;
+    rwlock_t sindex_block_lock;
+    std::unordered_map<uuid_u, scoped_ptr_t<rwlock_t>> sindex_block_locks;
+};
+
 class cache_t : public home_thread_mixin_t {
 public:
     explicit cache_t(serializer_t *serializer,
@@ -67,6 +77,10 @@ private:
 
     // throttler_ can cause the txn_t constructor to block
     alt_txn_throttler_t throttler_;
+
+    lock_state locks_;
+
+
     alt::page_cache_t page_cache_;
 
     scoped_ptr_t<alt_cache_stats_t> stats_;

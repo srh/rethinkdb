@@ -226,7 +226,7 @@ void apply_single_key_item(
 
             /* Acquire the sindex block and update the metainfo now, because we'll
             release the superblock soon */
-            sindex_block = sindex_block_lock_t(superblock->expose_buf(),
+            sindex_block = sindex_block_lock_t(superblock->get(),
                 superblock->get_sindex_block_id(rocksh), access_t::write);
             // TODO: This definitely needs to be in a rocksdb transaction, and possibly should be in opposite order.
             tokens.update_metainfo_cb(item.range.right, superblock.get());
@@ -352,7 +352,7 @@ void apply_multi_key_item(
             threshold = range_deleted.right;
 
             /* Acquire the sindex block and update the metainfo */
-            sindex_block_lock_t sindex_block(superblock->expose_buf(),
+            sindex_block_lock_t sindex_block(superblock->get(),
                 superblock->get_sindex_block_id(rocksh), access_t::write);
             tokens.update_metainfo_cb(threshold, superblock.get());
             superblock->release();

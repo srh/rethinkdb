@@ -5,6 +5,7 @@
 #include <string.h>
 #include <stdint.h>
 
+#include <functional>  // To see std::hash.
 #include <string>
 
 #include "errors.hpp"
@@ -63,5 +64,13 @@ typedef uuid_u backfill_session_id_t;
 typedef uuid_u branch_id_t;
 typedef uuid_u issue_id_t;
 
+namespace std {
+template<> struct hash<uuid_u> {
+    size_t operator()(const uuid_u& x) const {
+        // TODO: Don't allocate a string.
+        return std::hash<std::string>()(::std::string(reinterpret_cast<const char *>(x.data()), x.static_size()));
+    }
+};
+}  // namespace std
 
 #endif  // CONTAINERS_UUID_HPP_
