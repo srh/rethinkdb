@@ -30,8 +30,8 @@ public:
 
     block_id_t get_sindex_block_id(rockshard rocksh);
 
-    signal_t *read_acq_signal() override;
-    signal_t *write_acq_signal() override;
+    const signal_t *read_acq_signal() override;
+    const signal_t *write_acq_signal() override;
 
 private:
     /* The write_semaphore_acq_ is empty for reads.
@@ -51,8 +51,8 @@ public:
 
     void release() override;
 
-    signal_t *read_acq_signal() override;
-    signal_t *write_acq_signal() override;
+    const signal_t *read_acq_signal() override;
+    const signal_t *write_acq_signal() override;
 
 private:
     sindex_superblock_lock_t sb_buf_;

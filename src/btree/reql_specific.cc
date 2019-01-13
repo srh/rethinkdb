@@ -68,11 +68,11 @@ block_id_t real_superblock_t::get_sindex_block_id(rockshard rocksh) {
     return get_rocks_sindex_block_id(rocksh);
 }
 
-signal_t *real_superblock_t::read_acq_signal() {
+const signal_t *real_superblock_t::read_acq_signal() {
     return sb_buf_.read_acq_signal();
 }
 
-signal_t *real_superblock_t::write_acq_signal() {
+const signal_t *real_superblock_t::write_acq_signal() {
     return sb_buf_.write_acq_signal();
 }
 
@@ -83,11 +83,11 @@ void sindex_superblock_t::release() {
     sb_buf_.reset_buf_lock();
 }
 
-signal_t *sindex_superblock_t::read_acq_signal() {
+const signal_t *sindex_superblock_t::read_acq_signal() {
     return sb_buf_.read_acq_signal();
 }
 
-signal_t *sindex_superblock_t::write_acq_signal() {
+const signal_t *sindex_superblock_t::write_acq_signal() {
     return sb_buf_.write_acq_signal();
 }
 
