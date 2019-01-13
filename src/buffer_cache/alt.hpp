@@ -262,6 +262,19 @@ private:
     DISABLE_COPYING(buf_lock_t);
 };
 
+class real_superblock_lock_t : public buf_lock_t {
+public:
+    using buf_lock_t::buf_lock_t;
+};
+class sindex_block_lock_t : public buf_lock_t {
+public:
+    using buf_lock_t::buf_lock_t;
+};
+class sindex_superblock_lock_t : public buf_lock_t {
+public:
+    using buf_lock_t::buf_lock_t;
+};
+
 
 class buf_parent_t {
 public:

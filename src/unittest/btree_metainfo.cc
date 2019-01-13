@@ -66,7 +66,7 @@ TPTEST(BtreeMetainfo, MetainfoTest) {
     {
         txn_t txn(&cache_conn, write_durability_t::HARD, 1);
         {
-            buf_lock_t sb_lock(&txn, SUPERBLOCK_ID, alt_create_t::create);
+            real_superblock_lock_t sb_lock(&txn, SUPERBLOCK_ID, alt_create_t::create);
             real_superblock_t superblock(std::move(sb_lock));
             btree_slice_t::init_real_superblock(
                 &superblock,

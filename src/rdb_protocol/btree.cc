@@ -1295,7 +1295,7 @@ RDB_IMPL_SERIALIZABLE_2_SINCE_v1_13(rdb_modification_report_t, primary_key, info
 
 rdb_modification_report_cb_t::rdb_modification_report_cb_t(
         store_t *store,
-        buf_lock_t *sindex_block,
+        sindex_block_lock_t *sindex_block,
         auto_drainer_t::lock_t lock)
     : lock_(lock), store_(store),
       sindex_block_(sindex_block) {
@@ -2068,7 +2068,7 @@ private:
 
         // Acquire the sindex block and release the superblock.
         const block_id_t sindex_block_id = superblock->get_sindex_block_id(store_->rocksh());
-        buf_lock_t sindex_block(superblock->expose_buf(), sindex_block_id,
+        sindex_block_lock_t sindex_block(superblock->expose_buf(), sindex_block_id,
                                 access_t::write);
         superblock.reset();
         store_t::sindex_access_vector_t all_sindexes;

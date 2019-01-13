@@ -46,7 +46,7 @@ void store_t::note_reshard(const region_t &shard_region) {
 reql_version_t update_sindex_last_compatible_version(
         rockshard rocksh,
         secondary_index_t *sindex,
-        buf_lock_t *sindex_block) {
+        sindex_block_lock_t *sindex_block) {
     sindex_disk_info_t sindex_info;
     deserialize_sindex_info_or_crash(sindex->opaque_definition, &sindex_info);
 
@@ -94,9 +94,10 @@ void store_t::help_construct_bring_sindexes_up_to_date() {
                                  &superblock,
                                  &dummy_interruptor);
 
-    buf_lock_t sindex_block(superblock->expose_buf(),
-                            superblock->get_sindex_block_id(rocksh()),
-                            access_t::write);
+    sindex_block_lock_t sindex_block(
+        superblock->expose_buf(),
+        superblock->get_sindex_block_id(rocksh()),
+        access_t::write);
 
     superblock.reset();
 
@@ -966,7 +967,7 @@ private:
     const repli_timestamp_t timestamp;
     profile::sampler_t *const sampler;
     profile::trace_t *const trace;
-    buf_lock_t sindex_block;
+    sindex_block_lock_t sindex_block;
     profile::event_log_t event_log_out;
 
     DISABLE_COPYING(rdb_write_visitor_t);

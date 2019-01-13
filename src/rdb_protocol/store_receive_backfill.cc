@@ -121,7 +121,7 @@ public:
     std::function<void(
         const key_range_t::right_bound_t &progress,
         scoped_ptr_t<txn_t> &&txn,
-        buf_lock_t &&sindex_block,
+        sindex_block_lock_t &&sindex_block,
         std::vector<rdb_modification_report_t> &&mod_reports
         )> commit_cb;
 };
@@ -152,7 +152,7 @@ void apply_empty_range(
         fifo_enforcer_sink_t::exit_write_t exiter(
             &tokens.info->commit_fifo_sink, tokens.write_token);
         exiter.wait_lazily_unordered();
-        tokens.commit_cb(empty_range, std::move(txn), buf_lock_t(),
+        tokens.commit_cb(empty_range, std::move(txn), sindex_block_lock_t(),
             std::vector<rdb_modification_report_t>());
 
     } catch (const interrupted_exc_t &exc) {
@@ -209,7 +209,7 @@ void apply_single_key_item(
         /* Acquire the superblock */
         scoped_ptr_t<txn_t> txn;
         scoped_ptr_t<real_superblock_t> superblock;
-        buf_lock_t sindex_block;
+        sindex_block_lock_t sindex_block;
         {
             fifo_enforcer_sink_t::exit_write_t exiter(
                 &tokens.info->btree_fifo_sink, tokens.write_token);
@@ -226,7 +226,7 @@ void apply_single_key_item(
 
             /* Acquire the sindex block and update the metainfo now, because we'll
             release the superblock soon */
-            sindex_block = buf_lock_t(superblock->expose_buf(),
+            sindex_block = sindex_block_lock_t(superblock->expose_buf(),
                 superblock->get_sindex_block_id(rocksh), access_t::write);
             // TODO: This definitely needs to be in a rocksdb transaction, and possibly should be in opposite order.
             tokens.update_metainfo_cb(item.range.right, superblock.get());
@@ -352,7 +352,7 @@ void apply_multi_key_item(
             threshold = range_deleted.right;
 
             /* Acquire the sindex block and update the metainfo */
-            buf_lock_t sindex_block(superblock->expose_buf(),
+            sindex_block_lock_t sindex_block(superblock->expose_buf(),
                 superblock->get_sindex_block_id(rocksh), access_t::write);
             tokens.update_metainfo_cb(threshold, superblock.get());
             superblock->release();
@@ -445,7 +445,7 @@ continue_bool_t store_t::receive_backfill(
         tokens.commit_cb = [this, item_producer, &commit_threshold, &metainfo_threshold](
                 const key_range_t::right_bound_t &progress,
                 scoped_ptr_t<txn_t> &&txn,
-                buf_lock_t &&sindex_block,
+                sindex_block_lock_t &&sindex_block,
                 std::vector<rdb_modification_report_t> &&mod_reports) {
             /* Apply the modifications */
             if (!mod_reports.empty()) {

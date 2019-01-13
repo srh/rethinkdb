@@ -43,7 +43,7 @@ TPTEST(BTreeSindex, LowLevelOps) {
     {
         txn_t txn(&cache_conn, write_durability_t::HARD, 1);
         {
-            buf_lock_t sb_lock(&txn, SUPERBLOCK_ID, alt_create_t::create);
+            real_superblock_lock_t sb_lock(&txn, SUPERBLOCK_ID, alt_create_t::create);
             real_superblock_t superblock(std::move(sb_lock));
             btree_slice_t::init_real_superblock(
                 &superblock, rockshard(io_backender.rocks(), table_id, 0), std::vector<char>(), binary_blob_t());
@@ -64,7 +64,7 @@ TPTEST(BTreeSindex, LowLevelOps) {
                 write_durability_t::SOFT,
                 &superblock, &txn);
 
-            buf_lock_t sindex_block(superblock->expose_buf(),
+            sindex_block_lock_t sindex_block(superblock->expose_buf(),
                 superblock->get_sindex_block_id(rocksh),
                 access_t::write);
 
@@ -95,7 +95,7 @@ TPTEST(BTreeSindex, LowLevelOps) {
                 write_durability_t::SOFT,
                 &superblock,
                 &txn);
-            buf_lock_t sindex_block(
+            sindex_block_lock_t sindex_block(
                 superblock->expose_buf(),
                 superblock->get_sindex_block_id(rocksh),
                 access_t::write);
@@ -117,7 +117,7 @@ TPTEST(BTreeSindex, LowLevelOps) {
                 write_durability_t::SOFT,
                 &superblock,
                 &txn);
-            buf_lock_t sindex_block(
+            sindex_block_lock_t sindex_block(
                 superblock->expose_buf(),
                 superblock->get_sindex_block_id(rocksh),
                 access_t::write);
@@ -198,7 +198,7 @@ TPTEST(BTreeSindex, BtreeStoreAPI) {
                     1, write_durability_t::SOFT, &token,
                     &txn, &super_block, &dummy_interruptor);
 
-                buf_lock_t sindex_block(
+                sindex_block_lock_t sindex_block(
                     super_block->expose_buf(),
                     super_block->get_sindex_block_id(store.rocksh()),
                     access_t::write);
@@ -222,7 +222,7 @@ TPTEST(BTreeSindex, BtreeStoreAPI) {
                     1, write_durability_t::SOFT, &token,
                     &txn, &super_block, &dummy_interruptor);
 
-                buf_lock_t sindex_block(
+                sindex_block_lock_t sindex_block(
                     super_block->expose_buf(),
                     super_block->get_sindex_block_id(store.rocksh()),
                     access_t::write);
