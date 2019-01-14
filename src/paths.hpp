@@ -28,6 +28,7 @@ private:
 
 static const char *TEMPORARY_DIRECTORY_NAME = "tmp";
 
+// TODO: Cleanup usage of this?
 // Contains the name of a serializer file.
 class serializer_filepath_t {
 public:

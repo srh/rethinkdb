@@ -97,9 +97,7 @@ public:
 
 private:
     linux_file_t(scoped_fd_t &&fd, int64_t file_size, linux_disk_manager_t *diskmgr);
-    friend file_open_result_t open_file(const char *path, int mode,
-                                        io_backender_t *backender,
-                                        scoped_ptr_t<file_t> *out);
+
 
     scoped_fd_t fd;
     int64_t file_size;
@@ -114,10 +112,6 @@ private:
 
     DISABLE_COPYING(linux_file_t);
 };
-
-file_open_result_t open_file(const char *path, int mode,
-                             io_backender_t *backender,
-                             scoped_ptr_t<file_t> *out);
 
 NORETURN void crash_due_to_inaccessible_database_file(const char *path, file_open_result_t open_res);
 
