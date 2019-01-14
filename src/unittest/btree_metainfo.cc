@@ -4,7 +4,6 @@
 #include "arch/io/disk.hpp"
 #include "btree/operations.hpp"
 #include "btree/reql_specific.hpp"
-#include "buffer_cache/cache_balancer.hpp"
 #include "containers/binary_blob.hpp"
 #include "unittest/unittest_utils.hpp"
 #include "serializer/log/log_serializer.hpp"
@@ -57,8 +56,7 @@ TPTEST(BtreeMetainfo, MetainfoTest) {
         &file_opener,
         &get_global_perfmon_collection());
 
-    dummy_cache_balancer_t balancer(GIGABYTE);
-    cache_t cache(&serializer, &balancer, &get_global_perfmon_collection());
+    cache_t cache(&serializer, &get_global_perfmon_collection());
     cache_conn_t cache_conn(&cache);
     namespace_id_t table_id = str_to_uuid("12345678-1234-5678-abcd-12345678abcd");
     rockshard rocksh(io_backender.rocks(), table_id, 0);

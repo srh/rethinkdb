@@ -15,7 +15,6 @@
 #include "clustering/immediate_consistency/remote_replicator_server.hpp"
 #include "clustering/query_routing/primary_query_client.hpp"
 #include "clustering/query_routing/primary_query_server.hpp"
-#include "buffer_cache/cache_balancer.hpp"
 #include "unittest/dummy_metadata_controller.hpp"
 #include "unittest/gtest.hpp"
 #include "unittest/mock_store.hpp"
@@ -61,9 +60,8 @@ class test_store_t {
 public:
     test_store_t(io_backender_t *io_backender, order_source_t *order_source, rdb_context_t *ctx) :
             serializer(create_and_construct_serializer(&temp_file, io_backender)),
-            balancer(new dummy_cache_balancer_t(GIGABYTE)),
             store(region_t::universe(), 0 /* the only shard */,
-                io_backender->rocks(), serializer.get(), balancer.get(),
+                io_backender->rocks(), serializer.get(),
                 temp_file.name().permanent_path().c_str(), true,
                 &get_global_perfmon_collection(), ctx, io_backender, base_path_t("."),
                 generate_uuid(), update_sindexes_t::UPDATE) {
@@ -80,7 +78,6 @@ public:
 
     temp_file_t temp_file;
     scoped_ptr_t<merger_serializer_t> serializer;
-    scoped_ptr_t<cache_balancer_t> balancer;
     store_t store;
 };
 

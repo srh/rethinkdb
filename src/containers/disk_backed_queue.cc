@@ -4,7 +4,6 @@
 #include "arch/io/disk.hpp"
 #include "arch/runtime/thread_pool.hpp"
 #include "buffer_cache/alt.hpp"
-#include "buffer_cache/cache_balancer.hpp"
 #include "paths.hpp"
 #include "serializer/log/log_serializer.hpp"
 

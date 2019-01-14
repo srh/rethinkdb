@@ -6,7 +6,6 @@
 #include "arch/arch.hpp"
 #include "arch/io/network.hpp"
 #include "arch/os_signal.hpp"
-#include "buffer_cache/cache_balancer.hpp"
 #include "clustering/administration/artificial_reql_cluster_interface.hpp"
 #include "clustering/administration/http/server.hpp"
 #include "clustering/administration/issues/local.hpp"
@@ -297,17 +296,13 @@ bool do_serve(io_backender_t *io_backender,
             up tables and handling queries for them. The `table_persistence_interface_t`
             helps it by constructing the B-trees and serializers, and also persisting
             table-related metadata to disk. */
-            scoped_ptr_t<cache_balancer_t> cache_balancer;
             scoped_ptr_t<real_table_persistence_interface_t>
                 table_persistence_interface;
             scoped_ptr_t<multi_table_manager_t> multi_table_manager;
             if (i_am_a_server) {
-                cache_balancer.init(new alt_cache_balancer_t(
-                    server_config_server->get_actual_cache_size_bytes()));
                 table_persistence_interface.init(
                     new real_table_persistence_interface_t(
                         io_backender,
-                        cache_balancer.get(),
                         base_path,
                         &rdb_ctx,
                         metadata_file));

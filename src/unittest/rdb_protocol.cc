@@ -5,7 +5,6 @@
 #include <vector>
 
 #include "arch/io/disk.hpp"
-#include "buffer_cache/cache_balancer.hpp"
 #include "clustering/administration/artificial_reql_cluster_interface.hpp"
 #include "clustering/administration/metadata.hpp"
 #include "clustering/administration/tables/name_resolver.hpp"
@@ -62,7 +61,6 @@ void run_with_namespace_interface(
 
     temp_rockstore temp_rocks;
     io_backender_t io_backender(temp_rocks.rocks(), file_direct_io_mode_t::buffered_desired);
-    dummy_cache_balancer_t balancer(GIGABYTE);
 
     scoped_array_t<scoped_ptr_t<serializer_t> > serializers(store_shards.size());
     for (size_t i = 0; i < store_shards.size(); ++i) {
@@ -89,7 +87,7 @@ void run_with_namespace_interface(
             underlying_stores.push_back(
                     make_scoped<store_t>(region_t::universe(), i, io_backender.rocks(),
                         serializers[i].get(),
-                        &balancer, temp_files[i]->name().permanent_path().c_str(), do_create,
+                        temp_files[i]->name().permanent_path().c_str(), do_create,
                         &get_global_perfmon_collection(), &ctx, &io_backender,
                         base_path_t("."), table_id, update_sindexes_t::UPDATE));
         }

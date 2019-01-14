@@ -6,7 +6,6 @@
 #include "clustering/administration/persist/raft_storage_interface.hpp"
 #include "clustering/table_manager/table_metadata.hpp"
 
-class cache_balancer_t;
 class metadata_file_t;
 class real_multistore_ptr_t;
 class table_raft_storage_interface_t;
@@ -16,12 +15,10 @@ class real_table_persistence_interface_t :
 public:
     real_table_persistence_interface_t(
             io_backender_t *_io_backender,
-            cache_balancer_t *_cache_balancer,
             const base_path_t &_base_path,
             rdb_context_t *_rdb_context,
             metadata_file_t *_metadata_file) :
         io_backender(_io_backender),
-        cache_balancer(_cache_balancer),
         base_path(_base_path),
         rdb_context(_rdb_context),
         metadata_file(_metadata_file),
@@ -77,7 +74,6 @@ private:
     threadnum_t pick_thread();
 
     io_backender_t * const io_backender;
-    cache_balancer_t * const cache_balancer;
     base_path_t const base_path;
     rdb_context_t * const rdb_context;
     metadata_file_t * const metadata_file;

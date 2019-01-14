@@ -11,11 +11,6 @@
 #define ALT_DEBUG 0
 
 using alt::block_version_t;
-using alt::current_page_acq_t;
-using alt::page_acq_t;
-using alt::page_cache_t;
-using alt::page_t;
-using alt::page_txn_t;
 using alt::throttler_acq_t;
 
 const int64_t MINIMUM_SOFT_UNWRITTEN_CHANGES_LIMIT = 1;
@@ -75,23 +70,25 @@ void alt_txn_throttler_t::inform_memory_limit_change(uint64_t memory_limit,
 }
 
 cache_t::cache_t(serializer_t *serializer,
-                 cache_balancer_t *balancer,
                  perfmon_collection_t *perfmon_collection)
-    : throttler_(MINIMUM_SOFT_UNWRITTEN_CHANGES_LIMIT),
-      page_cache_(serializer, balancer, &throttler_),
-      stats_(make_scoped<alt_cache_stats_t>(&page_cache_, perfmon_collection)) { }
+    : throttler_(MINIMUM_SOFT_UNWRITTEN_CHANGES_LIMIT) { }
 
 cache_t::~cache_t() {
 }
 
 cache_account_t cache_t::create_cache_account(int priority) {
-    return page_cache_.create_cache_account(priority);
+    // TODO: What to do here?
+    return cache_account_t();
 }
+
+// TODO: Find out what to do with the default reads account.
+scoped_ptr_t<cache_account_t> default_reads_account = make_scoped<cache_account_t>();
+cache_account_t *get_default_reads_account() { return default_reads_account.get(); }
 
 txn_t::txn_t(cache_conn_t *cache_conn,
              read_access_t)
     : cache_(cache_conn->cache()),
-      cache_account_(cache_->page_cache_.default_reads_account()),
+      cache_account_(get_default_reads_account()),
       access_(access_t::read),
       durability_(write_durability_t::SOFT),
       is_committed_(false) {
@@ -105,7 +102,7 @@ txn_t::txn_t(cache_conn_t *cache_conn,
              write_durability_t durability,
              int64_t expected_change_count)
     : cache_(cache_conn->cache()),
-      cache_account_(cache_->page_cache_.default_reads_account()),
+      cache_account_(get_default_reads_account()),
       access_(access_t::write),
       durability_(durability),
       is_committed_(false) {
@@ -124,16 +121,13 @@ void txn_t::help_construct(int64_t expected_change_count,
         // does not block, we always yield in debug mode.
         DEBUG_ONLY_CODE(coro_t::yield_ordered());
     }
-    throttler_acq_t throttler_acq(
+
+    throttler_acq_ = make_scoped<throttler_acq_t>(
         access_ == access_t::write
         ? cache_->throttler_.begin_txn_or_throttle(expected_change_count)
         : throttler_acq_t());
 
     ASSERT_FINITE_CORO_WAITING;
-
-    page_txn_.init(new page_txn_t(&cache_->page_cache_,
-                                  std::move(throttler_acq),
-                                  cache_conn));
 }
 
 void txn_t::inform_tracker(cache_t *cache, throttler_acq_t *throttler_acq) {
@@ -148,13 +142,10 @@ void txn_t::pulse_and_inform_tracker(cache_t *cache,
 }
 
 txn_t::~txn_t() {
+    // TODO: Yeah, remove this guarantee or have txn_t::commit actually do something.
     guarantee(access_ == access_t::read || is_committed_,
         "A transaction was aborted. To avoid data corruption, we're "
         "terminating the server. Please report this bug.");
-
-    if (access_ == access_t::read) {
-        cache_->page_cache_.end_read_txn(std::move(page_txn_));
-    }
 }
 
 void txn_t::commit() {
@@ -164,19 +155,7 @@ void txn_t::commit() {
     guarantee(access_ == access_t::write);
     is_committed_ = true;
 
-    if (durability_ == write_durability_t::SOFT) {
-        cache_->page_cache_.flush_and_destroy_txn(std::move(page_txn_),
-            std::bind(&txn_t::inform_tracker,
-                cache_,
-                ph::_1));
-    } else {
-        cond_t cond;
-        cache_->page_cache_.flush_and_destroy_txn(
-            std::move(page_txn_),
-            std::bind(&txn_t::pulse_and_inform_tracker,
-                cache_, ph::_1, &cond));
-        cond.wait();
-    }
+    // TODO: Have txn_t::commit actually do something (like with rocksdb transactions).
 }
 
 void txn_t::set_account(cache_account_t *cache_account) {

@@ -9,7 +9,6 @@
 #include "btree/reql_specific.hpp"
 #include "btree/secondary_operations.hpp"
 #include "buffer_cache/alt.hpp"
-#include "buffer_cache/cache_balancer.hpp"
 #include "clustering/administration/issues/outdated_index.hpp"
 #include "concurrency/wait_any.hpp"
 #include "containers/archive/buffer_stream.hpp"
@@ -81,7 +80,6 @@ store_t::store_t(const region_t &_region,
                  int _shard_no,
                  rockstore::store *_rocks,
                  serializer_t *serializer,
-                 cache_balancer_t *balancer,
                  const char *perfmon_prefix,
                  bool create,
                  perfmon_collection_t *parent_perfmon_collection,
@@ -102,7 +100,7 @@ store_t::store_t(const region_t &_region,
       shard_no(_shard_no),
       write_superblock_acq_semaphore(WRITE_SUPERBLOCK_ACQ_WAITERS_LIMIT)
 {
-    cache.init(new cache_t(serializer, balancer, &perfmon_collection));
+    cache.init(new cache_t(serializer, &perfmon_collection));
     general_cache_conn.init(new cache_conn_t(cache.get()));
 
     if (create) {

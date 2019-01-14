@@ -5,7 +5,6 @@
 #include "btree/operations.hpp"
 #include "btree/reql_specific.hpp"
 #include "buffer_cache/alt.hpp"
-#include "buffer_cache/cache_balancer.hpp"
 #include "containers/uuid.hpp"
 #include "unittest/unittest_utils.hpp"
 #include "random.hpp"
@@ -22,7 +21,6 @@ TPTEST(BTreeSindex, LowLevelOps) {
     temp_rockstore rocks;
 
     io_backender_t io_backender(rocks.rocks(), file_direct_io_mode_t::buffered_desired);
-    dummy_cache_balancer_t balancer(GIGABYTE);
 
     filepath_file_opener_t file_opener(temp_file.name(), &io_backender);
     log_serializer_t::create(
@@ -34,7 +32,7 @@ TPTEST(BTreeSindex, LowLevelOps) {
         &file_opener,
         &get_global_perfmon_collection());
 
-    cache_t cache(&serializer, &balancer, &get_global_perfmon_collection());
+    cache_t cache(&serializer, &get_global_perfmon_collection());
     cache_conn_t cache_conn(&cache);
     namespace_id_t table_id = str_to_uuid("12345678-abcd-abcd-abcd-12345678abcd");
 

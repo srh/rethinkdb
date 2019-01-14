@@ -40,7 +40,6 @@ class real_superblock_t;
 class sindex_superblock_t;
 class superblock_t;
 class txn_t;
-class cache_balancer_t;
 struct rdb_modification_report_t;
 namespace rockstore { class store; }
 
@@ -68,7 +67,6 @@ public:
             int shard_no,
             rockstore::store *rocks,
             serializer_t *serializer,
-            cache_balancer_t *balancer,
             const char *perfmon_prefix,
             bool create,
             perfmon_collection_t *parent_perfmon_collection,

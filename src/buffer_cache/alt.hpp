@@ -16,9 +16,7 @@
 
 class serializer_t;
 
-class alt_cache_stats_t;
 class perfmon_collection_t;
-class cache_balancer_t;
 
 class alt_txn_throttler_t {
 public:
@@ -50,11 +48,8 @@ public:
 class cache_t : public home_thread_mixin_t {
 public:
     explicit cache_t(serializer_t *serializer,
-                     cache_balancer_t *balancer,
                      perfmon_collection_t *perfmon_collection);
     ~cache_t();
-
-    max_block_size_t max_block_size() const { return page_cache_.max_block_size(); }
 
     // These todos come from the mirrored cache.  The real problem is that whole
     // cache account / priority thing is just one ghetto hack amidst a dozen other
@@ -73,11 +68,6 @@ private:
     alt_txn_throttler_t throttler_;
 
     lock_state locks_;
-
-
-    alt::page_cache_t page_cache_;
-
-    scoped_ptr_t<alt_cache_stats_t> stats_;
 
     DISABLE_COPYING(cache_t);
 };
@@ -124,12 +114,13 @@ private:
     // set_account().
     cache_account_t *cache_account_;
 
+    // TODO: Make this not be scoped_ptr_t?
+    scoped_ptr_t<alt::throttler_acq_t> throttler_acq_;
+
     const access_t access_;
 
     // Only applicable if access_ == write.
     const write_durability_t durability_;
-
-    scoped_ptr_t<alt::page_txn_t> page_txn_;
 
     bool is_committed_;
 
