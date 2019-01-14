@@ -213,7 +213,8 @@ void rdb_distribution_get(rockshard rocksh, int keys_limit,
 /* Secondary Indexes */
 
 struct rdb_modification_info_t {
-    // TODO: Remove data_pair_t wrapper.
+    // TODO: Remove(?) data_pair_t wrapper (after figuring out
+    // serialization/non-serialization needs).
     struct data_pair_t { ql::datum_t first; };
     data_pair_t deleted;
     data_pair_t added;

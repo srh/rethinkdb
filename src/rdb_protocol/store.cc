@@ -1046,7 +1046,6 @@ struct rdb_write_visitor_t : public boost::static_visitor<void> {
 
     rdb_write_visitor_t(btree_slice_t *_btree,
                         store_t *_store,
-                        txn_t *_txn,
                         scoped_ptr_t<real_superblock_t> &&_superblock,
                         repli_timestamp_t _timestamp,
                         rdb_context_t *_ctx,
@@ -1056,7 +1055,6 @@ struct rdb_write_visitor_t : public boost::static_visitor<void> {
                         signal_t *_interruptor) :
         btree(_btree),
         store(_store),
-        txn(_txn),
         response(_response),
         ctx(_ctx),
         interruptor(_interruptor),
@@ -1079,7 +1077,6 @@ private:
 
     btree_slice_t *const btree;
     store_t *const store;
-    txn_t *const txn;
     write_response_t *const response;
     rdb_context_t *const ctx;
     signal_t *const interruptor;
@@ -1102,10 +1099,8 @@ void store_t::protocol_write(const write_t &_write,
 
     {
         profile::sampler_t start_write("Perform write on shard.", trace);
-        txn_t *txn = superblock->get()->txn();
         rdb_write_visitor_t v(btree.get(),
                               this,
-                              txn,
                               std::move(superblock),
                               timestamp.to_repli_timestamp(),
                               ctx,
