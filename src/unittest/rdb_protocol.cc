@@ -86,7 +86,6 @@ void run_with_namespace_interface(
             // TODO: Why is this not cpu_sharding_subspace(i) region?
             underlying_stores.push_back(
                     make_scoped<store_t>(region_t::universe(), i, io_backender.rocks(),
-                        serializers[i].get(),
                         temp_files[i]->name().permanent_path().c_str(), do_create,
                         &get_global_perfmon_collection(), &ctx, &io_backender,
                         base_path_t("."), table_id, update_sindexes_t::UPDATE));

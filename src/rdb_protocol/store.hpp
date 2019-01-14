@@ -66,7 +66,6 @@ public:
     store_t(const region_t &region,
             int shard_no,
             rockstore::store *rocks,
-            serializer_t *serializer,
             const char *perfmon_prefix,
             bool create,
             perfmon_collection_t *parent_perfmon_collection,

@@ -79,7 +79,6 @@ sindex_not_ready_exc_t::~sindex_not_ready_exc_t() throw() { }
 store_t::store_t(const region_t &_region,
                  int _shard_no,
                  rockstore::store *_rocks,
-                 serializer_t *serializer,
                  const char *perfmon_prefix,
                  bool create,
                  perfmon_collection_t *parent_perfmon_collection,
@@ -100,7 +99,7 @@ store_t::store_t(const region_t &_region,
       shard_no(_shard_no),
       write_superblock_acq_semaphore(WRITE_SUPERBLOCK_ACQ_WAITERS_LIMIT)
 {
-    cache.init(new cache_t(serializer, &perfmon_collection));
+    cache.init(new cache_t(&perfmon_collection));
     general_cache_conn.init(new cache_conn_t(cache.get()));
 
     if (create) {

@@ -88,7 +88,6 @@ public:
                 cpu_sharding_subspace(ix),
                 ix,
                 rocks,
-                multiplexer->proxies[ix],
                 "shard",
                 create,
                 perfmon_collection_serializers,

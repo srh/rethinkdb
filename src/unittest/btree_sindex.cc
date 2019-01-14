@@ -27,12 +27,7 @@ TPTEST(BTreeSindex, LowLevelOps) {
         &file_opener,
         log_serializer_t::static_config_t());
 
-    log_serializer_t serializer(
-        log_serializer_t::dynamic_config_t(),
-        &file_opener,
-        &get_global_perfmon_collection());
-
-    cache_t cache(&serializer, &get_global_perfmon_collection());
+    cache_t cache(&get_global_perfmon_collection());
     cache_conn_t cache_conn(&cache);
     namespace_id_t table_id = str_to_uuid("12345678-abcd-abcd-abcd-12345678abcd");
 

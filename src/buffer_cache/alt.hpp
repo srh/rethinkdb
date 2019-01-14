@@ -47,8 +47,7 @@ public:
 
 class cache_t : public home_thread_mixin_t {
 public:
-    explicit cache_t(serializer_t *serializer,
-                     perfmon_collection_t *perfmon_collection);
+    explicit cache_t(perfmon_collection_t *perfmon_collection);
     ~cache_t();
 
     // These todos come from the mirrored cache.  The real problem is that whole

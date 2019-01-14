@@ -253,16 +253,10 @@ TPTEST(RDBBtree, SindexPostConstruct) {
         &file_opener,
         log_serializer_t::static_config_t());
 
-    log_serializer_t serializer(
-        log_serializer_t::dynamic_config_t(),
-        &file_opener,
-        &get_global_perfmon_collection());
-
     store_t store(
             region_t::universe(),
             0,
             io_backender.rocks(),
-            &serializer,
             "unit_test_store",
             true,
             &get_global_perfmon_collection(),
@@ -296,16 +290,10 @@ TPTEST(RDBBtree, SindexEraseRange) {
         &file_opener,
         log_serializer_t::static_config_t());
 
-    log_serializer_t serializer(
-        log_serializer_t::dynamic_config_t(),
-        &file_opener,
-        &get_global_perfmon_collection());
-
     store_t store(
             region_t::universe(),
             0,
             io_backender.rocks(),
-            &serializer,
             "unit_test_store",
             true,
             &get_global_perfmon_collection(),
@@ -381,16 +369,10 @@ TPTEST(RDBBtree, SindexInterruptionViaDrop) {
         &file_opener,
         log_serializer_t::static_config_t());
 
-    log_serializer_t serializer(
-        log_serializer_t::dynamic_config_t(),
-        &file_opener,
-        &get_global_perfmon_collection());
-
     store_t store(
             region_t::universe(),
             0,
             io_backender.rocks(),
-            &serializer,
             "unit_test_store",
             true,
             &get_global_perfmon_collection(),
@@ -424,16 +406,10 @@ TPTEST(RDBBtree, SindexInterruptionViaStoreDelete) {
         &file_opener,
         log_serializer_t::static_config_t());
 
-    log_serializer_t serializer(
-        log_serializer_t::dynamic_config_t(),
-        &file_opener,
-        &get_global_perfmon_collection());
-
     scoped_ptr_t<store_t> store(new store_t(
             region_t::universe(),
             0,
             io_backender.rocks(),
-            &serializer,
             "unit_test_store",
             true,
             &get_global_perfmon_collection(),

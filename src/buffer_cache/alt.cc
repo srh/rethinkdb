@@ -69,15 +69,18 @@ void alt_txn_throttler_t::inform_memory_limit_change(uint64_t memory_limit,
     unwritten_block_changes_semaphore_.set_capacity(throttler_limit);
 }
 
-cache_t::cache_t(serializer_t *serializer,
-                 perfmon_collection_t *perfmon_collection)
-    : throttler_(MINIMUM_SOFT_UNWRITTEN_CHANGES_LIMIT) { }
+cache_t::cache_t(perfmon_collection_t *perfmon_collection)
+    : throttler_(MINIMUM_SOFT_UNWRITTEN_CHANGES_LIMIT) {
+    (void)perfmon_collection;
+    // TODO: Use perfmon_collection for something?
+}
 
 cache_t::~cache_t() {
 }
 
 cache_account_t cache_t::create_cache_account(int priority) {
     // TODO: What to do here?
+    (void)priority;
     return cache_account_t();
 }
 
@@ -112,6 +115,7 @@ txn_t::txn_t(cache_conn_t *cache_conn,
 
 void txn_t::help_construct(int64_t expected_change_count,
                            cache_conn_t *cache_conn) {
+    (void)cache_conn;  // TODO
     cache_->assert_thread();
     guarantee(expected_change_count >= 0);
     // We skip the throttler for read transactions.
@@ -150,6 +154,7 @@ txn_t::~txn_t() {
 
 void txn_t::commit() {
     cache_->assert_thread();
+    (void)durability_;  // TODO: Use this field (for rocksdb writing in txn commit)
 
     guarantee(!is_committed_);
     guarantee(access_ == access_t::write);

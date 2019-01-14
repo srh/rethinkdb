@@ -61,7 +61,7 @@ public:
     test_store_t(io_backender_t *io_backender, order_source_t *order_source, rdb_context_t *ctx) :
             serializer(create_and_construct_serializer(&temp_file, io_backender)),
             store(region_t::universe(), 0 /* the only shard */,
-                io_backender->rocks(), serializer.get(),
+                io_backender->rocks(),
                 temp_file.name().permanent_path().c_str(), true,
                 &get_global_perfmon_collection(), ctx, io_backender, base_path_t("."),
                 generate_uuid(), update_sindexes_t::UPDATE) {
