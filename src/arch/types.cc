@@ -16,14 +16,6 @@ address_in_use_exc_t::address_in_use_exc_t(const char* hostname, int port) throw
     }
 }
 
-file_account_t::file_account_t(file_t *par, int pri, int outstanding_requests_limit) :
-    parent(par),
-    account(parent->create_account(pri, outstanding_requests_limit)) { }
-
-file_account_t::~file_account_t() {
-    parent->destroy_account(account);
-}
-
 void linux_iocallback_t::on_io_failure(int errsv, int64_t offset, int64_t count) {
     if (errsv == ENOSPC) {
         // fail_due_to_user_error rather than crash because we don't want to

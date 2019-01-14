@@ -9,8 +9,7 @@ changed back. We'll sort this mess out when it's time to support another OS. */
 
 #include "arch/types.hpp"
 
-void co_read(file_t *file, int64_t offset, size_t length, void *buf, file_account_t *account);
-void co_write(file_t *file, int64_t offset, size_t length, void *buf, file_account_t *account,
-              file_t::wrap_in_datasyncs_t wrap_in_datasyncs);
+// TODO: Remove this file?
+
 
 #endif /* ARCH_ARCH_HPP_ */

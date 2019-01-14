@@ -105,53 +105,5 @@ enum class file_direct_io_mode_t {
     buffered_desired
 };
 
-// A linux file.  It expects reads and writes and buffers to have an
-// alignment of DEVICE_BLOCK_SIZE.
-class file_t {
-public:
-    enum wrap_in_datasyncs_t { NO_DATASYNCS, WRAP_IN_DATASYNCS };
-
-    file_t() { }
-
-    virtual ~file_t() { }
-    virtual int64_t get_file_size() = 0;
-    virtual void set_file_size(int64_t size) = 0;
-    virtual void set_file_size_at_least(int64_t size, int64_t extent_size) = 0;
-
-    virtual void read_async(int64_t offset, size_t length, void *buf,
-                            file_account_t *account, linux_iocallback_t *cb) = 0;
-    virtual void write_async(int64_t offset, size_t length, const void *buf,
-                             file_account_t *account, linux_iocallback_t *cb,
-                             wrap_in_datasyncs_t wrap_in_datasyncs) = 0;
-    // writev_async doesn't provide the atomicity guarantees of writev.
-    virtual void writev_async(int64_t offset, size_t length, scoped_array_t<iovec> &&bufs,
-                              file_account_t *account, linux_iocallback_t *cb) = 0;
-
-    virtual void *create_account(int priority, int outstanding_requests_limit) = 0;
-    virtual void destroy_account(void *account) = 0;
-
-    virtual bool coop_lock_and_check() = 0;
-
-private:
-    DISABLE_COPYING(file_t);
-};
-
-class file_account_t {
-public:
-    file_account_t(file_t *f, int p, int outstanding_requests_limit = UNLIMITED_OUTSTANDING_REQUESTS);
-    ~file_account_t();
-    void *get_account() { return account; }
-
-private:
-    file_t *parent;
-
-    // When used with a linux_file_t, account is a `accounting_diskmgr_t::account_t
-    // *`.  When used with a mock_file_t, it's a unused non-null pointer to some kind
-    // of irrelevant object.  But mock_file_t has been removed.
-    void *account;
-
-    DISABLE_COPYING(file_account_t);
-};
-
 
 #endif  // ARCH_TYPES_HPP_
