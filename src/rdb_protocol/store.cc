@@ -185,6 +185,7 @@ scoped_ptr_t<sindex_superblock_t> acquire_sindex_for_read(
     return sindex_sb;
 }
 
+// TODO: Is sindex_id_out always nullptr?
 void do_snap_read(
         rockshard rocksh,
         ql::env_t *env,
@@ -193,7 +194,6 @@ void do_snap_read(
         real_superblock_t *superblock,
         const rget_read_t &rget,
         rget_read_response_t *res,
-        release_superblock_t release_superblock,
         optional<uuid_u> *sindex_id_out) {
     guarantee(rget.current_shard.has_value());
     if (!rget.sindex.has_value()) {
@@ -203,10 +203,8 @@ void do_snap_read(
         }
         superblock->read_acq_signal()->wait_lazily_ordered();
         rockstore::snapshot snap = make_snapshot(rocksh.rocks);
-        // TODO: Is it always RELEASE?
-        if (release_superblock == release_superblock_t::RELEASE) {
-            superblock->release();
-        }
+        superblock->release();
+
         rdb_rget_snapshot_slice(
             snap.snap,
             rocksh,
@@ -232,7 +230,7 @@ void do_snap_read(
                 acquire_sindex_for_read(
                     store,
                     superblock,
-                    release_superblock,
+                    release_superblock_t::RELEASE,
                     rget.table_name,
                     rget.sindex->id,
                     &sindex_info,
@@ -765,7 +763,7 @@ struct rdb_read_visitor_t : public boost::static_visitor<void> {
             rget.serializable_env,
             trace);
         do_snap_read(store->rocksh(), &ql_env, store, btree, superblock, rget, res,
-                release_superblock_t::RELEASE, nullptr);
+                     nullptr);
     }
 
     void operator()(const distribution_read_t &dg) {
