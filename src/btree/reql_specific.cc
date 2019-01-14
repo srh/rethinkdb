@@ -316,16 +316,10 @@ void get_btree_superblock_and_txn_for_backfilling(
 // secondary index nodes that you could not possibly access.
 void get_btree_superblock_and_txn_for_reading(
         cache_conn_t *cache_conn,
-        cache_snapshotted_t snapshotted,
         scoped_ptr_t<real_superblock_t> *got_superblock_out,
         scoped_ptr_t<txn_t> *txn_out) {
     txn_t *txn = new txn_t(cache_conn, read_access_t::read);
     txn_out->init(txn);
 
     get_btree_superblock(txn, access_t::read, got_superblock_out);
-
-    if (snapshotted == CACHE_SNAPSHOTTED_YES) {
-        (*got_superblock_out)->get()->snapshot_subdag();
-    }
 }
-

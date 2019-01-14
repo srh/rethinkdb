@@ -103,7 +103,7 @@ TPTEST(BtreeMetainfo, MetainfoTest) {
             scoped_ptr_t<txn_t> txn;
             scoped_ptr_t<real_superblock_t> superblock;
             get_btree_superblock_and_txn_for_reading(
-                &cache_conn, CACHE_SNAPSHOTTED_NO, &superblock, &txn);
+                &cache_conn, &superblock, &txn);
             std::vector<std::pair<std::vector<char>, std::vector<char> > > read_back;
             get_superblock_metainfo(rocksh, superblock.get(), &read_back);
             std::set<std::string> seen;

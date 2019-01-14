@@ -316,7 +316,7 @@ std::map<std::string, std::pair<sindex_config_t, sindex_status_t> > store_t::sin
     scoped_ptr_t<real_superblock_t> superblock;
     scoped_ptr_t<txn_t> txn;
     get_btree_superblock_and_txn_for_reading(general_cache_conn.get(),
-        CACHE_SNAPSHOTTED_NO, &superblock, &txn);
+        &superblock, &txn);
     sindex_block_lock_t sindex_block(superblock->get(),
                             superblock->get_sindex_block_id(rocksh()),
                             access_t::read);
@@ -907,7 +907,7 @@ std::map<sindex_name_t, secondary_index_t> store_t::get_sindexes() const {
     scoped_ptr_t<txn_t> txn;
     scoped_ptr_t<real_superblock_t> superblock;
     get_btree_superblock_and_txn_for_reading(
-        general_cache_conn.get(), CACHE_SNAPSHOTTED_NO, &superblock, &txn);
+        general_cache_conn.get(), &superblock, &txn);
 
     sindex_block_lock_t sindex_block(
         superblock->get(), superblock->get_sindex_block_id(rocksh()), access_t::read);
@@ -1160,10 +1160,11 @@ void store_t::acquire_superblock_for_read(
         wait_interruptible(token->main_read_token.get(), interruptor);
     }
 
-    cache_snapshotted_t cache_snapshotted =
-        use_snapshot ? CACHE_SNAPSHOTTED_YES : CACHE_SNAPSHOTTED_NO;
     get_btree_superblock_and_txn_for_reading(
-        general_cache_conn.get(), cache_snapshotted, sb_out, txn_out);
+        general_cache_conn.get(), sb_out, txn_out);
+    if (use_snapshot) {
+        (*sb_out)->get()->snapshot_subdag();
+    }
 }
 
 void store_t::acquire_superblock_for_write(
