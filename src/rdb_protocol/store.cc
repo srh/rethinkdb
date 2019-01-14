@@ -185,6 +185,113 @@ scoped_ptr_t<sindex_superblock_t> acquire_sindex_for_read(
     return sindex_sb;
 }
 
+void do_snap_read(
+        rockshard rocksh,
+        ql::env_t *env,
+        store_t *store,
+        btree_slice_t *btree,
+        real_superblock_t *superblock,
+        const rget_read_t &rget,
+        rget_read_response_t *res,
+        release_superblock_t release_superblock,
+        optional<uuid_u> *sindex_id_out) {
+    guarantee(rget.current_shard.has_value());
+    if (!rget.sindex.has_value()) {
+        // rget using a primary index
+        if (sindex_id_out != nullptr) {
+            *sindex_id_out = r_nullopt;
+        }
+        superblock->read_acq_signal()->wait_lazily_ordered();
+        rockstore::snapshot snap = make_snapshot(rocksh.rocks);
+        // TODO: Is it always RELEASE?
+        if (release_superblock == release_superblock_t::RELEASE) {
+            superblock->release();
+        }
+        rdb_rget_snapshot_slice(
+            snap.snap,
+            rocksh,
+            btree,
+            *rget.current_shard,
+            rget.region.inner,
+            rget.primary_keys,
+            env,
+            rget.batchspec,
+            rget.transforms,
+            rget.terminal,
+            rget.sorting,
+            res);
+    } else {
+        superblock->get()->snapshot_subdag();
+        // rget using a secondary index
+        sindex_disk_info_t sindex_info;
+        uuid_u sindex_uuid;
+        scoped_ptr_t<sindex_superblock_t> sindex_sb;
+        key_range_t sindex_range;
+        try {
+            sindex_sb =
+                acquire_sindex_for_read(
+                    store,
+                    superblock,
+                    release_superblock,
+                    rget.table_name,
+                    rget.sindex->id,
+                    &sindex_info,
+                    &sindex_uuid);
+            if (sindex_id_out != nullptr) {
+                *sindex_id_out = make_optional(sindex_uuid);
+            }
+            reql_version_t reql_version =
+                sindex_info.mapping_version_info.latest_compatible_reql_version;
+            res->reql_version = reql_version;
+            if (rget.sindex->region.has_value()) {
+                sindex_range = rget.sindex->region->inner;
+            } else {
+                sindex_range =
+                    rget.sindex->datumspec.covering_range().to_sindex_keyrange(
+                        reql_version);
+            }
+            if (sindex_info.geo == sindex_geo_bool_t::GEO) {
+                res->result = ql::exc_t(
+                    ql::base_exc_t::LOGIC,
+                    strprintf(
+                        "Index `%s` is a geospatial index.  Only get_nearest and "
+                        "get_intersecting can use a geospatial index.",
+                        rget.sindex->id.c_str()),
+                    ql::backtrace_id_t::empty());
+                return;
+            }
+
+            rdb_rget_secondary_slice(
+                rocksh,
+                sindex_uuid,
+                store->get_sindex_slice(sindex_uuid),
+                *rget.current_shard,
+                rget.sindex->datumspec,
+                sindex_range,
+                sindex_sb.get(),
+                env,
+                rget.batchspec,
+                rget.transforms,
+                rget.terminal,
+                rget.region.inner,
+                rget.sorting,
+                rget.sindex->require_sindex_val,
+                sindex_info,
+                res,
+                release_superblock_t::RELEASE);
+        } catch (const ql::exc_t &e) {
+            res->result = e;
+            return;
+        } catch (const ql::datum_exc_t &e) {
+            // TODO: consider adding some logic on the machine handling the
+            // query to attach a real backtrace here.
+            res->result = ql::exc_t(e, ql::backtrace_id_t::empty());
+            return;
+        }
+    }
+}
+
+// TODO: Remove this?
 void do_read(rockshard rocksh,
              ql::env_t *env,
              store_t *store,
@@ -342,6 +449,7 @@ struct rdb_read_visitor_t : public boost::static_visitor<void> {
                     &ops});
             }
             rget.sorting = s.spec.range.sorting;
+
             // The superblock will instead be released in `store_t::read`
             // shortly after this function returns.
             rget_read_response_t resp;
@@ -643,7 +751,6 @@ struct rdb_read_visitor_t : public boost::static_visitor<void> {
             // this changefeed stamp business that needs to happen before
             // subsequent writes.)
         }
-        superblock->get()->snapshot_subdag();
 
         if (rget.transforms.size() != 0 || rget.terminal) {
             // This asserts that the optargs have been initialized.  (There is always
@@ -657,7 +764,7 @@ struct rdb_read_visitor_t : public boost::static_visitor<void> {
             interruptor,
             rget.serializable_env,
             trace);
-        do_read(store->rocksh(), &ql_env, store, btree, superblock, rget, res,
+        do_snap_read(store->rocksh(), &ql_env, store, btree, superblock, rget, res,
                 release_superblock_t::RELEASE, nullptr);
     }
 

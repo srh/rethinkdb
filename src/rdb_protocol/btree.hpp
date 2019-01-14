@@ -107,6 +107,20 @@ void rdb_delete(rockshard rocksh,
                 profile::trace_t *trace,
                 promise_t<superblock_t *> *pass_back_superblock);
 
+void rdb_rget_snapshot_slice(
+    const rocksdb::Snapshot *snap,
+    rockshard rocksh,
+    btree_slice_t *slice,
+    const region_t &shard,
+    const key_range_t &range,
+    const optional<std::map<store_key_t, uint64_t> > &primary_keys,
+    ql::env_t *ql_env,
+    const ql::batchspec_t &batchspec,
+    const std::vector<ql::transform_variant_t> &transforms,
+    const optional<ql::terminal_variant_t> &terminal,
+    sorting_t sorting,
+    rget_read_response_t *response);
+
 void rdb_rget_slice(
     rockshard rocksh,
     btree_slice_t *slice,

@@ -899,6 +899,87 @@ continue_bool_t rocks_rget_cb::handle_pair(
     }
 }
 
+// TODO: Remove/merge with rdb_rget_slice again?
+
+// TODO: Flip snap/rocksh argument order, to be consistent.
+void rdb_rget_snapshot_slice(
+        const rocksdb::Snapshot *snap,
+        rockshard rocksh,
+        btree_slice_t *slice,
+        const region_t &shard,
+        const key_range_t &range,
+        const optional<std::map<store_key_t, uint64_t> > &primary_keys,
+        ql::env_t *ql_env,
+        const ql::batchspec_t &batchspec,
+        const std::vector<transform_variant_t> &transforms,
+        const optional<terminal_variant_t> &terminal,
+        sorting_t sorting,
+        rget_read_response_t *response) {
+    r_sanity_check(boost::get<ql::exc_t>(&response->result) == nullptr);
+    PROFILE_STARTER_IF_ENABLED(
+        ql_env->profile() == profile_bool_t::PROFILE,
+        "Do range scan on primary index.",
+        ql_env->trace);
+
+    rocks_rget_cb callback(
+        rget_io_data_t(response, slice),
+        job_data_t(ql_env,
+                   batchspec,
+                   transforms,
+                   terminal,
+                   shard,
+                   !reversed(sorting)
+                       ? range.left
+                       : range.right.key_or_max(),
+                   sorting,
+                   require_sindexes_t::NO),
+        r_nullopt);
+
+    direction_t direction = reversed(sorting) ? direction_t::backward : direction_t::forward;
+    continue_bool_t cont = continue_bool_t::CONTINUE;
+    std::string rocks_kv_prefix = rockstore::table_primary_prefix(rocksh.table_id, rocksh.shard_no);
+    if (primary_keys.has_value()) {
+        // TODO: Instead of holding onto the superblock, we could make an iterator once,
+        // or hold a rocksdb snapshot once, out here.
+        auto cb = [&](const std::pair<store_key_t, uint64_t> &pair) {
+            rocks_rget_cb_wrapper wrapper(&callback, pair.second, r_nullopt);
+            return rocks_traversal(
+                rocksh.rocks,
+                snap,
+                rocks_kv_prefix,
+                key_range_t::one_key(pair.first),
+                direction,
+                &wrapper);
+        };
+        if (!reversed(sorting)) {
+            for (auto it = primary_keys->begin(); it != primary_keys->end();) {
+                auto this_it = it++;
+                if (cb(*this_it) == continue_bool_t::ABORT) {
+                    // If required the superblock will get released further up the stack.
+                    cont = continue_bool_t::ABORT;
+                    break;
+                }
+            }
+        } else {
+            for (auto it = primary_keys->rbegin(); it != primary_keys->rend();) {
+                auto this_it = it++;
+                if (cb(*this_it) == continue_bool_t::ABORT) {
+                    // If required the superblock will get released further up the stack.
+                    cont = continue_bool_t::ABORT;
+                    break;
+                }
+            }
+        }
+    } else {
+        rocks_rget_cb_wrapper wrapper(&callback, 1, r_nullopt);
+        cont = rocks_traversal(
+            rocksh.rocks, snap, rocks_kv_prefix, range, direction, &wrapper);
+    }
+    callback.finish(cont);
+}
+
+
+
 // TODO: I get the feeling this ismissing some functionality, such as use of
 // batchspec -- we returned all 12000 rows in the data explorer, instead of
 // paging.  It took a while and felt weird.
