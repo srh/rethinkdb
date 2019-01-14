@@ -147,7 +147,7 @@ private:
 
     // When used with a linux_file_t, account is a `accounting_diskmgr_t::account_t
     // *`.  When used with a mock_file_t, it's a unused non-null pointer to some kind
-    // of irrelevant object.
+    // of irrelevant object.  But mock_file_t has been removed.
     void *account;
 
     DISABLE_COPYING(file_account_t);

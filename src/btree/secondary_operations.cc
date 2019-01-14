@@ -8,8 +8,9 @@
 #include "containers/archive/versioned.hpp"
 #include "rockstore/store.hpp"
 
-RDB_IMPL_SERIALIZABLE_5_SINCE_v2_2(
-        secondary_index_t, superblock, opaque_definition,
+// TODO: Remove old serialization versions, or maybe even serialization versioning.
+RDB_IMPL_SERIALIZABLE_4_SINCE_v2_4(
+        secondary_index_t, opaque_definition,
         needs_post_construction_range, being_deleted, id);
 
 // Pre 2.2 we didn't have the `needs_post_construction_range` field, but instead had
@@ -19,8 +20,10 @@ template <cluster_version_t W>
 archive_result_t pre_2_2_deserialize(
         read_stream_t *s, secondary_index_t *sindex) {
     archive_result_t res = archive_result_t::SUCCESS;
-    res = deserialize<W>(s, deserialize_deref(sindex->superblock));
-    if (bad(res)) { return res; }
+    // TODO: We removed sindex->superblock, in fact the block_id_t type entirely, and this
+    // code (which is obsolete deserialization code anyway) should be removed.
+    // res = deserialize<W>(s, deserialize_deref(sindex->superblock));
+    // if (bad(res)) { return res; }
     res = deserialize<W>(s, deserialize_deref(sindex->opaque_definition));
     if (bad(res)) { return res; }
 

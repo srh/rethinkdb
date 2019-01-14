@@ -26,13 +26,9 @@ class sindex_block_lock;
 
 struct secondary_index_t {
     secondary_index_t()
-        : superblock(NULL_BLOCK_ID),
-          needs_post_construction_range(key_range_t::universe()),
+        : needs_post_construction_range(key_range_t::universe()),
           being_deleted(false),
           id(generate_uuid()) { }
-
-    /* A virtual superblock. */
-    block_id_t superblock;
 
     /* Whether the index still needs to be post constructed, and/or is being deleted.
      Note that an index can be in any combination of those states. */

@@ -630,7 +630,6 @@ optional<uuid_u> store_t::add_sindex_internal(
     } else {
         {
             sindex_superblock_lock sb_lock(sindex_block, sindex.id, alt_create_t::create);
-            sindex.superblock = sb_lock.block_id();
             sindex.opaque_definition = opaque_definition;
 
             sindex_superblock_t superblock(std::move(sb_lock));

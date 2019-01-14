@@ -8,31 +8,6 @@
 #include "rockstore/store.hpp"
 
 
-// TODO: Remove this struct (reql_btree_superblock_t) entirely.
-/* This is the actual structure stored on disk for the superblock of a table's primary or
-sindex B-tree. Both of them use the exact same format, but the sindex B-trees don't make
-use of the `sindex_block` or `metainfo_blob` fields. */
-ATTR_PACKED(struct reql_btree_superblock_t {
-    block_magic_t magic;
-    block_id_t root_block;
-    block_id_t stat_block_unused;
-    block_id_t sindex_block_unused;
-
-    static const int METAINFO_BLOB_MAXREFLEN
-        = from_ser_block_size_t<DEVICE_BLOCK_SIZE>::cache_size - sizeof(block_magic_t)
-                                                               - 3 * sizeof(block_id_t);
-
-    char metainfo_blob_unused[METAINFO_BLOB_MAXREFLEN];
-});
-
-void btree_superblock_ct_asserts() {
-    // Just some place to put the CT_ASSERTs
-    CT_ASSERT(reql_btree_superblock_t::METAINFO_BLOB_MAXREFLEN > 0);
-    CT_ASSERT(from_cache_block_size_t<sizeof(reql_btree_superblock_t)>::ser_size
-              == DEVICE_BLOCK_SIZE);
-}
-
-
 real_superblock_t::real_superblock_t(real_superblock_lock &&sb_buf)
     : sb_buf_(std::move(sb_buf)) {}
 

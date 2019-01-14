@@ -56,10 +56,10 @@ void alt_txn_throttler_t::end_txn(UNUSED throttler_acq_t acq) {
     // Just let the acq destructor do its thing.
 }
 
-void alt_txn_throttler_t::inform_memory_limit_change(uint64_t memory_limit,
-                                                     const block_size_t max_block_size) {
+void alt_txn_throttler_t::inform_memory_limit_change(uint64_t memory_limit) {
+    // TODO: Hard-coded 4096 for removed max_block_size parameter -- this is kind of B.S.
     int64_t throttler_limit = std::min<int64_t>(SOFT_UNWRITTEN_CHANGES_LIMIT,
-        (memory_limit / max_block_size.ser_value()) * SOFT_UNWRITTEN_CHANGES_MEMORY_FRACTION);
+        (memory_limit / 4096) * SOFT_UNWRITTEN_CHANGES_MEMORY_FRACTION);
 
     // Always provide at least one capacity in the semaphore
     throttler_limit = std::max<int64_t>(throttler_limit, minimum_unwritten_changes_limit_);

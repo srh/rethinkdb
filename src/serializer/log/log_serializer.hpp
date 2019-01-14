@@ -22,9 +22,6 @@
 #include "serializer/log/extent_manager.hpp"
 #include "serializer/log/stats.hpp"
 
-class cond_t;
-struct block_magic_t;
-class io_backender_t;
 
 // TODO: Remove this file.
 

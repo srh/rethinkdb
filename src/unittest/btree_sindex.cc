@@ -62,7 +62,6 @@ TPTEST(BTreeSindex, LowLevelOps) {
         sindex_name_t name(uuid_to_str(generate_uuid()));
 
         secondary_index_t s;
-        s.superblock = randint(1000);
 
         std::string opaque_blob = rand_string(1000);
         s.opaque_definition.assign(opaque_blob.begin(), opaque_blob.end());
@@ -119,7 +118,7 @@ TPTEST(BTreeSindex, LowLevelOps) {
                 ASSERT_TRUE(jt != mirror.end());
 
                 ASSERT_TRUE(it->first == jt->first);
-                ASSERT_TRUE(it->second.superblock == jt->second.superblock &&
+                ASSERT_TRUE(
                     it->second.opaque_definition == jt->second.opaque_definition);
                 ++it;
                 ++jt;

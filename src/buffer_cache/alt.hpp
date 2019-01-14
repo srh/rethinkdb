@@ -18,6 +18,7 @@ class serializer_t;
 
 class perfmon_collection_t;
 
+// TODO: Throttling has to be done globally.  But beware of deadlock.
 class alt_txn_throttler_t {
 public:
     explicit alt_txn_throttler_t(int64_t minimum_unwritten_changes_limit);
@@ -26,8 +27,7 @@ public:
     alt::throttler_acq_t begin_txn_or_throttle(int64_t expected_change_count);
     void end_txn(alt::throttler_acq_t acq);
 
-    void inform_memory_limit_change(uint64_t memory_limit,
-                                    block_size_t max_block_size);
+    void inform_memory_limit_change(uint64_t memory_limit);
 
 private:
     const int64_t minimum_unwritten_changes_limit_;
@@ -232,8 +232,6 @@ public:
         txn_ = nullptr;
         acq_.reset();
     }
-
-    block_id_t block_id() const { return block_id_t(1); }  // TODO: Remove this ghetto hack.
 
     void mark_deleted() {
         // TODO: Implement for real (remove from sindex_superblock_locks -- force caller to hold parent lock, see if that's reasonable)

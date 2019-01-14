@@ -21,13 +21,7 @@ cache_conn_t::~cache_conn_t() {
 
 namespace alt {
 
-class current_page_help_t {
-public:
-    current_page_help_t(block_id_t _block_id)
-        : block_id(_block_id) { }
-    block_id_t block_id;
-};
-
+// TODO: This is nonsense -- we don't call this, right?  And there are no pages.
 void throttler_acq_t::update_dirty_page_count(int64_t new_count) {
     rassert(
         block_changes_semaphore_acq_.count() == index_changes_semaphore_acq_.count());

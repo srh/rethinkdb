@@ -2,6 +2,8 @@
 #ifndef CONFIG_ARGS_HPP_
 #define CONFIG_ARGS_HPP_
 
+// TODO: Remove obsolete values here.
+
 #define KILOBYTE 1024LL
 #define MEGABYTE (KILOBYTE * 1024LL)
 #define GIGABYTE (MEGABYTE * 1024LL)

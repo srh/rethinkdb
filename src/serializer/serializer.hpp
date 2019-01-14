@@ -11,9 +11,6 @@
 #include "repli_timestamp.hpp"
 #include "serializer/types.hpp"
 
-class buf_ptr_t;
-class new_mutex_in_line_t;
-
 // TODO: Delete this file.
 
 #endif /* SERIALIZER_SERIALIZER_HPP_ */
