@@ -99,17 +99,6 @@ private:
     const signal_t *interruptor_;
 };
 
-// TODO: Remove old function (also in the .cc)
-continue_bool_t geo_traversal(
-        rockshard rocksh,
-        uuid_u sindex_uuid,
-        sindex_superblock_t *superblock,
-        release_superblock_t release_superblock,
-        const key_range_t &sindex_range,
-        geo_index_traversal_helper_t *helper);
-
-
-
 continue_bool_t geo_traversal(
         const rocksdb::Snapshot *snap,
         rockshard rocksh,

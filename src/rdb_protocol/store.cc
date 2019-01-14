@@ -484,10 +484,8 @@ struct rdb_read_visitor_t : public boost::static_visitor<void> {
                 return;
             }
         }
-        // TODO: Verify that snapshotting (here) in the case of a stamped query is
+        // TODO: Verify that snapshotting (below) in the case of a stamped query is
         // okay (by examing source code).  I think there was a mistake of implementation.
-        superblock->get()->snapshot_subdag();
-
 
         sindex_disk_info_t sindex_info;
         uuid_u sindex_uuid;
@@ -519,15 +517,20 @@ struct rdb_read_visitor_t : public boost::static_visitor<void> {
             return;
         }
 
+        sindex_sb->read_acq_signal()->wait_lazily_ordered();
+        rockshard rocksh = store->rocksh();
+        rockstore::snapshot snap = make_snapshot(rocksh.rocks);
+        sindex_sb.reset();
+
         guarantee(geo_read.sindex.region);
         rdb_get_intersecting_slice(
+            snap.snap,
             store->rocksh(),
             sindex_uuid,
             store->get_sindex_slice(sindex_uuid),
             geo_read.region, // This happens to always be the shard for geo reads.
             geo_read.query_geometry,
             geo_read.sindex.region->inner,
-            sindex_sb.get(),
             &ql_env,
             geo_read.batchspec,
             geo_read.transforms,

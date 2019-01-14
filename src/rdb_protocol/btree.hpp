@@ -142,13 +142,13 @@ void rdb_rget_secondary_slice(
     release_superblock_t release_superblock);
 
 void rdb_get_intersecting_slice(
+        const rocksdb::Snapshot *snap,
         rockshard rocksh,
         uuid_u sindex_uuid,
         btree_slice_t *slice,
         const region_t &shard,
         const ql::datum_t &query_geometry,
         const key_range_t &sindex_range,
-        sindex_superblock_t *superblock,
         ql::env_t *ql_env,
         const ql::batchspec_t &batchspec,
         const std::vector<ql::transform_variant_t> &transforms,

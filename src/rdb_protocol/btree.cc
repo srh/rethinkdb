@@ -1060,13 +1060,13 @@ void rdb_rget_secondary_slice(
 }
 
 void rdb_get_intersecting_slice(
+        const rocksdb::Snapshot *snap,
         rockshard rocksh,
         uuid_u sindex_uuid,
         btree_slice_t *slice,
         const region_t &shard,
         const ql::datum_t &query_geometry,
         const key_range_t &sindex_range,
-        sindex_superblock_t *superblock,
         ql::env_t *ql_env,
         const ql::batchspec_t &batchspec,
         const std::vector<ql::transform_variant_t> &transforms,
@@ -1101,8 +1101,7 @@ void rdb_get_intersecting_slice(
         response);
 
     continue_bool_t cont = geo_traversal(
-        rocksh, sindex_uuid, superblock, release_superblock_t::RELEASE,
-        sindex_range, &callback);
+        snap, rocksh, sindex_uuid, sindex_range, &callback);
     callback.finish(cont);
 }
 
@@ -1145,8 +1144,7 @@ void rdb_get_nearest_slice(
                 ql_env,
                 &state);
             geo_traversal(
-                snap,
-                rocksh, sindex_uuid, key_range_t::universe(), &callback);
+                snap, rocksh, sindex_uuid, key_range_t::universe(), &callback);
             callback.finish(&partial_response);
         } catch (const geo_exception_t &e) {
             partial_response.results_or_error =
