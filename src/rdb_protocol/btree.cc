@@ -1108,6 +1108,7 @@ void rdb_get_intersecting_slice(
 
 
 void rdb_get_nearest_slice(
+    const rocksdb::Snapshot *snap,
     rockshard rocksh,
     uuid_u sindex_uuid,
     btree_slice_t *slice,
@@ -1115,7 +1116,6 @@ void rdb_get_nearest_slice(
     double max_dist,
     uint64_t max_results,
     const ellipsoid_spec_t &geo_system,
-    sindex_superblock_t *superblock,
     ql::env_t *ql_env,
     const key_range_t &pk_range,
     const sindex_disk_info_t &sindex_info,
@@ -1144,10 +1144,9 @@ void rdb_get_nearest_slice(
                                   sindex_func_reql_version, sindex_info.multi),
                 ql_env,
                 &state);
-            // TODO: We could create a rocks iterator (or snapshot) out here, and pass that in, instead of
-            // holding on to the superblock.
             geo_traversal(
-                rocksh, sindex_uuid, superblock, release_superblock_t::KEEP, key_range_t::universe(), &callback);
+                snap,
+                rocksh, sindex_uuid, key_range_t::universe(), &callback);
             callback.finish(&partial_response);
         } catch (const geo_exception_t &e) {
             partial_response.results_or_error =

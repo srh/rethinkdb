@@ -539,7 +539,6 @@ struct rdb_read_visitor_t : public boost::static_visitor<void> {
     }
 
     void operator()(const nearest_geo_read_t &geo_read) {
-        superblock->get()->snapshot_subdag();
         ql::env_t ql_env(
             ctx,
             ql::return_empty_normal_batches_t::NO,
@@ -579,7 +578,13 @@ struct rdb_read_visitor_t : public boost::static_visitor<void> {
             return;
         }
 
+        sindex_sb->read_acq_signal()->wait_lazily_ordered();
+        rockshard rocksh = store->rocksh();
+        rockstore::snapshot snap = make_snapshot(rocksh.rocks);
+        sindex_sb.reset();
+
         rdb_get_nearest_slice(
+            snap.snap,
             store->rocksh(),
             sindex_uuid,
             store->get_sindex_slice(sindex_uuid),
@@ -587,7 +592,6 @@ struct rdb_read_visitor_t : public boost::static_visitor<void> {
             geo_read.max_dist,
             geo_read.max_results,
             geo_read.geo_system,
-            sindex_sb.get(),
             &ql_env,
             geo_read.region.inner,
             sindex_info,

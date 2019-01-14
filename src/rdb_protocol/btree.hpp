@@ -15,6 +15,8 @@
 #include "rdb_protocol/protocol.hpp"
 #include "rdb_protocol/store.hpp"
 
+namespace rocksdb { class Snapshot; }
+
 class btree_slice_t;
 enum class delete_mode_t;
 class key_tester_t;
@@ -157,6 +159,7 @@ void rdb_get_intersecting_slice(
         rget_read_response_t *response);
 
 void rdb_get_nearest_slice(
+    const rocksdb::Snapshot *snap,
     rockshard rocksh,
     uuid_u sindex_uuid,
     btree_slice_t *slice,
@@ -164,7 +167,6 @@ void rdb_get_nearest_slice(
     double max_dist,
     uint64_t max_results,
     const ellipsoid_spec_t &geo_system,
-    sindex_superblock_t *superblock,
     ql::env_t *ql_env,
     const key_range_t &pk_range,
     const sindex_disk_info_t &sindex_info,
