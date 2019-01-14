@@ -44,22 +44,9 @@ public:
     int acks;
 };
 
-inline merger_serializer_t *create_and_construct_serializer(temp_file_t *temp_file, io_backender_t *io_backender) {
-    filepath_file_opener_t file_opener(temp_file->name(), io_backender);
-    log_serializer_t::create(&file_opener,
-                                  log_serializer_t::static_config_t());
-    auto inner_serializer = make_scoped<log_serializer_t>(
-            log_serializer_t::dynamic_config_t(),
-            &file_opener,
-            &get_global_perfmon_collection());
-    return new merger_serializer_t(std::move(inner_serializer),
-                                   MERGER_SERIALIZER_MAX_ACTIVE_WRITES);
-}
-
 class test_store_t {
 public:
     test_store_t(io_backender_t *io_backender, order_source_t *order_source, rdb_context_t *ctx) :
-            serializer(create_and_construct_serializer(&temp_file, io_backender)),
             store(region_t::universe(), 0 /* the only shard */,
                 io_backender->rocks(),
                 temp_file.name().permanent_path().c_str(), true,
@@ -77,7 +64,6 @@ public:
     }
 
     temp_file_t temp_file;
-    scoped_ptr_t<merger_serializer_t> serializer;
     store_t store;
 };
 

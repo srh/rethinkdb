@@ -41,15 +41,8 @@ std::string vector_to_string(const std::vector<char> &v) {
 }
 
 TPTEST(BtreeMetainfo, MetainfoTest) {
-    temp_file_t temp_file;
-
     temp_rockstore rocks;
     io_backender_t io_backender(rocks.rocks(), file_direct_io_mode_t::buffered_desired);
-
-    filepath_file_opener_t file_opener(temp_file.name(), &io_backender);
-    log_serializer_t::create(
-        &file_opener,
-        log_serializer_t::static_config_t());
 
     cache_t cache(&get_global_perfmon_collection());
     cache_conn_t cache_conn(&cache);

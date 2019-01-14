@@ -18,9 +18,6 @@
 #include "rdb_protocol/store.hpp"
 #include "rpc/directory/read_manager.hpp"
 #include "rpc/semilattice/semilattice_manager.hpp"
-#include "serializer/log/log_serializer.hpp"
-#include "serializer/merger.hpp"
-#include "serializer/translator.hpp"
 #include "stl_utils.hpp"
 #include "store_subview.hpp"
 #include "unittest/dummy_namespace_interface.hpp"
@@ -61,18 +58,6 @@ void run_with_namespace_interface(
 
     temp_rockstore temp_rocks;
     io_backender_t io_backender(temp_rocks.rocks(), file_direct_io_mode_t::buffered_desired);
-
-    scoped_array_t<scoped_ptr_t<serializer_t> > serializers(store_shards.size());
-    for (size_t i = 0; i < store_shards.size(); ++i) {
-        filepath_file_opener_t file_opener(temp_files[i]->name(), &io_backender);
-        log_serializer_t::create(&file_opener,
-                                 log_serializer_t::static_config_t());
-        scoped_ptr_t<log_serializer_t> log_ser(
-            new log_serializer_t(log_serializer_t::dynamic_config_t(),
-                                 &file_opener,
-                                 &get_global_perfmon_collection()));
-        serializers[i].init(new merger_serializer_t(std::move(log_ser), 1));
-    }
 
     extproc_pool_t extproc_pool(2);
     dummy_semilattice_controller_t<auth_semilattice_metadata_t> auth_manager;

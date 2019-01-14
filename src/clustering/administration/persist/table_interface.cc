@@ -51,25 +51,11 @@ public:
         int res = access(path.permanent_path().c_str(), R_OK | W_OK);
         bool create = (res != 0);
 
+        // TODO: Remove serializer_thread_allocation?
         on_thread_t thread_switcher(serializer_thread_allocation->get_thread());
-        filepath_file_opener_t file_opener(path, io_backender);
-
-        if (create) {
-            log_serializer_t::create(
-                &file_opener,
-                log_serializer_t::static_config_t());
-        }
 
         // TODO: Could we handle failure when loading the serializer?  Right
         // now, we don't.
-
-        scoped_ptr_t<serializer_t> inner_serializer(new log_serializer_t(
-            log_serializer_t::dynamic_config_t(),
-            &file_opener,
-            perfmon_collection_serializers));
-        serializer.init(new merger_serializer_t(
-            std::move(inner_serializer),
-            MERGER_SERIALIZER_MAX_ACTIVE_WRITES));
 
         pmap(CPU_SHARDING_FACTOR, [&](int ix) {
             // TODO: Exceptions? If exceptions are being thrown in here, nothing is
@@ -106,10 +92,6 @@ public:
                     &non_interruptor);
             }
         });
-
-        if (create) {
-            file_opener.move_serializer_file_to_permanent_location();
-        }
     }
 
     ~real_multistore_ptr_t() {
@@ -123,18 +105,10 @@ public:
                 stores[ix].reset();
             }
         });
-        if (serializer.has()) {
-            on_thread_t thread_switcher(serializer->home_thread());
-            serializer.reset();
-        }
     }
 
     branch_history_manager_t *get_branch_history_manager() {
         return branch_history_manager.get();
-    }
-
-    serializer_t *get_serializer() {
-        return serializer.get_or_null();
     }
 
     store_view_t *get_cpu_sharded_store(size_t i) {
@@ -145,18 +119,8 @@ public:
         return stores[i].get();
     }
 
-    bool is_gc_active() {
-        rassert(!drainer.is_draining());
-        if (serializer.has()) {
-            return serializer->is_gc_active();
-        } else {
-            return false;
-        }
-    }
-
 private:
     scoped_ptr_t<real_branch_history_manager_t> branch_history_manager;
-    scoped_ptr_t<serializer_t> serializer;
     scoped_ptr_t<store_t> stores[CPU_SHARDING_FACTOR];
 
     scoped_ptr_t<thread_allocation_t> serializer_thread_allocation;
@@ -323,31 +287,7 @@ serializer_filepath_t real_table_persistence_interface_t::file_name_for(
 }
 
 bool real_table_persistence_interface_t::is_gc_active() const {
-    for (int thread = 0; thread < get_num_db_threads(); ++thread) {
-        std::map<serializer_t *, auto_drainer_t::lock_t> serializers_copy;
-
-        // Note the copy in the loop below is intentional, one of the members is a
-        // `auto_drainer_t::lock_t` that we want to hold.
-        for (auto real_multistore : real_multistores) {
-            serializer_t *serializer =
-                real_multistore.second.first->get_serializer();
-            if (serializer == nullptr ||
-                    serializer->home_thread() != threadnum_t(thread)) {
-                continue;
-            }
-            serializers_copy.insert(
-                std::make_pair(serializer, real_multistore.second.second));
-        }
-
-        {
-            on_thread_t on_thread((threadnum_t(thread)));
-            for (auto const &serializer : serializers_copy) {
-                if (serializer.first->is_gc_active()) {
-                    return true;
-                }
-            }
-        }
-    }
+    // TODO: Is there a rocksdb version of this?
 
     return false;
 }
