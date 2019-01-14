@@ -7,8 +7,6 @@
 #include "logger.hpp"
 #include "paths.hpp"
 #include "rockstore/store.hpp"
-#include "serializer/log/log_serializer.hpp"
-#include "serializer/merger.hpp"
 
 // See ROCKSDB_STORAGE_FORMAT documentation
 const std::string METADATA_PREFIX = "rethinkdb/metadata/";

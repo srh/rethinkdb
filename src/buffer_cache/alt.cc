@@ -4,7 +4,6 @@
 
 #include "arch/types.hpp"
 #include "arch/runtime/coroutines.hpp"
-#include "buffer_cache/stats.hpp"
 #include "concurrency/auto_drainer.hpp"
 #include "utils.hpp"
 

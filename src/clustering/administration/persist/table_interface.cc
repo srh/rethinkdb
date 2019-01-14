@@ -11,9 +11,6 @@
 #include "clustering/administration/perfmon_collection_repo.hpp"
 #include "logger.hpp"
 #include "rdb_protocol/store.hpp"
-#include "serializer/log/log_serializer.hpp"
-#include "serializer/merger.hpp"
-#include "serializer/translator.hpp"
 
 class real_multistore_ptr_t :
     public multistore_ptr_t {

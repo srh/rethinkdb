@@ -6,7 +6,6 @@
 #include "btree/reql_specific.hpp"
 #include "containers/binary_blob.hpp"
 #include "unittest/unittest_utils.hpp"
-#include "serializer/log/log_serializer.hpp"
 
 namespace unittest {
 

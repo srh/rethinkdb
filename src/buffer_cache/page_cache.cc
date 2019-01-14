@@ -12,7 +12,6 @@
 #include "concurrency/auto_drainer.hpp"
 #include "concurrency/new_mutex.hpp"
 #include "do_on_thread.hpp"
-#include "serializer/serializer.hpp"
 #include "stl_utils.hpp"
 
 cache_conn_t::~cache_conn_t() {

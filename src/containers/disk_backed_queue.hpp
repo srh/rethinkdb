@@ -12,7 +12,6 @@
 #include "containers/archive/vector_stream.hpp"
 #include "containers/scoped.hpp"
 #include "perfmon/core.hpp"
-#include "serializer/types.hpp"
 
 class perfmon_collection_t;
 

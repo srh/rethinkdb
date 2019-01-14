@@ -11,7 +11,6 @@
 #include "containers/archive/archive.hpp"
 #include "containers/uuid.hpp"
 #include "rpc/serialize_macros.hpp"
-#include "serializer/types.hpp"
 
 class rockshard;
 

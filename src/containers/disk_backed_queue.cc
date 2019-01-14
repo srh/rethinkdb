@@ -1,11 +1,13 @@
 // Copyright 2010-2014 RethinkDB, all rights reserved.
 #include "containers/disk_backed_queue.hpp"
 
+#include <sys/stat.h>
+#include <sys/types.h>
+
 #include "arch/io/disk.hpp"
 #include "arch/runtime/thread_pool.hpp"
 #include "buffer_cache/alt.hpp"
 #include "paths.hpp"
-#include "serializer/log/log_serializer.hpp"
 
 void create_directory(const std::string &dirname) {
     linux_thread_pool_t::run_in_blocker_pool([&]() {

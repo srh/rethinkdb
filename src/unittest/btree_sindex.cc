@@ -12,7 +12,6 @@
 #include "rdb_protocol/datum.hpp"
 #include "rdb_protocol/store.hpp"
 #include "rdb_protocol/protocol.hpp"
-#include "serializer/log/log_serializer.hpp"
 
 namespace unittest {
 

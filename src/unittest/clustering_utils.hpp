@@ -21,8 +21,6 @@
 #include "unittest/unittest_utils.hpp"
 #include "rdb_protocol/protocol.hpp"
 #include "rdb_protocol/store.hpp"
-#include "serializer/log/log_serializer.hpp"
-#include "serializer/merger.hpp"
 
 namespace unittest {
 

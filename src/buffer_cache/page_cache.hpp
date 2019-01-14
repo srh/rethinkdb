@@ -11,9 +11,6 @@
 
 #include "buffer_cache/block_version.hpp"
 #include "buffer_cache/cache_account.hpp"
-#include "buffer_cache/evicter.hpp"
-#include "buffer_cache/free_list.hpp"
-#include "buffer_cache/page.hpp"
 #include "buffer_cache/types.hpp"
 #include "concurrency/access.hpp"
 #include "concurrency/auto_drainer.hpp"
@@ -24,7 +21,6 @@
 #include "containers/intrusive_list.hpp"
 #include "containers/segmented_vector.hpp"
 #include "repli_timestamp.hpp"
-#include "serializer/types.hpp"
 
 class alt_txn_throttler_t;
 class auto_drainer_t;

@@ -10,11 +10,10 @@
 #include "buffer_cache/page_cache.hpp"
 #include "buffer_cache/types.hpp"
 #include "concurrency/rwlock.hpp"
+#include "containers/scoped.hpp"
 #include "containers/two_level_array.hpp"
 #include "containers/uuid.hpp"
 #include "repli_timestamp.hpp"
-
-class serializer_t;
 
 class perfmon_collection_t;
 
