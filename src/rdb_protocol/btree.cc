@@ -32,21 +32,6 @@
 
 #include "debug.hpp"
 
-void rdb_get_secondary_for_unittest(
-        rockshard rocksh, uuid_u sindex_uuid, const store_key_t &store_key,
-        sindex_superblock_t *superblock, ql::datum_t *out) {
-    superblock->read_acq_signal()->wait_lazily_ordered();
-    std::string loc = rockstore::table_secondary_key(
-        rocksh.table_id, rocksh.shard_no, sindex_uuid, key_to_unescaped_str(store_key));
-    std::pair<std::string, bool> val = rocksh.rocks->try_read(loc);
-    superblock->release();
-    if (!val.second) {
-        *out = ql::datum_t::null();
-    } else {
-        *out = datum_deserialize_from_vec(val.first.data(), val.first.size());
-    }
-}
-
 void rdb_get(rockshard rocksh, const store_key_t &store_key,
              real_superblock_t *superblock, point_read_response_t *response) {
     superblock->read_acq_signal()->wait_lazily_ordered();
@@ -477,49 +462,6 @@ void rdb_set(rockshard rocksh,
         (had_value ? point_write_result_t::DUPLICATE : point_write_result_t::STORED);
 }
 
-// TODO: Remove this (I wish).
-void rdb_set_sindex_for_unittest(
-        rockshard rocksh,
-        uuid_u sindex_uuid,
-        const store_key_t &key,
-        ql::datum_t data,
-        bool overwrite,  /* TODO: Who calls this with and without overwrite? */
-        btree_slice_t *slice,
-        repli_timestamp_t timestamp,
-        sindex_superblock_t *superblock,
-        point_write_response_t *response_out,
-        profile::trace_t *trace) {
-    (void)timestamp, (void)trace;  // TODO: Remove params or delete the unit test.
-
-    superblock->write_acq_signal()->wait_lazily_ordered();
-
-    slice->stats.pm_keys_set.record();
-    slice->stats.pm_total_keys_set += 1;
-
-    std::string rocks_kv_location = rockstore::table_secondary_key(rocksh.table_id, rocksh.shard_no, sindex_uuid, key_to_unescaped_str(key));
-    std::pair<std::string, bool> maybe_value
-        = rocksh.rocks->try_read(rocks_kv_location);
-
-    const bool had_value = maybe_value.second;
-
-    if (overwrite || !had_value) {
-        // TODO: We don't do kv_location_delete in case of null value?
-        ql::serialization_result_t res =
-            kv_location_set_secondary(
-                rocksh.rocks, rocks_kv_location, data);
-        if (res & ql::serialization_result_t::ARRAY_TOO_BIG) {
-            rfail_typed_target(&data, "Array too large for disk writes "
-                               "(limit 100,000 elements).");
-        } else if (res & ql::serialization_result_t::EXTREMA_PRESENT) {
-            rfail_typed_target(&data, "`r.minval` and `r.maxval` cannot be "
-                               "written to disk.");
-        }
-        r_sanity_check(!ql::bad(res));
-    }
-    superblock->release();
-    response_out->result =
-        (had_value ? point_write_result_t::DUPLICATE : point_write_result_t::STORED);
-}
 
 void rdb_delete(rockshard rocksh,
                 const store_key_t &key,

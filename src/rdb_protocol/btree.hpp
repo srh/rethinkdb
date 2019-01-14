@@ -31,11 +31,6 @@ void rdb_get(
     real_superblock_t *superblock,
     point_read_response_t *response);
 
-// TODO: Probably, remove at some point.
-void rdb_get_secondary_for_unittest(
-        rockshard rocksh, uuid_u sindex_uuid, const store_key_t &store_key,
-        sindex_superblock_t *superblock, ql::datum_t *out);
-
 struct btree_info_t {
     btree_info_t(btree_slice_t *_slice,
                  repli_timestamp_t _timestamp,
@@ -98,16 +93,6 @@ void rdb_set(rockshard rocksh,
              rdb_modification_info_t *mod_info,
              profile::trace_t *trace,
              promise_t<superblock_t *> *pass_back_superblock);
-
-void rdb_set_sindex_for_unittest(
-    rockshard rocksh,
-    uuid_u sindex_uuid,
-    const store_key_t &key, ql::datum_t data,
-    bool overwrite,
-    btree_slice_t *slice, repli_timestamp_t timestamp,
-    sindex_superblock_t *superblock,
-    point_write_response_t *response,
-    profile::trace_t *trace);
 
 void rdb_delete(rockshard rocksh,
                 const store_key_t &key,
