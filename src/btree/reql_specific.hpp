@@ -67,9 +67,10 @@ index B-trees. */
 
 class btree_slice_t : public home_thread_mixin_debug_only_t {
 public:
-    // Initializes a superblock (presumably, a buf_lock_t constructed with
-    // alt_create_t::create) for use with btrees, setting the initial value of the
-    // metainfo (with a single key/value pair). Not for use with sindex superblocks.
+    // Initializes a superblock (presumably, constructed with
+    // alt_create_t::create) for use with btrees, setting the initial value of
+    // the metainfo (with a single key/value pair). Not for use with sindex
+    // superblocks.
     static void init_real_superblock(
             real_superblock_t *superblock,
             rockshard rocksh,

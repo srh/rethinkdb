@@ -16,7 +16,6 @@
 
 class serializer_t;
 
-class buf_lock_t;
 class alt_cache_stats_t;
 class alt_snapshot_node_t;
 class perfmon_collection_t;
@@ -70,7 +69,6 @@ private:
     friend class real_superblock_lock;
     friend class sindex_block_lock;
     friend class sindex_superblock_lock;
-    friend class buf_lock_t;
 
     alt_snapshot_node_t *matching_snapshot_node_or_null(
             block_id_t block_id,
@@ -147,136 +145,6 @@ private:
     bool is_committed_;
 
     DISABLE_COPYING(txn_t);
-};
-
-class buf_parent_t;
-
-class buf_lock_t {
-public:
-    buf_lock_t();
-
-    // buf_parent_t is a type that either points at a buf_lock_t (its parent) or
-    // merely at a txn_t (e.g. for acquiring the superblock, which has no parent).
-    // If acquiring the child for read, the constructor will wait for the parent to
-    // be acquired for read.  Similarly, if acquiring the child for write, the
-    // constructor will wait for the parent to be acquired for write.  Once the
-    // constructor returns, you are "in line" for the block, meaning you'll acquire
-    // it in the same order relative other agents as you did when acquiring the same
-    // parent.  (Of course, readers can intermingle.)
-
-    // These constructors will _not_ yield the coroutine _if_ the parent is already
-    // {access}-acquired.
-
-    // Acquires an existing block for read or write access.
-    buf_lock_t(buf_parent_t parent,
-               block_id_t block_id,
-               access_t access);
-
-    // Creates a new block with a specified block id, one that doesn't have a parent.
-    buf_lock_t(txn_t *txn,
-               block_id_t block_id,
-               alt_create_t create);
-
-    // Creates a new block with a specified block id as the child of a parent (if it's
-    // not just a txn_t *).
-    buf_lock_t(buf_parent_t parent,
-               block_id_t block_id,
-               alt_create_t create);
-
-    // Acquires an existing block given the parent.
-    buf_lock_t(buf_lock_t *parent,
-               block_id_t block_id,
-               access_t access);
-
-    // Creates a block, a new child of the given parent.  It gets assigned a block id
-    // from one of the unused block id's.
-    buf_lock_t(buf_parent_t parent,
-               alt_create_t create,
-               block_type_t block_type = block_type_t::normal);
-
-    // Creates a block, a new child of the given parent.  It gets assigned a block id
-    // from one of the unused block id's.
-    buf_lock_t(buf_lock_t *parent,
-               alt_create_t create,
-               block_type_t block_type = block_type_t::normal);
-
-    ~buf_lock_t();
-
-    buf_lock_t(buf_lock_t &&movee);
-    buf_lock_t &operator=(buf_lock_t &&movee);
-
-    void swap(buf_lock_t &other);
-    void reset_buf_lock();
-    bool empty() const {
-        return txn_ == nullptr;
-    }
-
-    bool is_snapshotted() const;
-    void snapshot_subdag();
-
-    block_id_t block_id() const {
-        guarantee(txn_ != nullptr);
-        return current_page_acq()->block_id();
-    }
-
-    access_t access() const {
-        guarantee(!empty());
-        return current_page_acq()->access();
-    }
-
-    signal_t *read_acq_signal() {
-        guarantee(!empty());
-        return current_page_acq()->read_acq_signal();
-    }
-    signal_t *write_acq_signal() {
-        guarantee(!empty());
-        return current_page_acq()->write_acq_signal();
-    }
-
-    void mark_deleted();
-
-    txn_t *txn() const { return txn_; }
-    cache_t *cache() const { return txn_->cache(); }
-
-private:
-    static void apply_buf_write(buf_lock_t *lock, alt_create_t);
-    void help_construct(buf_parent_t parent, block_id_t block_id, access_t access);
-    void help_construct(
-        buf_parent_t parent,
-        alt_create_t create,
-        block_type_t block_type);
-    void help_construct(buf_parent_t parent, block_id_t block_id, alt_create_t create);
-
-    static alt_snapshot_node_t *help_make_child(cache_t *cache, block_id_t child_id);
-
-
-    static void wait_for_parent(buf_parent_t parent, access_t access);
-    static alt_snapshot_node_t *
-    get_or_create_child_snapshot_node(cache_t *cache,
-                                      alt_snapshot_node_t *parent,
-                                      block_id_t child_id);
-    static void create_empty_child_snapshot_attachments(
-            cache_t *cache,
-            alt::block_version_t parent_version,
-            block_id_t parent_id,
-            block_id_t child_id);
-    static void create_child_snapshot_attachments(cache_t *cache,
-                                                  alt::block_version_t parent_version,
-                                                  block_id_t parent_id,
-                                                  block_id_t child_id);
-    alt::current_page_acq_t *current_page_acq() const;
-
-    txn_t *txn_;
-
-    scoped_ptr_t<alt::current_page_acq_t> current_page_acq_;
-
-    alt_snapshot_node_t *snapshot_node_;
-
-    // Keeps track of how many alt_buf_{read|write}_t have been created for
-    // this lock, for assertion/guarantee purposes.
-    intptr_t access_ref_count_;
-
-    DISABLE_COPYING(buf_lock_t);
 };
 
 // TODO: Public/private properly.
@@ -394,41 +262,6 @@ public:
 
     txn_t *txn_;
     rwlock_in_line_t acq_;
-};
-
-
-class buf_parent_t {
-public:
-    buf_parent_t() : txn_(nullptr), lock_or_null_(nullptr) { }
-
-    explicit buf_parent_t(buf_lock_t *lock)
-        : txn_(lock->txn()), lock_or_null_(lock) {
-        guarantee(lock != nullptr);
-        guarantee(!lock->empty());
-    }
-
-    explicit buf_parent_t(txn_t *_txn)
-        : txn_(_txn), lock_or_null_(nullptr) {
-        rassert(_txn != NULL);
-    }
-
-    bool empty() const {
-        return txn_ == nullptr;
-    }
-
-    txn_t *txn() const {
-        guarantee(!empty());
-        return txn_;
-    }
-    cache_t *cache() const {
-        guarantee(!empty());
-        return txn_->cache();
-    }
-
-private:
-    friend class buf_lock_t;
-    txn_t *txn_;
-    buf_lock_t *lock_or_null_;
 };
 
 

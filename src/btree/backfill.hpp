@@ -16,7 +16,6 @@
 #include "repli_timestamp.hpp"
 #include "rpc/serialize_macros.hpp"
 
-class buf_parent_t;
 class real_superblock_t;
 class rockshard;
 class superblock_t;

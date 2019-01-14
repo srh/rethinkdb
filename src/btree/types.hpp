@@ -4,8 +4,6 @@
 
 #include "errors.hpp"
 
-class buf_parent_t;
-
 enum class continue_bool_t { CONTINUE = 0, ABORT = 1 };
 
 enum class release_superblock_t {RELEASE, KEEP};

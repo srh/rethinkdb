@@ -9,7 +9,6 @@ namespace unittest {
 TEST(SizeofTest, Sizes) {
     EXPECT_GT(1000u, sizeof(log_serializer_t));
     EXPECT_GT(1000u, sizeof(cache_t));
-    EXPECT_GT(1000u, sizeof(buf_lock_t));
     EXPECT_GT(1000u, sizeof(txn_t));
 }
 
