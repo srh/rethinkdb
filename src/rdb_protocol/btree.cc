@@ -127,7 +127,7 @@ batched_replace_response_t rdb_replace_and_return_superblock(
         rockshard rocksh,
         const btree_loc_info_t &info,
         const one_replace_t *replacer,
-        promise_t<superblock_t *> *superblock_promise,
+        promise_t<real_superblock_t *> *superblock_promise,
         rdb_modification_info_t *mod_info_out,
         profile::trace_t *trace) {
     (void)trace;  // TODO: Use trace?
@@ -287,7 +287,7 @@ void do_a_replace_from_batched_replace(
     btree_loc_info_t &&info,
     const one_replace_t one_replace,
     const ql::configured_limits_t &limits,
-    promise_t<superblock_t *> *superblock_promise,
+    promise_t<real_superblock_t *> *superblock_promise,
     rdb_modification_report_cb_t *mod_cb,
     bool update_pkey_cfeeds,
     batched_replace_response_t *stats_out,
@@ -363,7 +363,7 @@ batched_replace_response_t rdb_batched_replace(
         {
             auto_drainer_t drainer;
             for (size_t i = 0; i < keys.size(); ++i) {
-                promise_t<superblock_t *> superblock_promise;
+                promise_t<real_superblock_t *> superblock_promise;
                 coro_queue.push(
                     [lock = auto_drainer_t::lock_t(&drainer),
                      rocksh,
@@ -423,7 +423,7 @@ void rdb_set(rockshard rocksh,
              point_write_response_t *response_out,
              rdb_modification_info_t *mod_info,
              profile::trace_t *trace,
-             promise_t<superblock_t *> *pass_back_superblock) {
+             promise_t<real_superblock_t *> *pass_back_superblock) {
     (void)trace;  // TODO: Use trace?
     superblock_passback_guard spb(superblock, pass_back_superblock);
     slice->stats.pm_keys_set.record();
@@ -472,7 +472,7 @@ void rdb_delete(rockshard rocksh,
                 point_delete_response_t *response,
                 rdb_modification_info_t *mod_info,
                 profile::trace_t *trace,
-                promise_t<superblock_t *> *pass_back_superblock) {
+                promise_t<real_superblock_t *> *pass_back_superblock) {
     (void)trace;  // TODO: Use trace?
     superblock_passback_guard spb(superblock, pass_back_superblock);
     slice->stats.pm_keys_set.record();

@@ -58,7 +58,7 @@ void insert_rows(int start, int finish, store_t *store) {
                 ql::to_datum(doc, limits, reql_version_t::LATEST),
                 false, store->btree.get(), repli_timestamp_t::distant_past,
                 superblock.get(), &response, &mod_report.info,
-                static_cast<profile::trace_t *>(NULL), superblock_t::no_passback);
+                static_cast<profile::trace_t *>(NULL), real_superblock_t::no_passback);
 
             store_t::sindex_access_vector_t sindexes;
             store->acquire_all_sindex_superblocks_for_write(&sindex_block, &sindexes);

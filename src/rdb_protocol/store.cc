@@ -1005,7 +1005,7 @@ struct rdb_write_visitor_t : public boost::static_visitor<void> {
         rdb_modification_report_t mod_report(w.key);
         rdb_set(store->rocksh(),
                 w.key, w.data, w.overwrite, btree, timestamp, superblock.get(),
-                res, &mod_report.info, trace, superblock_t::no_passback);
+                res, &mod_report.info, trace, real_superblock_t::no_passback);
 
         update_sindexes(mod_report);
     }
@@ -1021,7 +1021,7 @@ struct rdb_write_visitor_t : public boost::static_visitor<void> {
         rdb_modification_report_t mod_report(d.key);
         rdb_delete(store->rocksh(),
                 d.key, btree, timestamp, superblock.get(),
-                delete_mode_t::REGULAR_QUERY, res, &mod_report.info, trace, superblock_t::no_passback);
+                delete_mode_t::REGULAR_QUERY, res, &mod_report.info, trace, real_superblock_t::no_passback);
 
         update_sindexes(mod_report);
     }

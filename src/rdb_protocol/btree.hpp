@@ -94,7 +94,7 @@ void rdb_set(rockshard rocksh,
              point_write_response_t *response,
              rdb_modification_info_t *mod_info,
              profile::trace_t *trace,
-             promise_t<superblock_t *> *pass_back_superblock);
+             promise_t<real_superblock_t *> *pass_back_superblock);
 
 void rdb_delete(rockshard rocksh,
                 const store_key_t &key,
@@ -105,7 +105,7 @@ void rdb_delete(rockshard rocksh,
                 point_delete_response_t *response,
                 rdb_modification_info_t *mod_info,
                 profile::trace_t *trace,
-                promise_t<superblock_t *> *pass_back_superblock);
+                promise_t<real_superblock_t *> *pass_back_superblock);
 
 void rdb_rget_snapshot_slice(
     const rocksdb::Snapshot *snap,

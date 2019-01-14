@@ -3,9 +3,12 @@
 #define BTREE_REQL_SPECIFIC_HPP_
 
 #include "btree/operations.hpp"
+#include "buffer_cache/alt.hpp"
 #include "containers/uuid.hpp"
+#include "concurrency/new_semaphore.hpp"
 
 class rockshard;
+class cache_t;
 
 /* Most of the code in the `btree/` directory doesn't "know" about the format of the
 superblock; instead it manipulates the superblock using the abstract `superblock_t`. This
@@ -22,6 +25,8 @@ class binary_blob_t;
 /* `real_superblock_t` represents the superblock for the primary B-tree of a table. */
 class real_superblock_t : public superblock_t {
 public:
+    static constexpr std::nullptr_t no_passback = nullptr;
+
     explicit real_superblock_t(real_superblock_lock &&sb_buf);
     real_superblock_t(real_superblock_lock &&sb_buf, new_semaphore_in_line_t &&write_semaphore_acq);
 
@@ -41,6 +46,26 @@ private:
 
     real_superblock_lock sb_buf_;
 };
+
+
+
+class superblock_passback_guard {
+public:
+    superblock_passback_guard(real_superblock_t *_superblock, promise_t<real_superblock_t *> *_pass_back)
+        : superblock(_superblock), pass_back_superblock(_pass_back) {}
+    ~superblock_passback_guard() {
+        if (superblock != nullptr) {
+            if (pass_back_superblock != nullptr) {
+                pass_back_superblock->pulse(superblock);
+            } else {
+                superblock->release();
+            }
+        }
+    }
+    real_superblock_t *superblock;
+    promise_t<real_superblock_t *> *pass_back_superblock;
+};
+
 
 /* `sindex_superblock_t` represents the superblock for a sindex B-tree. */
 class sindex_superblock_t : public superblock_t {

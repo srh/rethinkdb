@@ -38,7 +38,6 @@ class internal_disk_backed_queue_t;
 class io_backender_t;
 class real_superblock_t;
 class sindex_superblock_t;
-class superblock_t;
 class txn_t;
 struct rdb_modification_report_t;
 namespace rockstore { class store; }

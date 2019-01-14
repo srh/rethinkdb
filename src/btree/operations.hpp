@@ -32,8 +32,6 @@ the root block ID and the stat block ID. */
 // Under rockstore code, this only serves as a read-write lock (possibly, vestigially).
 class superblock_t {
 public:
-    static constexpr std::nullptr_t no_passback = nullptr;
-
     superblock_t() { }
     virtual ~superblock_t() { }
     // Release the superblock if possible (otherwise do nothing)
@@ -45,24 +43,6 @@ public:
 private:
     DISABLE_COPYING(superblock_t);
 };
-
-class superblock_passback_guard {
-public:
-    superblock_passback_guard(superblock_t *_superblock, promise_t<superblock_t *> *_pass_back)
-        : superblock(_superblock), pass_back_superblock(_pass_back) {}
-    ~superblock_passback_guard() {
-        if (superblock != nullptr) {
-            if (pass_back_superblock != nullptr) {
-                pass_back_superblock->pulse(superblock);
-            } else {
-                superblock->release();
-            }
-        }
-    }
-    superblock_t *superblock;
-    promise_t<superblock_t *> *pass_back_superblock;
-};
-
 
 // TODO: Remove or make use of.
 /* `delete_mode_t` controls how `apply_keyvalue_change()` acts when `kv_loc->value` is

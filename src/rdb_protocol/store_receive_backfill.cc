@@ -169,7 +169,7 @@ void apply_item_pair(
         real_superblock_t *superblock,
         backfill_item_t::pair_t &&pair,
         std::vector<rdb_modification_report_t> *mod_reports_out,
-        promise_t<superblock_t *> *pass_back_superblock) {
+        promise_t<real_superblock_t *> *pass_back_superblock) {
     mod_reports_out->resize(mod_reports_out->size() + 1);
     mod_reports_out->back().primary_key = pair.key;
     if (static_cast<bool>(pair.value1)) {
@@ -339,7 +339,7 @@ void apply_multi_key_item(
             /* Apply any pairs from the item that fall within the deleted region */
             while (next_pair < item.pairs.size() &&
                     range_deleted.contains_key(item.pairs[next_pair].key)) {
-                promise_t<superblock_t *> pass_back_superblock;
+                promise_t<real_superblock_t *> pass_back_superblock;
                 apply_item_pair(rocksh, tokens.info->slice, superblock.get(),
                     std::move(item.pairs[next_pair]), &mod_reports,
                     &pass_back_superblock);

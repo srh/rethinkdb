@@ -16,7 +16,6 @@ struct rdb_modification_report_t;
 class real_superblock_t;
 class rockshard;
 class signal_t;
-class superblock_t;
 
 class key_tester_t {
 public:
