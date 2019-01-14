@@ -36,31 +36,6 @@ const int64_t INDEX_CHANGES_LIMIT_FACTOR = 5;
 // spawn_now call.
 
 
-// The intrusive list of alt_snapshot_node_t contains all the snapshot nodes for a
-// given block id, in order by version. (See cache_t::snapshot_nodes_by_block_id_.)
-class alt_snapshot_node_t : public intrusive_list_node_t<alt_snapshot_node_t> {
-public:
-    explicit alt_snapshot_node_t(scoped_ptr_t<current_page_acq_t> &&acq);
-    ~alt_snapshot_node_t();
-
-private:
-    friend class cache_t;
-
-    // This is never null (and is always a current_page_acq_t that has had
-    // declare_snapshotted() called).
-    scoped_ptr_t<current_page_acq_t> current_page_acq_;
-
-    // A NULL pointer associated with a block id indicates that the block is deleted.
-    std::map<block_id_t, alt_snapshot_node_t *> children_;
-
-    // The number of buf_lock_t's referring to this node, plus the number of
-    // alt_snapshot_node_t's referring to this node (via its children_ vector).
-    int64_t ref_count_;
-
-
-    DISABLE_COPYING(alt_snapshot_node_t);
-};
-
 alt_txn_throttler_t::alt_txn_throttler_t(int64_t minimum_unwritten_changes_limit)
     : minimum_unwritten_changes_limit_(minimum_unwritten_changes_limit),
       unwritten_block_changes_semaphore_(SOFT_UNWRITTEN_CHANGES_LIMIT),
@@ -107,82 +82,10 @@ cache_t::cache_t(serializer_t *serializer,
       stats_(make_scoped<alt_cache_stats_t>(&page_cache_, perfmon_collection)) { }
 
 cache_t::~cache_t() {
-    guarantee(snapshot_nodes_by_block_id_.empty());
 }
 
 cache_account_t cache_t::create_cache_account(int priority) {
     return page_cache_.create_cache_account(priority);
-}
-
-alt_snapshot_node_t *
-cache_t::matching_snapshot_node_or_null(block_id_t block_id,
-                                        block_version_t block_version) {
-    ASSERT_NO_CORO_WAITING;
-    auto list_it = snapshot_nodes_by_block_id_.find(block_id);
-    if (list_it == snapshot_nodes_by_block_id_.end()) {
-        return nullptr;
-    }
-    intrusive_list_t<alt_snapshot_node_t> *list = &list_it->second;
-    for (alt_snapshot_node_t *p = list->tail(); p != nullptr; p = list->prev(p)) {
-        if (p->current_page_acq_->block_version() == block_version) {
-            return p;
-        }
-    }
-    return nullptr;
-}
-
-void cache_t::add_snapshot_node(block_id_t block_id,
-                                alt_snapshot_node_t *node) {
-    ASSERT_NO_CORO_WAITING;
-    snapshot_nodes_by_block_id_[block_id].push_back(node);
-}
-
-void cache_t::remove_snapshot_node(block_id_t block_id, alt_snapshot_node_t *node) {
-    ASSERT_FINITE_CORO_WAITING;
-    // In some hypothetical cache data structure (a disk backed queue) we could have
-    // a long linked list of snapshot nodes.  So we avoid _recursively_ removing
-    // snapshot nodes.
-
-    // Nodes to be deleted.
-    std::stack<std::pair<block_id_t, alt_snapshot_node_t *> > stack;
-    stack.push(std::make_pair(block_id, node));
-
-    while (!stack.empty()) {
-        auto pair = stack.top();
-        stack.pop();
-        // Step 1. Remove the node to be deleted from its list in
-        // snapshot_nodes_by_block_id_.
-        auto list_it = snapshot_nodes_by_block_id_.find(pair.first);
-        rassert(list_it != snapshot_nodes_by_block_id_.end());
-        list_it->second.remove(pair.second);
-        if (list_it->second.empty()) {
-            snapshot_nodes_by_block_id_.erase(list_it);
-        }
-
-        const std::map<block_id_t, alt_snapshot_node_t *> children
-            = std::move(pair.second->children_);
-        // Step 2. Destroy the node.
-        delete pair.second;
-
-        // Step 3. Take its children and reduce their reference count, readying them
-        // for deletion if necessary.
-        for (auto it = children.begin(); it != children.end(); ++it) {
-#if ALT_DEBUG
-            debugf("decring child %p from parent %p (in %p)\n",
-                   it->second, pair.second, this);
-#endif
-            if (it->second != nullptr) {
-                --it->second->ref_count_;
-                if (it->second->ref_count_ == 0) {
-#if ALT_DEBUG
-                    debugf("removing child %p from parent %p (in %p)\n",
-                           it->second, pair.second, this);
-#endif
-                    stack.push(*it);
-                }
-            }
-        }
-    }
 }
 
 txn_t::txn_t(cache_conn_t *cache_conn,
@@ -278,16 +181,4 @@ void txn_t::commit() {
 
 void txn_t::set_account(cache_account_t *cache_account) {
     cache_account_ = cache_account;
-}
-
-
-alt_snapshot_node_t::alt_snapshot_node_t(scoped_ptr_t<current_page_acq_t> &&acq)
-    : current_page_acq_(std::move(acq)), ref_count_(0) { }
-
-alt_snapshot_node_t::~alt_snapshot_node_t() {
-    // The only thing that deletes an alt_snapshot_node_t should be the
-    // remove_snapshot_node function.
-    rassert(ref_count_ == 0);
-    rassert(current_page_acq_.has());
-    rassert(children_.empty());
 }

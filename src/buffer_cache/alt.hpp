@@ -17,7 +17,6 @@
 class serializer_t;
 
 class alt_cache_stats_t;
-class alt_snapshot_node_t;
 class perfmon_collection_t;
 class cache_balancer_t;
 
@@ -70,12 +69,6 @@ private:
     friend class sindex_block_lock;
     friend class sindex_superblock_lock;
 
-    alt_snapshot_node_t *matching_snapshot_node_or_null(
-            block_id_t block_id,
-            alt::block_version_t block_version);
-    void add_snapshot_node(block_id_t block_id, alt_snapshot_node_t *node);
-    void remove_snapshot_node(block_id_t block_id, alt_snapshot_node_t *node);
-
     // throttler_ can cause the txn_t constructor to block
     alt_txn_throttler_t throttler_;
 
@@ -85,9 +78,6 @@ private:
     alt::page_cache_t page_cache_;
 
     scoped_ptr_t<alt_cache_stats_t> stats_;
-
-    std::map<block_id_t, intrusive_list_t<alt_snapshot_node_t> >
-        snapshot_nodes_by_block_id_;
 
     DISABLE_COPYING(cache_t);
 };
@@ -110,7 +100,6 @@ public:
     void commit();
 
     cache_t *cache() { return cache_; }
-    alt::page_txn_t *page_txn() { return page_txn_.get(); }
     access_t access() const { return access_; }
 
     void set_account(cache_account_t *cache_account);
