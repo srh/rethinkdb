@@ -174,7 +174,6 @@ void rdb_get_nearest_slice(
 
 void rdb_distribution_get(rockshard rocksh, int keys_limit,
                           const key_range_t &key_range,
-                          real_superblock_t *superblock,
                           distribution_read_response_t *response);
 
 /* Secondary Indexes */

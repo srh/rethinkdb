@@ -11,7 +11,7 @@ class rockshard;
 class real_superblock_t;
 
 void get_distribution(
-    rockshard rocksh, key_range_t key_range, real_superblock_t *superblock, int keys_limit,
+    rockshard rocksh, key_range_t key_range, int keys_limit,
     std::vector<store_key_t> *keys_out, std::vector<uint64_t> *counts_out);
 
 

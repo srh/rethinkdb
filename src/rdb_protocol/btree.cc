@@ -1169,11 +1169,10 @@ void rdb_get_nearest_slice(
 // TODO: Make sure that distribution gets (with new rockstore stuff) get tested.
 void rdb_distribution_get(rockshard rocksh, int keys_limit,
                           const key_range_t &key_range,
-                          real_superblock_t *superblock,
                           distribution_read_response_t *response) {
     std::vector<store_key_t> key_lowerbounds;
     std::vector<uint64_t> interval_disk_sizes;
-    get_distribution(rocksh, key_range, superblock, keys_limit,
+    get_distribution(rocksh, key_range, keys_limit,
                     &key_lowerbounds, &interval_disk_sizes);
     // TODO: Return a vec of pairs in get_distribution.
     guarantee(key_lowerbounds.size() == interval_disk_sizes.size());

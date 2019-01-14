@@ -13,7 +13,7 @@
 // Outputs a set of "split keys", i.e. keys within key_range (exclusive) that
 // break up the region into equal parts.
 void get_distribution(
-        rockshard rocksh, key_range_t key_range, real_superblock_t *superblock, int keys_limit,
+        rockshard rocksh, key_range_t key_range, int keys_limit,
         std::vector<store_key_t> *keys_out, std::vector<uint64_t> *counts_out) {
     keys_out->clear();
     rocksdb::OptimisticTransactionDB *db = rocksh.rocks->db();
@@ -29,9 +29,6 @@ void get_distribution(
     std::vector<store_key_t> ret;
     std::vector<uint64_t> count_output;
 
-    superblock->read_acq_signal()->wait_lazily_ordered();
-    // We're creating approximate values, so it does no major harm to let in subsequent writes.
-    superblock->release();
     linux_thread_pool_t::run_in_blocker_pool([&]() {
         std::vector<std::string> key_names;
 

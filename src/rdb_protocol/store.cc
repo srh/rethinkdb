@@ -662,15 +662,15 @@ struct rdb_read_visitor_t : public boost::static_visitor<void> {
     }
 
     void operator()(const distribution_read_t &dg) {
-        superblock->get()->snapshot_subdag();
+        superblock->read_acq_signal()->wait_lazily_ordered();
+        superblock->release();
         response->response = distribution_read_response_t();
         distribution_read_response_t *res = boost::get<distribution_read_response_t>(&response->response);
         // TODO: Replace max_depth option of distribution_read_t (when we break
         // the clustering protocol).  And make result_limit forced nonzero.
         // TODO: Reuse the scale_down_distribution function in rdb_distribution_get code.
         int keys_limit = dg.result_limit > 0 ? dg.result_limit : 1 << (4 * dg.max_depth);
-        rdb_distribution_get(store->rocksh(), keys_limit, dg.region.inner,
-                             superblock, res);
+        rdb_distribution_get(store->rocksh(), keys_limit, dg.region.inner, res);
         // TODO: This filtering by region is now unnecessary.
         for (std::map<store_key_t, int64_t>::iterator it = res->key_counts.begin(); it != res->key_counts.end(); ) {
             if (!dg.region.inner.contains_key(store_key_t(it->first))) {
