@@ -337,7 +337,7 @@ TPTEST(RDBBtree, SindexEraseRange) {
                 &mod_reports,
                 &deleted_range);
 
-            store.update_sindexes(txn.get(), &sindex_block, mod_reports, true);
+            store.update_sindexes(std::move(sindex_block), mod_reports);
         }
         txn->commit();
     }

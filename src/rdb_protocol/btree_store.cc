@@ -295,7 +295,7 @@ void store_t::reset_data(
         superblock.reset();
         if (!mod_reports.empty()) {
             // TODO: Pass along the transactionality from rdb_erase_small_range for rocksdb.
-            update_sindexes(txn.get(), &sindex_block, mod_reports, true);
+            update_sindexes(std::move(sindex_block), mod_reports);
         }
 
         sindex_block.reset_buf_lock();
@@ -544,18 +544,13 @@ void store_t::emergency_deregister_sindex_queue(
 }
 
 void store_t::update_sindexes(
-            txn_t *txn,
-            sindex_block_lock *sindex_block,
-            const std::vector<rdb_modification_report_t> &mod_reports,
-            bool release_sindex_block) {
-    (void)txn;  // TODO: Remove parameter.
-    new_mutex_in_line_t acq = get_in_line_for_sindex_queue(sindex_block);
+            sindex_block_lock &&sindex_block,
+            const std::vector<rdb_modification_report_t> &mod_reports) {
+    new_mutex_in_line_t acq = get_in_line_for_sindex_queue(&sindex_block);
     {
         sindex_access_vector_t sindexes;
-        acquire_all_sindex_superblocks_for_write(sindex_block, &sindexes);
-        if (release_sindex_block) {
-            sindex_block->reset_buf_lock();
-        }
+        acquire_all_sindex_superblocks_for_write(&sindex_block, &sindexes);
+        sindex_block.reset_buf_lock();
 
         for (size_t i = 0; i < mod_reports.size(); ++i) {
             // TODO: What rocksdb transaction is this with?

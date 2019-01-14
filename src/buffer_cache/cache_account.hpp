@@ -1,9 +1,7 @@
 #ifndef BUFFER_CACHE_CACHE_ACCOUNT_HPP_
 #define BUFFER_CACHE_CACHE_ACCOUNT_HPP_
 
-#include "threading.hpp"
-// TODO: REmove this include^
-
+#include "errors.hpp"
 
 // TODO: This is kind of vestigial, figure out what to do with callers/users,
 // figure out how this might work with rocksdb.

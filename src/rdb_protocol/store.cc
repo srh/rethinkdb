@@ -1074,8 +1074,7 @@ private:
         // This copying of the mod_report is inefficient, but it seems this
         // function is only used for unit tests at the moment anyway.
         mod_reports.push_back(mod_report);
-        store->update_sindexes(txn, &sindex_block, mod_reports,
-                               true /* release_sindex_block */);
+        store->update_sindexes(std::move(sindex_block), mod_reports);
     }
 
     btree_slice_t *const btree;

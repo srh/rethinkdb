@@ -16,7 +16,6 @@
 #include <set> // NOLINT(build/include_order)
 #include <string> // NOLINT(build/include_order)
 
-#include "arch/arch.hpp"
 #include "arch/io/network.hpp"
 #include "client_protocol/client_server_error.hpp"
 #include "client_protocol/protocols.hpp"

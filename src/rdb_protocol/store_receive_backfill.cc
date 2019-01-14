@@ -448,7 +448,7 @@ continue_bool_t store_t::receive_backfill(
             /* Apply the modifications */
             if (!mod_reports.empty()) {
                 // TODO: We have transactionality to pass in here.
-                update_sindexes(txn.get(), &sindex_block, mod_reports, true);
+                update_sindexes(std::move(sindex_block), mod_reports);
             } else {
                 sindex_block.reset_buf_lock();
             }

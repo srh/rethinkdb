@@ -4,7 +4,6 @@
 #include <algorithm>
 #include <functional>
 
-#include "arch/arch.hpp"
 #include "arch/runtime/coroutines.hpp"
 #include "concurrency/wait_any.hpp"
 

@@ -189,10 +189,8 @@ public:
     // Updates the live sindexes, and pushes modification reports onto the sindex
     // queues of non-live indexes.
     void update_sindexes(
-            txn_t *txn,
-            sindex_block_lock *sindex_block,
-            const std::vector<rdb_modification_report_t> &mod_reports,
-            bool release_sindex_block);
+            sindex_block_lock &&sindex_block,
+            const std::vector<rdb_modification_report_t> &mod_reports);
 
     void sindex_queue_push(
             const rdb_modification_report_t &mod_report,

@@ -6,7 +6,6 @@
 #include <cmath>
 #include <map>
 
-#include "arch/arch.hpp"
 #include "concurrency/pmap.hpp"
 #include "rdb_protocol/datum.hpp"
 

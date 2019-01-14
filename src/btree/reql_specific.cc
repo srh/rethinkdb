@@ -37,6 +37,7 @@ void sindex_superblock_t::release() {
     sb_buf_.reset_buf_lock();
 }
 
+
 const signal_t *sindex_superblock_t::read_acq_signal() {
     return sb_buf_.read_acq_signal();
 }
