@@ -17,23 +17,12 @@
 #include "concurrency/cond_var.hpp"
 #include "concurrency/fifo_enforcer.hpp"
 #include "concurrency/new_semaphore.hpp"
-#include "containers/backindex_bag.hpp"
 #include "containers/intrusive_list.hpp"
 #include "containers/segmented_vector.hpp"
 #include "repli_timestamp.hpp"
 
 class alt_txn_throttler_t;
-class auto_drainer_t;
 class cache_t;
-class file_account_t;
-
-// TODO: Check if anything is using backindex_bag_t
-
-namespace alt {
-
-enum class page_create_t { no, yes };
-
-}  // namespace alt
 
 enum class alt_create_t { create };
 
