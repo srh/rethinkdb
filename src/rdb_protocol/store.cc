@@ -219,7 +219,6 @@ void do_snap_read(
             rget.sorting,
             res);
     } else {
-        superblock->get()->snapshot_subdag();
         // rget using a secondary index
         sindex_disk_info_t sindex_info;
         uuid_u sindex_uuid;
@@ -259,14 +258,18 @@ void do_snap_read(
                 return;
             }
 
-            rdb_rget_secondary_slice(
+            sindex_sb->read_acq_signal()->wait_lazily_ordered();
+            rockstore::snapshot snap = make_snapshot(rocksh.rocks);
+            sindex_sb->release();
+
+            rdb_rget_secondary_snapshot_slice(
+                snap.snap,
                 rocksh,
                 sindex_uuid,
                 store->get_sindex_slice(sindex_uuid),
                 *rget.current_shard,
                 rget.sindex->datumspec,
                 sindex_range,
-                sindex_sb.get(),
                 env,
                 rget.batchspec,
                 rget.transforms,
@@ -275,8 +278,7 @@ void do_snap_read(
                 rget.sorting,
                 rget.sindex->require_sindex_val,
                 sindex_info,
-                res,
-                release_superblock_t::RELEASE);
+                res);
         } catch (const ql::exc_t &e) {
             res->result = e;
             return;

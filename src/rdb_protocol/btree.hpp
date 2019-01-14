@@ -121,6 +121,7 @@ void rdb_rget_snapshot_slice(
     sorting_t sorting,
     rget_read_response_t *response);
 
+// TODO: So much duplication, remove this?
 void rdb_rget_slice(
     rockshard rocksh,
     btree_slice_t *slice,
@@ -136,6 +137,25 @@ void rdb_rget_slice(
     rget_read_response_t *response,
     release_superblock_t release_superblock);
 
+void rdb_rget_secondary_snapshot_slice(
+    const rocksdb::Snapshot *snap,
+    rockshard rocksh,
+    uuid_u sindex_uuid,
+    btree_slice_t *slice,
+    const region_t &shard,
+    const ql::datumspec_t &datumspec,
+    const key_range_t &sindex_range,
+    ql::env_t *ql_env,
+    const ql::batchspec_t &batchspec,
+    const std::vector<ql::transform_variant_t> &transforms,
+    const optional<ql::terminal_variant_t> &terminal,
+    const key_range_t &pk_range,
+    sorting_t sorting,
+    require_sindexes_t require_sindex_val,
+    const sindex_disk_info_t &sindex_info,
+    rget_read_response_t *response);
+
+// TODO: So much duplication, remove this?
 void rdb_rget_secondary_slice(
     rockshard rocksh,
     uuid_u sindex_uuid,

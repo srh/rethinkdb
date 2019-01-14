@@ -1063,6 +1063,83 @@ void rdb_rget_slice(
     callback.finish(cont);
 }
 
+
+void rdb_rget_secondary_snapshot_slice(
+        const rocksdb::Snapshot *snap,
+        rockshard rocksh,
+        uuid_u sindex_uuid,
+        btree_slice_t *slice,
+        const region_t &shard,
+        const ql::datumspec_t &datumspec,
+        const key_range_t &sindex_region_range,
+        ql::env_t *ql_env,
+        const ql::batchspec_t &batchspec,
+        const std::vector<transform_variant_t> &transforms,
+        const optional<terminal_variant_t> &terminal,
+        const key_range_t &pk_range,
+        sorting_t sorting,
+        require_sindexes_t require_sindex_val,
+        const sindex_disk_info_t &sindex_info,
+        rget_read_response_t *response) {
+    r_sanity_check(boost::get<ql::exc_t>(&response->result) == nullptr);
+    guarantee(sindex_info.geo == sindex_geo_bool_t::REGULAR);
+    PROFILE_STARTER_IF_ENABLED(
+        ql_env->profile() == profile_bool_t::PROFILE,
+        "Do range scan on secondary index.",
+        ql_env->trace);
+
+    const reql_version_t sindex_func_reql_version =
+        sindex_info.mapping_version_info.latest_compatible_reql_version;
+
+    key_range_t active_region_range = sindex_region_range;
+    rocks_rget_cb callback(
+        rget_io_data_t(response, slice),
+        job_data_t(ql_env,
+                   batchspec,
+                   transforms,
+                   terminal,
+                   shard,
+                   !reversed(sorting)
+                       ? sindex_region_range.left
+                       : sindex_region_range.right.key_or_max(),
+                   sorting,
+                   require_sindex_val),
+        make_optional(rget_sindex_data_t(
+            pk_range,
+            datumspec,
+            &active_region_range,
+            sindex_func_reql_version,
+            sindex_info.mapping,
+            sindex_info.multi)));
+
+    std::string rocks_kv_prefix = rockstore::table_secondary_prefix(rocksh.table_id, rocksh.shard_no, sindex_uuid);
+
+    direction_t direction = reversed(sorting) ? direction_t::backward : direction_t::forward;
+    auto cb = [&](const std::pair<ql::datum_range_t, uint64_t> &pair, UNUSED bool is_last) {
+        key_range_t sindex_keyrange =
+            pair.first.to_sindex_keyrange(sindex_func_reql_version);
+        rocks_rget_cb_wrapper wrapper(
+            &callback,
+            pair.second,
+            make_optional(key_to_unescaped_str(sindex_keyrange.left)));
+        key_range_t active_range = active_region_range.intersection(sindex_keyrange);
+        // This can happen sometimes with truncated keys.
+        if (active_range.is_empty()) return continue_bool_t::CONTINUE;
+        return rocks_traversal(
+            rocksh.rocks,
+            snap,
+            rocks_kv_prefix,
+            active_range,
+            direction,
+            &wrapper);
+    };
+    continue_bool_t cont = datumspec.iter(sorting, cb);
+    // TODO: See if anybody else calls datumspec.iter, can we remove is_last parameter.
+    callback.finish(cont);
+}
+
+
+// TODO: Remove this?  And header.
 void rdb_rget_secondary_slice(
         rockshard rocksh,
         uuid_u sindex_uuid,
