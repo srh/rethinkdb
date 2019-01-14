@@ -20,6 +20,7 @@
 #include "concurrency/fifo_enforcer.hpp"
 #include "rockstore/store.hpp"
 
+// TODO: Inline this...
 continue_bool_t process_traversal_element(
         const std::string &rocks_kv_prefix,
         rocksdb::Slice key, rocksdb::Slice value, rocks_traversal_cb *cb) {
@@ -33,18 +34,14 @@ continue_bool_t process_traversal_element(
 }
 
 continue_bool_t rocks_traversal(
-        superblock_t *superblock,
         rockstore::store *rocks,
+        const rocksdb::Snapshot *rocksnap,
         const std::string &rocks_kv_prefix,
         const key_range_t &range,
         direction_t direction,
-        release_superblock_t release_superblock,
         rocks_traversal_cb *cb) {
     // duh
     rocksdb::OptimisticTransactionDB *db = rocks->db();
-
-    // Acquire read lock on superblock first.
-    superblock->read_acq_signal()->wait_lazily_ordered();
 
     // linux_thread_pool_t::run_in_blocker_pool([&]() {
 
@@ -55,6 +52,7 @@ continue_bool_t rocks_traversal(
         rocksdb::Slice prefixed_upper_bound_slice;
         // TODO: Proper rocksdb::ReadOptions()
         rocksdb::ReadOptions opts;
+        opts.snapshot = rocksnap;
         if (!range.right.unbounded) {
             prefixed_upper_bound = rocks_kv_prefix + key_to_unescaped_str(range.right.key());
         } else {
@@ -70,10 +68,6 @@ continue_bool_t rocks_traversal(
         // TODO: Check if we must call NewIterator on the thread pool thread.
         // TODO: Switching threads for every key/value pair is kind of lame.
         scoped_ptr_t<rocksdb::Iterator> iter(db->NewIterator(opts));
-        // Release superblock after snapshotted iterator created.
-        if (release_superblock == release_superblock_t::RELEASE) {
-            superblock->release();
-        }
         bool was_valid;
         rocksdb::Slice key_slice;
         rocksdb::Slice value_slice;
@@ -107,13 +101,10 @@ continue_bool_t rocks_traversal(
         rocksdb::Slice prefixed_left_bound_slice(prefixed_left_bound);
         // TODO: Proper rocksdb::ReadOptions()
         rocksdb::ReadOptions opts;
+        opts.snapshot = rocksnap;
         opts.iterate_lower_bound = &prefixed_left_bound_slice;
         // TODO: Check if we must call NewIterator on the thread pool thread.
         scoped_ptr_t<rocksdb::Iterator> iter(db->NewIterator(opts));
-        // Release superblock after snapshotted iterator created.
-        if (release_superblock == release_superblock_t::RELEASE) {
-            superblock->release();
-        }
 
         bool was_valid;
         rocksdb::Slice key_slice;
@@ -169,4 +160,43 @@ continue_bool_t rocks_traversal(
         }
         return continue_bool_t::CONTINUE;
     }
+}
+
+rocks_snapshot make_snapshot(rockstore::store *rocks) {
+    auto db = rocks->db();
+    rocks_snapshot ret(db, db->GetSnapshot());
+    return ret;
+}
+
+rocks_snapshot::~rocks_snapshot() {
+    reset();
+}
+
+void rocks_snapshot::reset() {
+    if (db != nullptr) {
+        db->ReleaseSnapshot(snapshot);
+        db = nullptr;
+        snapshot = nullptr;
+    }
+}
+
+continue_bool_t rocks_traversal(
+        superblock_t *superblock,
+        rockstore::store *rocks,
+        const std::string &rocks_kv_prefix,
+        const key_range_t &range,
+        direction_t direction,
+        release_superblock_t release_superblock,
+        rocks_traversal_cb *cb) {
+
+    // Acquire read lock on superblock first.
+    superblock->read_acq_signal()->wait_lazily_ordered();
+
+    rocks_snapshot snap = make_snapshot(rocks);
+
+    if (release_superblock == release_superblock_t::RELEASE) {
+        superblock->release();
+    }
+
+    return rocks_traversal(rocks, snap.snapshot, rocks_kv_prefix, range, direction, cb);
 }

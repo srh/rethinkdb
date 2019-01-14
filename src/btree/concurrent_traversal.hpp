@@ -7,6 +7,10 @@
 #include "containers/archive/archive.hpp"
 
 class key_range_t;
+namespace rocksdb {
+    class Snapshot;
+    class OptimisticTransactionDB;
+}
 namespace rockstore { class store; }
 class superblock_t;
 
@@ -31,9 +35,38 @@ protected:
     DISABLE_COPYING(rocks_traversal_cb);
 };
 
+// TODO: Move this stuff into rockstore/store.hpp
+struct rocks_snapshot {
+    rocks_snapshot(
+        rocksdb::OptimisticTransactionDB *_db,
+        const rocksdb::Snapshot *_snapshot) : db(_db), snapshot(_snapshot) {}
+    ~rocks_snapshot();
+    rocks_snapshot(rocks_snapshot &&movee) : db(movee.db), snapshot(movee.snapshot) {
+        movee.db = nullptr;
+        movee.snapshot = nullptr;
+    }
+
+    void reset();
+
+    rocksdb::OptimisticTransactionDB *db;
+    const rocksdb::Snapshot *snapshot;
+    DISABLE_COPYING(rocks_snapshot);
+};
+
+rocks_snapshot make_snapshot(rockstore::store *rocks);
+
+
 // TODO: This should freaking take an interruptor, no?
 
-// We release the superblock after calling get_snapshot (or starting a txn, or
+continue_bool_t rocks_traversal(
+        rockstore::store *rocks,
+        const rocksdb::Snapshot *rocksnap,
+        const std::string &rocks_kv_prefix,
+        const key_range_t &range,
+        direction_t direction,
+        rocks_traversal_cb *cb);
+
+// We release the superblock after calling get_snapshot (or starting an iterator, or
 // something) in rocksdb.
 continue_bool_t rocks_traversal(
         superblock_t *superblock,
@@ -43,5 +76,6 @@ continue_bool_t rocks_traversal(
         direction_t direction,
         release_superblock_t release_superblock,
         rocks_traversal_cb *cb);
+
 
 #endif  // BTREE_CONCURRENT_TRAVERSAL_HPP_

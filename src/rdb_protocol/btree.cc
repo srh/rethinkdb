@@ -2154,7 +2154,10 @@ void post_construct_secondary_index_range(
         &txn,
         &superblock,
         interruptor);
-    superblock->get()->snapshot_subdag();
+    superblock->read_acq_signal()->wait_lazily_ordered();
+    rockshard rocksh = store->rocksh();
+    rocks_snapshot rocksnap = make_snapshot(rocksh.rocks);
+    superblock->release();
 
     // Note: This starts a write transaction, which might get throttled.
     // It is important that we construct the `traversal_cb` *after* we've started
@@ -2171,16 +2174,15 @@ void post_construct_secondary_index_range(
         = txn->cache()->create_cache_account(SINDEX_POST_CONSTRUCTION_CACHE_PRIORITY);
     txn->set_account(&cache_account);
 
-    rockshard rocksh = store->rocksh();
     std::string rocks_kv_prefix = rockstore::table_primary_prefix(rocksh.table_id, rocksh.shard_no);
     continue_bool_t cont = rocks_traversal(
-        superblock.get(),
         rocksh.rocks,
+        rocksnap.snapshot,
         rocks_kv_prefix,
         *construction_range_inout,
         direction_t::forward,
-        release_superblock_t::RELEASE,
         &traversal_cb);
+    rocksnap.reset();
     if (cont == continue_bool_t::ABORT
         && (interruptor->is_pulsed() || on_index_deleted_interruptor.is_pulsed())) {
         throw interrupted_exc_t();
