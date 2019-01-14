@@ -203,11 +203,11 @@ void store_t::read(
 
     acquire_superblock_for_read(token, &txn, &superblock,
                                 interruptor);
+    DEBUG_ONLY_CODE(metainfo->visit(
+        superblock.get(), metainfo_checker.region, metainfo_checker.callback));
     if (_read.use_snapshot()) {
         superblock->get()->snapshot_subdag();
     }
-    DEBUG_ONLY_CODE(metainfo->visit(
-        superblock.get(), metainfo_checker.region, metainfo_checker.callback));
     protocol_read(_read, response, superblock.get(), interruptor);
 }
 
