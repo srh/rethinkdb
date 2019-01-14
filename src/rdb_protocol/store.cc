@@ -483,11 +483,11 @@ struct rdb_read_visitor_t : public boost::static_visitor<void> {
                     ql::backtrace_id_t::empty());
                 return;
             }
-        } else {
-            // TODO: We don't snapshot the subdag in the case of a changefeed
-            // stamp read?  Seems wrong.
-            superblock->get()->snapshot_subdag();
         }
+        // TODO: Verify that snapshotting (here) in the case of a stamped query is
+        // okay (by examing source code).  I think there was a mistake of implementation.
+        superblock->get()->snapshot_subdag();
+
 
         sindex_disk_info_t sindex_info;
         uuid_u sindex_uuid;
