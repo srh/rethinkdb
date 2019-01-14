@@ -34,11 +34,9 @@ class superblock_t {
 public:
     superblock_t() { }
     virtual ~superblock_t() { }
-    // Release the superblock if possible (otherwise do nothing)
-    virtual void release() = 0;
 
+    virtual void release() = 0;
     virtual const signal_t *read_acq_signal() = 0;
-    virtual const signal_t *write_acq_signal() = 0;
 
 private:
     DISABLE_COPYING(superblock_t);

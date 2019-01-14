@@ -34,7 +34,7 @@ public:
     real_superblock_lock *get() { return &sb_buf_; }
 
     const signal_t *read_acq_signal() override;
-    const signal_t *write_acq_signal() override;
+    const signal_t *write_acq_signal();
 
 private:
     /* The write_semaphore_acq_ is empty for reads.
@@ -75,7 +75,7 @@ public:
     void release() override;
 
     const signal_t *read_acq_signal() override;
-    const signal_t *write_acq_signal() override;
+    const signal_t *write_acq_signal();
 
 private:
     sindex_superblock_lock sb_buf_;
