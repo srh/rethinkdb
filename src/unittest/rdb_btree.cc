@@ -124,7 +124,6 @@ ql::grouped_t<ql::stream_t> read_row_via_sindex(
     store->acquire_superblock_for_read(
             &token, &txn, &super_block,
             &dummy_interruptor);
-    super_block->get()->snapshot_subdag();
 
     scoped_ptr_t<sindex_superblock_t> sindex_sb;
     uuid_u sindex_uuid;
