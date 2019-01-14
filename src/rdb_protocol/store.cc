@@ -713,6 +713,9 @@ void store_t::protocol_read(const read_t &_read,
     {
         PROFILE_STARTER_IF_ENABLED(
             _read.profile == profile_bool_t::PROFILE, "Perform read on shard.", trace);
+        if (_read.use_snapshot()) {
+            superblock->get()->snapshot_subdag();
+        }
         rdb_read_visitor_t v(btree.get(), this,
                              superblock,
                              ctx, response, trace.get_or_null(), interruptor);

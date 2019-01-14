@@ -205,9 +205,6 @@ void store_t::read(
                                 interruptor);
     DEBUG_ONLY_CODE(metainfo->visit(
         superblock.get(), metainfo_checker.region, metainfo_checker.callback));
-    if (_read.use_snapshot()) {
-        superblock->get()->snapshot_subdag();
-    }
     protocol_read(_read, response, superblock.get(), interruptor);
 }
 
