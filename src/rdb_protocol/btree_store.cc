@@ -148,8 +148,7 @@ store_t::store_t(const region_t &_region,
         acquire_superblock_for_read(&token,
                                     &txn,
                                     &superblock,
-                                    &dummy_interruptor,
-                                    false /* don't use snapshot */ );
+                                    &dummy_interruptor);
 
         metainfo.init(new store_metainfo_manager_t(rocksh(), superblock.get()));
 
@@ -203,8 +202,10 @@ void store_t::read(
     scoped_ptr_t<real_superblock_t> superblock;
 
     acquire_superblock_for_read(token, &txn, &superblock,
-                                interruptor,
-                                _read.use_snapshot());
+                                interruptor);
+    if (_read.use_snapshot()) {
+        superblock->get()->snapshot_subdag();
+    }
     DEBUG_ONLY_CODE(metainfo->visit(
         superblock.get(), metainfo_checker.region, metainfo_checker.callback));
     protocol_read(_read, response, superblock.get(), interruptor);
@@ -1119,8 +1120,7 @@ region_map_t<binary_blob_t> store_t::get_metainfo(
     scoped_ptr_t<real_superblock_t> superblock;
     acquire_superblock_for_read(token,
                                 &txn, &superblock,
-                                interruptor,
-                                false /* KSI: christ */);
+                                interruptor);
     return metainfo->get(superblock.get(), _region);
 }
 
@@ -1150,8 +1150,7 @@ void store_t::acquire_superblock_for_read(
         read_token_t *token,
         scoped_ptr_t<txn_t> *txn_out,
         scoped_ptr_t<real_superblock_t> *sb_out,
-        signal_t *interruptor,
-        bool use_snapshot)
+        signal_t *interruptor)
         THROWS_ONLY(interrupted_exc_t) {
     assert_thread();
 
@@ -1162,9 +1161,6 @@ void store_t::acquire_superblock_for_read(
 
     get_btree_superblock_and_txn_for_reading(
         general_cache_conn.get(), sb_out, txn_out);
-    if (use_snapshot) {
-        (*sb_out)->get()->snapshot_subdag();
-    }
 }
 
 void store_t::acquire_superblock_for_write(

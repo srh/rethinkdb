@@ -288,8 +288,7 @@ public:
             read_token_t *token,
             scoped_ptr_t<txn_t> *txn_out,
             scoped_ptr_t<real_superblock_t> *sb_out,
-            signal_t *interruptor,
-            bool use_snapshot)
+            signal_t *interruptor)
             THROWS_ONLY(interrupted_exc_t);
 
     void acquire_superblock_for_write(

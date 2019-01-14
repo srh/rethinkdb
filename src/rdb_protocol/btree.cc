@@ -2153,8 +2153,8 @@ void post_construct_secondary_index_range(
         &read_token,
         &txn,
         &superblock,
-        interruptor,
-        true /* USE_SNAPSHOT */);
+        interruptor);
+    superblock->get()->snapshot_subdag();
 
     // Note: This starts a write transaction, which might get throttled.
     // It is important that we construct the `traversal_cb` *after* we've started

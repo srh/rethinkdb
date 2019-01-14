@@ -288,7 +288,8 @@ TPTEST(BTreeSindex, BtreeStoreAPI) {
 
             store.acquire_superblock_for_read(
                     &token, &txn, &main_sb,
-                    &dummy_interruptor, true);
+                    &dummy_interruptor);
+            main_sb->get()->snapshot_subdag();
 
             {
                 std::vector<char> opaque_definition;
