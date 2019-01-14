@@ -71,13 +71,6 @@ public:
             std::move(inner_serializer),
             MERGER_SERIALIZER_MAX_ACTIVE_WRITES));
 
-        std::vector<serializer_t *> ptrs;
-        ptrs.push_back(serializer.get());
-        if (create) {
-            serializer_multiplexer_t::create(ptrs, CPU_SHARDING_FACTOR);
-        }
-        multiplexer.init(new serializer_multiplexer_t(ptrs));
-
         pmap(CPU_SHARDING_FACTOR, [&](int ix) {
             // TODO: Exceptions? If exceptions are being thrown in here, nothing is
             // handling them.
@@ -132,9 +125,6 @@ public:
         });
         if (serializer.has()) {
             on_thread_t thread_switcher(serializer->home_thread());
-            if (multiplexer.has()) {
-                multiplexer.reset();
-            }
             serializer.reset();
         }
     }
@@ -167,7 +157,6 @@ public:
 private:
     scoped_ptr_t<real_branch_history_manager_t> branch_history_manager;
     scoped_ptr_t<serializer_t> serializer;
-    scoped_ptr_t<serializer_multiplexer_t> multiplexer;
     scoped_ptr_t<store_t> stores[CPU_SHARDING_FACTOR];
 
     scoped_ptr_t<thread_allocation_t> serializer_thread_allocation;
