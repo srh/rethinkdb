@@ -2098,7 +2098,7 @@ void post_construct_secondary_index_range(
         interruptor);
     superblock->read_acq_signal()->wait_lazily_ordered();
     rockshard rocksh = store->rocksh();
-    rocks_snapshot rocksnap = make_snapshot(rocksh.rocks);
+    rockstore::snapshot rocksnap = make_snapshot(rocksh.rocks);
     superblock->release();
 
     // Note: This starts a write transaction, which might get throttled.
@@ -2119,7 +2119,7 @@ void post_construct_secondary_index_range(
     std::string rocks_kv_prefix = rockstore::table_primary_prefix(rocksh.table_id, rocksh.shard_no);
     continue_bool_t cont = rocks_traversal(
         rocksh.rocks,
-        rocksnap.snapshot,
+        rocksnap.snap,
         rocks_kv_prefix,
         *construction_range_inout,
         direction_t::forward,

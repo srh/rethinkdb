@@ -11,8 +11,9 @@
 
 namespace rocksdb {
 class OptimisticTransactionDB;
-class WriteBatch;
+class Snapshot;
 class Transaction;
+class WriteBatch;
 }
 
 class base_path_t;
@@ -59,6 +60,27 @@ private:
     scoped_ptr_t<rocksdb::Transaction> txn_;
     bool committed_;
 };
+
+// TODO: Make things private and such?
+struct snapshot {
+    snapshot(
+        rocksdb::OptimisticTransactionDB *_db,
+        const rocksdb::Snapshot *_snap) : db(_db), snap(_snap) {}
+    ~snapshot();
+    snapshot(snapshot &&movee) : db(movee.db), snap(movee.snap) {
+        movee.db = nullptr;
+        movee.snap = nullptr;
+    }
+
+    void reset();
+
+    rocksdb::OptimisticTransactionDB *db;
+    const rocksdb::Snapshot *snap;
+    DISABLE_COPYING(snapshot);
+};
+
+snapshot make_snapshot(store *rocks);
+
 
 class store final {
 public:

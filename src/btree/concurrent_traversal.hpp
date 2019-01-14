@@ -9,7 +9,6 @@
 class key_range_t;
 namespace rocksdb {
     class Snapshot;
-    class OptimisticTransactionDB;
 }
 namespace rockstore { class store; }
 class superblock_t;
@@ -34,26 +33,6 @@ protected:
     virtual ~rocks_traversal_cb() {}
     DISABLE_COPYING(rocks_traversal_cb);
 };
-
-// TODO: Move this stuff into rockstore/store.hpp
-struct rocks_snapshot {
-    rocks_snapshot(
-        rocksdb::OptimisticTransactionDB *_db,
-        const rocksdb::Snapshot *_snapshot) : db(_db), snapshot(_snapshot) {}
-    ~rocks_snapshot();
-    rocks_snapshot(rocks_snapshot &&movee) : db(movee.db), snapshot(movee.snapshot) {
-        movee.db = nullptr;
-        movee.snapshot = nullptr;
-    }
-
-    void reset();
-
-    rocksdb::OptimisticTransactionDB *db;
-    const rocksdb::Snapshot *snapshot;
-    DISABLE_COPYING(rocks_snapshot);
-};
-
-rocks_snapshot make_snapshot(rockstore::store *rocks);
 
 
 // TODO: This should freaking take an interruptor, no?

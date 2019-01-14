@@ -149,6 +149,25 @@ void txn::insert(
 }
 
 
+snapshot make_snapshot(store *rocks) {
+    auto db = rocks->db();
+    snapshot ret(db, db->GetSnapshot());
+    return ret;
+}
+
+snapshot::~snapshot() {
+    reset();
+}
+
+void snapshot::reset() {
+    if (db != nullptr) {
+        db->ReleaseSnapshot(snap);
+        db = nullptr;
+        snap = nullptr;
+    }
+}
+
+
 store::store(scoped_ptr_t<rocksdb::OptimisticTransactionDB> &&db) : db_(std::move(db)) {}
 store::store(store&& other) : db_(std::move(other.db_)) {}
 

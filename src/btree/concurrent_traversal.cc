@@ -162,24 +162,6 @@ continue_bool_t rocks_traversal(
     }
 }
 
-rocks_snapshot make_snapshot(rockstore::store *rocks) {
-    auto db = rocks->db();
-    rocks_snapshot ret(db, db->GetSnapshot());
-    return ret;
-}
-
-rocks_snapshot::~rocks_snapshot() {
-    reset();
-}
-
-void rocks_snapshot::reset() {
-    if (db != nullptr) {
-        db->ReleaseSnapshot(snapshot);
-        db = nullptr;
-        snapshot = nullptr;
-    }
-}
-
 continue_bool_t rocks_traversal(
         superblock_t *superblock,
         rockstore::store *rocks,
@@ -192,11 +174,11 @@ continue_bool_t rocks_traversal(
     // Acquire read lock on superblock first.
     superblock->read_acq_signal()->wait_lazily_ordered();
 
-    rocks_snapshot snap = make_snapshot(rocks);
+    rockstore::snapshot snap = make_snapshot(rocks);
 
     if (release_superblock == release_superblock_t::RELEASE) {
         superblock->release();
     }
 
-    return rocks_traversal(rocks, snap.snapshot, rocks_kv_prefix, range, direction, cb);
+    return rocks_traversal(rocks, snap.snap, rocks_kv_prefix, range, direction, cb);
 }
