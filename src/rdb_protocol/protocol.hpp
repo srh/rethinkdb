@@ -511,10 +511,6 @@ struct read_t {
     read_t(T &&_read, profile_bool_t _profile, read_mode_t _read_mode)
         : read(std::forward<T>(_read)), profile(_profile), read_mode(_read_mode) { }
 
-    // We use snapshotting for queries that acquire-and-hold large portions of the
-    // table, so that they don't block writes.
-    bool use_snapshot() const THROWS_NOTHING;
-
     // At the moment changefeed reads must be routed to the primary replica.
     bool route_to_primary() const THROWS_NOTHING;
 };

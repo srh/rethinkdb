@@ -451,6 +451,7 @@ struct rdb_read_visitor_t : public boost::static_visitor<void> {
     }
 
     void operator()(const intersecting_geo_read_t &geo_read) {
+        // TODO: We construct this kind of early.
         ql::env_t ql_env(
             ctx,
             ql::return_empty_normal_batches_t::NO,
@@ -482,6 +483,10 @@ struct rdb_read_visitor_t : public boost::static_visitor<void> {
                     ql::backtrace_id_t::empty());
                 return;
             }
+        } else {
+            // TODO: We don't snapshot the subdag in the case of a changefeed
+            // stamp read?  Seems wrong.
+            superblock->get()->snapshot_subdag();
         }
 
         sindex_disk_info_t sindex_info;
@@ -534,6 +539,7 @@ struct rdb_read_visitor_t : public boost::static_visitor<void> {
     }
 
     void operator()(const nearest_geo_read_t &geo_read) {
+        superblock->get()->snapshot_subdag();
         ql::env_t ql_env(
             ctx,
             ql::return_empty_normal_batches_t::NO,
@@ -625,8 +631,12 @@ struct rdb_read_visitor_t : public boost::static_visitor<void> {
             // we first needed to get the changefeed stamps (see
             // `use_snapshot_visitor_t`).
             // However now it's safe to use a snapshot for the rest of the read.
-            superblock->get()->snapshot_subdag();
+
+            // (Non-changefeed reads use snapshotting too, and they don't have
+            // this changefeed stamp business that needs to happen before
+            // subsequent writes.)
         }
+        superblock->get()->snapshot_subdag();
 
         if (rget.transforms.size() != 0 || rget.terminal) {
             // This asserts that the optargs have been initialized.  (There is always
@@ -645,6 +655,7 @@ struct rdb_read_visitor_t : public boost::static_visitor<void> {
     }
 
     void operator()(const distribution_read_t &dg) {
+        superblock->get()->snapshot_subdag();
         response->response = distribution_read_response_t();
         distribution_read_response_t *res = boost::get<distribution_read_response_t>(&response->response);
         // TODO: Replace max_depth option of distribution_read_t (when we break
@@ -713,9 +724,6 @@ void store_t::protocol_read(const read_t &_read,
     {
         PROFILE_STARTER_IF_ENABLED(
             _read.profile == profile_bool_t::PROFILE, "Perform read on shard.", trace);
-        if (_read.use_snapshot()) {
-            superblock->get()->snapshot_subdag();
-        }
         rdb_read_visitor_t v(btree.get(), this,
                              superblock,
                              ctx, response, trace.get_or_null(), interruptor);
