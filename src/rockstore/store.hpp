@@ -125,6 +125,8 @@ private:
 // directory.  Throws std::runtime_error.
 store create_rockstore(const base_path_t &base_path);
 
+std::string table_overall_prefix(namespace_id_t id);
+std::string table_existence_key(namespace_id_t id);
 std::string table_prefix(namespace_id_t id, int shard_no);
 std::string table_metadata_prefix(namespace_id_t id, int shard_no);
 std::string table_sindex_map(namespace_id_t id, int shard_no);
@@ -137,6 +139,7 @@ std::string table_primary_key(namespace_id_t id, int shard_no, const std::string
 
 std::string prefix_end(const std::string &prefix);
 
+// TODO: Don't have a table metadata version key?  Just have a single global version?
 inline const char * VERSION() { return "v2_4"; }
 inline const char * TABLE_METADATA_VERSION_KEY() { return "version"; }
 inline const char * TABLE_METADATA_METAINFO_KEY() { return "metainfo"; }

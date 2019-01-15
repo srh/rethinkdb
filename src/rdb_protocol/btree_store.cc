@@ -121,6 +121,7 @@ store_t::store_t(const region_t &_region,
             real_superblock_t superblock(std::move(sb_lock));
             // TODO: Make sure store initialization logic doesn't miss out on
             // lock ordering logic, when we go rocks-only.
+            // TODO: Not to mention... file existence logic.
             btree_slice_t::init_real_superblock(
                 &superblock, rocksh(), key.vector(), binary_blob_t());
         }

@@ -330,6 +330,19 @@ txn store::begin(const write_options &opts) {
     return txn{scoped_ptr_t<rocksdb::Transaction>(tx)};
 }
 
+std::string table_overall_prefix(namespace_id_t id) {
+    std::string ret = "tables/";
+    ret += uuid_to_str(id);
+    ret += '/';
+    return ret;
+}
+std::string table_existence_key(namespace_id_t id) {
+    std::string ret = table_overall_prefix(id);
+    ret += "exists";
+    return ret;
+}
+
+
 std::string table_prefix(namespace_id_t id, int shard_no) {
     // TODO: Do we use a binary or non-binary UUID?
     std::string ret = "tables/";

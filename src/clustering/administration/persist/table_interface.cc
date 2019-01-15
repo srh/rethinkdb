@@ -4,6 +4,8 @@
 #include <algorithm>
 #include <array>
 
+#include "rocksdb/write_batch.h"
+
 #include "arch/io/disk.hpp"
 #include "clustering/administration/persist/branch_history_manager.hpp"
 #include "clustering/administration/persist/file_keys.hpp"
@@ -38,15 +40,16 @@ public:
         // TODO: If the server gets killed when starting up, we can
         // get a database in an invalid startup state.
 
-        // TODO: This is quite suspicious in that we check if the file
-        // exists and then assume it exists or does not exist when
-        // loading or creating it.
+        std::string existence_key = rockstore::table_existence_key(table_id);
+        bool exists = rocks->try_read(existence_key).second;
+        bool create = !exists;
 
-        // TODO: We should use N slices on M serializers, not N slices
-        // on 1 serializer.
-
-        int res = access(path.permanent_path().c_str(), R_OK | W_OK);
-        bool create = (res != 0);
+        if (create) {
+            // TODO: Handle this transactionally (so we aren't stuck in an
+            // invalid state after putting the existence key but not creating
+            // the stores.)
+            rocks->put(existence_key, "1", rockstore::write_options::TODO());
+        }
 
         // TODO: Remove serializer_thread_allocation?
         on_thread_t thread_switcher(serializer_thread_allocation->get_thread());
@@ -271,11 +274,12 @@ void real_table_persistence_interface_t::destroy_multistore(
     guarantee(multistore_ptr_in->has());
     multistore_ptr_in->reset();
 
-    std::string filepath = file_name_for(table_id).permanent_path();
-    logNTC("Removing file %s\n", filepath.c_str());
-    const int res = ::unlink(filepath.c_str());
-    guarantee_err(res == 0 || get_errno() == ENOENT,
-                  "unlink failed for file %s", filepath.c_str());
+    std::string prefix = rockstore::table_overall_prefix(table_id);
+    std::string end_prefix = rockstore::prefix_end(end_prefix);
+
+    rocksdb::WriteBatch batch;
+    batch.DeleteRange(prefix, end_prefix);
+    io_backender->rocks()->write_batch(std::move(batch), rockstore::write_options::TODO());
 }
 
 serializer_filepath_t real_table_persistence_interface_t::file_name_for(
