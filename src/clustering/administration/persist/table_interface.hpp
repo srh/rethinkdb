@@ -70,7 +70,6 @@ public:
     bool is_gc_active() const;
 
 private:
-    serializer_filepath_t file_name_for(const namespace_id_t &table_id);
     threadnum_t pick_thread();
 
     io_backender_t * const io_backender;

@@ -20,19 +20,16 @@ public:
     real_multistore_ptr_t(
             rockstore::store *rocks,
             const namespace_id_t &table_id,
-            const serializer_filepath_t &path,
             scoped_ptr_t<real_branch_history_manager_t> &&bhm,
             const base_path_t &base_path,
             io_backender_t *io_backender,
             rdb_context_t *rdb_context,
             perfmon_collection_t *perfmon_collection_serializers,
-            scoped_ptr_t<thread_allocation_t> &&serializer_thread,
             std::vector<scoped_ptr_t<thread_allocation_t> > &&store_threads,
             std::map<
                 namespace_id_t, std::pair<real_multistore_ptr_t *, auto_drainer_t::lock_t>
             > *real_multistores) :
         branch_history_manager(std::move(bhm)),
-        serializer_thread_allocation(std::move(serializer_thread)),
         store_thread_allocations(std::move(store_threads)),
         map_insertion_sentry(
             real_multistores, table_id, std::make_pair(this, drainer.lock()))
@@ -50,12 +47,6 @@ public:
             // the stores.)
             rocks->put(existence_key, "1", rockstore::write_options::TODO());
         }
-
-        // TODO: Remove serializer_thread_allocation?
-        on_thread_t thread_switcher(serializer_thread_allocation->get_thread());
-
-        // TODO: Could we handle failure when loading the serializer?  Right
-        // now, we don't.
 
         pmap(CPU_SHARDING_FACTOR, [&](int ix) {
             // TODO: Exceptions? If exceptions are being thrown in here, nothing is
@@ -95,7 +86,6 @@ public:
     }
 
     ~real_multistore_ptr_t() {
-        serializer_thread_allocation.reset();
         store_thread_allocations.clear();
         map_insertion_sentry.reset();
         drainer.drain();
@@ -123,7 +113,6 @@ private:
     scoped_ptr_t<real_branch_history_manager_t> branch_history_manager;
     scoped_ptr_t<store_t> stores[CPU_SHARDING_FACTOR];
 
-    scoped_ptr_t<thread_allocation_t> serializer_thread_allocation;
     std::vector<scoped_ptr_t<thread_allocation_t> > store_thread_allocations;
 
     auto_drainer_t drainer;
@@ -236,8 +225,6 @@ void real_table_persistence_interface_t::load_multistore(
         new real_branch_history_manager_t(
             table_id, metadata_file, metadata_read_txn, interruptor));
 
-    scoped_ptr_t<thread_allocation_t> serializer_thread(
-        new thread_allocation_t(&thread_allocator));
     std::vector<scoped_ptr_t<thread_allocation_t> > store_threads;
     for (size_t i = 0; i < CPU_SHARDING_FACTOR; ++i) {
         store_threads.emplace_back(new thread_allocation_t(&thread_allocator));
@@ -246,13 +233,11 @@ void real_table_persistence_interface_t::load_multistore(
     multistore_ptr_out->init(new real_multistore_ptr_t(
         io_backender->rocks(),
         table_id,
-        file_name_for(table_id),
         std::move(bhm),
         base_path,
         io_backender,
         rdb_context,
         perfmon_collection_serializers,
-        std::move(serializer_thread),
         std::move(store_threads),
         &real_multistores));
 }
@@ -280,11 +265,6 @@ void real_table_persistence_interface_t::destroy_multistore(
     rocksdb::WriteBatch batch;
     batch.DeleteRange(prefix, end_prefix);
     io_backender->rocks()->write_batch(std::move(batch), rockstore::write_options::TODO());
-}
-
-serializer_filepath_t real_table_persistence_interface_t::file_name_for(
-        const namespace_id_t &table_id) {
-    return serializer_filepath_t(base_path, uuid_to_str(table_id));
 }
 
 bool real_table_persistence_interface_t::is_gc_active() const {
