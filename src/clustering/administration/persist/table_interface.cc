@@ -41,12 +41,9 @@ public:
         bool exists = rocks->try_read(existence_key).second;
         bool create = !exists;
 
-        if (create) {
-            // TODO: Handle this transactionally (so we aren't stuck in an
-            // invalid state after putting the existence key but not creating
-            // the stores.)
-            rocks->put(existence_key, "1", rockstore::write_options::TODO());
-        }
+        // We might want to wipe out the entire key range here, for hygiene --
+        // or wipe out just the metainfo and assert there is nothing else in the
+        // actual table shards.
 
         pmap(CPU_SHARDING_FACTOR, [&](int ix) {
             // TODO: Exceptions? If exceptions are being thrown in here, nothing is
@@ -83,6 +80,15 @@ public:
                     &non_interruptor);
             }
         });
+
+        // We create existence key after we've actually created and initialized
+        // the stores (and before any data writes could happen).
+        if (create) {
+            // TODO: Handle this transactionally (so we aren't stuck in an
+            // invalid state after putting the existence key but not creating
+            // the stores.)
+            rocks->put(existence_key, "1", rockstore::write_options::TODO());
+        }
     }
 
     ~real_multistore_ptr_t() {
