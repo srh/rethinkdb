@@ -192,14 +192,9 @@ void do_snap_read(
         btree_slice_t *btree,
         real_superblock_t *superblock,
         const rget_read_t &rget,
-        rget_read_response_t *res,
-        optional<uuid_u> *sindex_id_out) {
+        rget_read_response_t *res) {
     guarantee(rget.current_shard.has_value());
     if (!rget.sindex.has_value()) {
-        // rget using a primary index
-        if (sindex_id_out != nullptr) {
-            *sindex_id_out = r_nullopt;
-        }
         superblock->read_acq_signal()->wait_lazily_ordered();
         rockstore::snapshot snap = make_snapshot(rocksh.rocks);
         superblock->release();
@@ -233,9 +228,6 @@ void do_snap_read(
                     rget.sindex->id,
                     &sindex_info,
                     &sindex_uuid);
-            if (sindex_id_out != nullptr) {
-                *sindex_id_out = make_optional(sindex_uuid);
-            }
             reql_version_t reql_version =
                 sindex_info.mapping_version_info.latest_compatible_reql_version;
             res->reql_version = reql_version;
@@ -761,8 +753,7 @@ struct rdb_read_visitor_t : public boost::static_visitor<void> {
             interruptor,
             rget.serializable_env,
             trace);
-        do_snap_read(store->rocksh(), &ql_env, store, btree, superblock, rget, res,
-                     nullptr);
+        do_snap_read(store->rocksh(), &ql_env, store, btree, superblock, rget, res);
     }
 
     void operator()(const distribution_read_t &dg) {
