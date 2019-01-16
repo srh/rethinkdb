@@ -99,9 +99,8 @@ continue_bool_t store_t::send_backfill_pre(
 
             key_range_t to_do = pair.first;
             to_do.left = threshold.key();
-            continue_bool_t cont = btree_send_backfill_pre(sb.get(),
-                release_superblock_t::RELEASE, to_do, pair.second, &limiter,
-                interruptor);
+            continue_bool_t cont = btree_send_backfill_pre(std::move(sb),
+                to_do, pair.second, &limiter, interruptor);
             guarantee(threshold <= pair.first.right);
             if (limiter.inner_aborted) {
                 guarantee(cont == continue_bool_t::ABORT);
