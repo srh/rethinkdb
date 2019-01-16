@@ -622,9 +622,8 @@ class point_write_t {
 public:
     point_write_t() { }
     point_write_t(const store_key_t& _key,
-                  ql::datum_t _data,
-                  bool _overwrite = true)
-        : key(_key), data(_data), overwrite(_overwrite) { }
+                  ql::datum_t _data)
+        : key(_key), data(_data), overwrite(true) { }
 
     store_key_t key;
     ql::datum_t data;

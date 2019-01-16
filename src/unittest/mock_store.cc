@@ -15,9 +15,9 @@ write_t mock_overwrite(std::string key, std::string value) {
     m[datum_string_t("id")] = ql::datum_t(datum_string_t(key));
     m[datum_string_t("value")] = ql::datum_t(datum_string_t(value));
 
-    point_write_t pw(store_key_t(key),
-                                     ql::datum_t(std::move(m)),
-                                     true);
+    point_write_t pw(
+        store_key_t(key),
+        ql::datum_t(std::move(m)));
     return write_t(pw, DURABILITY_REQUIREMENT_SOFT, profile_bool_t::DONT_PROFILE,
                    ql::configured_limits_t());
 }

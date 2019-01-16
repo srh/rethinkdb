@@ -416,7 +416,7 @@ batched_replace_response_t rdb_batched_replace(
 void rdb_set(rockshard rocksh,
              const store_key_t &key,
              ql::datum_t data,
-             bool overwrite,  /* TODO: Who calls this with and without overwrite? */
+             bool overwrite,  /* Right now, via point_write_t::overwrite this is always true. */
              btree_slice_t *slice,
              repli_timestamp_t timestamp,
              real_superblock_t *superblock,
@@ -428,6 +428,8 @@ void rdb_set(rockshard rocksh,
     superblock_passback_guard spb(superblock, pass_back_superblock);
     slice->stats.pm_keys_set.record();
     slice->stats.pm_total_keys_set += 1;
+
+    superblock->read_acq_signal()->wait_lazily_ordered();
 
     std::string rocks_kv_location = rockstore::table_primary_key(rocksh.table_id, rocksh.shard_no, key_to_unescaped_str(key));
     std::pair<std::string, bool> maybe_value
@@ -444,6 +446,7 @@ void rdb_set(rockshard rocksh,
     mod_info->added.first = data;
 
     if (overwrite || !had_value) {
+        superblock->write_acq_signal()->wait_lazily_ordered();
         // TODO: We don't do kv_location_delete in case of R_NULL value?
         // (I think the value can't be R_NULL because backfilling code is what calls this.)
         ql::serialization_result_t res =
@@ -478,6 +481,8 @@ void rdb_delete(rockshard rocksh,
     slice->stats.pm_keys_set.record();
     slice->stats.pm_total_keys_set += 1;
 
+    superblock->read_acq_signal()->wait_lazily_ordered();
+
     std::string rocks_kv_location = rockstore::table_primary_key(rocksh.table_id, rocksh.shard_no, key_to_unescaped_str(key));
     std::pair<std::string, bool> maybe_value = rocksh.rocks->try_read(rocks_kv_location);
 
@@ -485,6 +490,7 @@ void rdb_delete(rockshard rocksh,
 
     /* Update the modification report. */
     if (exists) {
+        superblock->write_acq_signal()->wait_lazily_ordered();
         mod_info->deleted.first = datum_deserialize_from_vec(maybe_value.first.data(), maybe_value.first.size());
         kv_location_delete(rocksh.rocks, rocks_kv_location, timestamp, delete_mode);
     }

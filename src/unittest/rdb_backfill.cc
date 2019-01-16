@@ -89,7 +89,7 @@ private:
             doc.overwrite("padding", ql::datum_t(datum_string_t(
                 std::string(value_padding_length, 'a'))));
             _write = write_t(
-                    point_write_t(store_key_t(key), std::move(doc).to_datum(), true),
+                    point_write_t(store_key_t(key), std::move(doc).to_datum()),
                     DURABILITY_REQUIREMENT_SOFT,
                     profile_bool_t::PROFILE,
                     ql::configured_limits_t());
