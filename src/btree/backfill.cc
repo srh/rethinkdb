@@ -40,7 +40,8 @@ continue_bool_t btree_send_backfill_pre(
 }
 
 continue_bool_t send_all_in_keyrange(
-        rockshard rocksh, real_superblock_t *superblock, release_superblock_t release_superblock,
+        rockshard rocksh,
+        scoped_ptr_t<real_superblock_t> &&superblock,
         const key_range_t &range,
         repli_timestamp_t reference_timestamp,
         repli_timestamp_t max_timestamp,
@@ -70,9 +71,7 @@ continue_bool_t send_all_in_keyrange(
     // TODO: With all superblock read_acq_signals... use the interruptor?
     superblock->read_acq_signal()->wait_lazily_ordered();
     scoped_ptr_t<rocksdb::Iterator> iter(db->NewIterator(opts));
-    if (release_superblock == release_superblock_t::RELEASE) {
-        superblock->release();
-    }
+    superblock.reset();
 
     bool was_valid = iter->Valid();
     rocksdb::Slice key_slice;
@@ -163,8 +162,7 @@ void ignore_all_pre_items(
 // TODO: Rename (drop the btree prefix)
 continue_bool_t btree_send_backfill(
         rockshard rocksh,
-        real_superblock_t *superblock,
-        release_superblock_t release_superblock,
+        scoped_ptr_t<real_superblock_t> &&superblock,
         const key_range_t &range,
         repli_timestamp_t reference_timestamp,
         repli_timestamp_t max_timestamp,
@@ -180,7 +178,7 @@ continue_bool_t btree_send_backfill(
     ignore_all_pre_items(drainer.lock(), range, pre_item_producer);
 
     continue_bool_t cont = send_all_in_keyrange(
-        rocksh, superblock, release_superblock, range, reference_timestamp,
+        rocksh, std::move(superblock), range, reference_timestamp,
         max_timestamp, item_consumer,
         memory_tracker, interruptor);
 

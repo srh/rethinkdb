@@ -117,8 +117,7 @@ protected:
 
 continue_bool_t btree_send_backfill(
         rockshard rocksh,
-        real_superblock_t *superblock,
-        release_superblock_t release_superblock,
+        scoped_ptr_t<real_superblock_t> &&superblock,
         const key_range_t &range,
         repli_timestamp_t reference_timestamp,
         repli_timestamp_t max_timestamp,

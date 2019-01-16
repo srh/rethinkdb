@@ -246,7 +246,7 @@ continue_bool_t store_t::send_backfill(
                 item_consumer, &threshold, &metainfo_copy);
 
             continue_bool_t cont = btree_send_backfill(
-                rocksh(), sb.get(), release_superblock_t::RELEASE, to_do, pair.second, max_timestamp,
+                rocksh(), std::move(sb), to_do, pair.second, max_timestamp,
                 &pre_item_adapter, &limiter, memory_tracker, interruptor);
 
             /* Check if the backfill was aborted because of exhausting the memory
