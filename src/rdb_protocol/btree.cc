@@ -1989,6 +1989,8 @@ void rdb_update_single_sindex(
                         sindex->sindex.id,
                         key_to_unescaped_str(it->first.btree_key()));
 
+                // TODO: We could do a SingleDelete for secondary index removals.
+
                 rocksh.rocks->remove(rocks_secondary_kv_location, rockstore::write_options::TODO());
             }
         } catch (const ql::base_exc_t &) {
