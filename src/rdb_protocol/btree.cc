@@ -1107,11 +1107,6 @@ void rdb_rget_snapshot_slice(
 }
 
 
-
-// TODO: I get the feeling this ismissing some functionality, such as use of
-// batchspec -- we returned all 12000 rows in the data explorer, instead of
-// paging.  It took a while and felt weird.
-
 // TODO: Having two functions which are 99% the same sucks.
 void rdb_rget_slice(
         rockshard rocksh,
