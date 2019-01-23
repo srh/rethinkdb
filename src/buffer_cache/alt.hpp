@@ -199,14 +199,15 @@ public:
 class sindex_superblock_lock {
 public:
     sindex_superblock_lock(sindex_block_lock *parent, uuid_u sindex_uuid, access_t access)
-        : txn_(parent->txn()), acq_() {
+        : acq_() {
+        txn_t *txn = parent->txn();
         wait_for_rwlock(parent->acq_.get(), access);
-        auto it = txn_->cache()->locks_.sindex_superblock_locks.find(sindex_uuid);
+        auto it = txn->cache()->locks_.sindex_superblock_locks.find(sindex_uuid);
         // TODO: Precisely manage lock construction, building the sindex_superblock_locks at initial
         // table load?
         // TODO: Someplace, we need to delete locks.
-        if (it == txn_->cache()->locks_.sindex_superblock_locks.end()) {
-            auto res = txn_->cache()->locks_.sindex_superblock_locks.emplace(
+        if (it == txn->cache()->locks_.sindex_superblock_locks.end()) {
+            auto res = txn->cache()->locks_.sindex_superblock_locks.emplace(
                 sindex_uuid,
                 make_scoped<rwlock_t>());
             it = res.first;
@@ -215,13 +216,14 @@ public:
     }
 
     sindex_superblock_lock(sindex_block_lock *parent, uuid_u sindex_uuid, alt_create_t)
-        : txn_(parent->txn()), acq_() {
+        : acq_() {
+        txn_t *txn = parent->txn();
         wait_for_rwlock(parent->acq_.get(), access_t::write);
-        auto it = txn_->cache()->locks_.sindex_superblock_locks.find(sindex_uuid);
-        guarantee(it == txn_->cache()->locks_.sindex_superblock_locks.end());
+        auto it = txn->cache()->locks_.sindex_superblock_locks.find(sindex_uuid);
+        guarantee(it == txn->cache()->locks_.sindex_superblock_locks.end());
         scoped_ptr_t<rwlock_t> the_lock = make_scoped<rwlock_t>();
         acq_.init(the_lock.get(), access_t::write);
-        txn_->cache()->locks_.sindex_superblock_locks.emplace(
+        txn->cache()->locks_.sindex_superblock_locks.emplace(
             sindex_uuid, std::move(the_lock));
     }
 
@@ -229,7 +231,6 @@ public:
     const signal_t *write_acq_signal() { return acq_.write_signal(); }
 
     void reset_buf_lock() {
-        txn_ = nullptr;
         acq_.reset();
     }
 
@@ -237,7 +238,6 @@ public:
         // TODO: Implement for real (remove from sindex_superblock_locks -- force caller to hold parent lock, see if that's reasonable)
     }
 
-    txn_t *txn_;
     rwlock_in_line_t acq_;
 };
 
