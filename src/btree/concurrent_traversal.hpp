@@ -11,7 +11,6 @@ namespace rocksdb {
     class Snapshot;
 }
 namespace rockstore { class store; }
-class superblock_t;
 
 enum class direction_t {
     forward,
@@ -44,17 +43,5 @@ continue_bool_t rocks_traversal(
         const key_range_t &range,
         direction_t direction,
         rocks_traversal_cb *cb);
-
-// We release the superblock after calling get_snapshot (or starting an iterator, or
-// something) in rocksdb.
-continue_bool_t rocks_traversal(
-        superblock_t *superblock,
-        rockstore::store *rocks,
-        const std::string &rocks_kv_prefix,
-        const key_range_t &range,
-        direction_t direction,
-        release_superblock_t release_superblock,
-        rocks_traversal_cb *cb);
-
 
 #endif  // BTREE_CONCURRENT_TRAVERSAL_HPP_

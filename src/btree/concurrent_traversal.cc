@@ -161,24 +161,3 @@ continue_bool_t rocks_traversal(
         return continue_bool_t::CONTINUE;
     }
 }
-
-continue_bool_t rocks_traversal(
-        superblock_t *superblock,
-        rockstore::store *rocks,
-        const std::string &rocks_kv_prefix,
-        const key_range_t &range,
-        direction_t direction,
-        release_superblock_t release_superblock,
-        rocks_traversal_cb *cb) {
-
-    // Acquire read lock on superblock first.
-    superblock->read_acq_signal()->wait_lazily_ordered();
-
-    rockstore::snapshot snap = make_snapshot(rocks);
-
-    if (release_superblock == release_superblock_t::RELEASE) {
-        superblock->release();
-    }
-
-    return rocks_traversal(rocks, snap.snap, rocks_kv_prefix, range, direction, cb);
-}

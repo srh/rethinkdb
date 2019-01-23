@@ -746,15 +746,15 @@ void store_t::clear_sindex_data(
         try {
             std::string rocks_sindex_kv_prefix =
                 rockstore::table_secondary_prefix(table_id, shard_no, sindex_id);
-            sindex_superblock_t sindex_superblock(&sindex_superblock_lock);
+            sindex_superblock_lock.read_acq_signal()->wait_lazily_ordered();
+            rockstore::snapshot snap = make_snapshot(rocks);
             reached_end =
                 (continue_bool_t::CONTINUE == rocks_traversal(
-                    &sindex_superblock,
                     rocks,
+                    snap.snap,
                     rocks_sindex_kv_prefix,
                     remaining_range,
                     direction_t::forward,
-                    release_superblock_t::KEEP,
                     &traversal_cb));
         } catch (const interrupted_exc_t &) {
             // It's safe to interrupt in the middle of clearing the index.

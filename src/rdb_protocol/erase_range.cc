@@ -91,13 +91,18 @@ continue_bool_t rdb_erase_small_range(
         interruptor);
     std::string rocks_kv_prefix =
         rockstore::table_primary_prefix(rocksh.table_id, rocksh.shard_no);
+
+    // Acquire read lock on superblock before taking snapshot.
+    superblock->read_acq_signal()->wait_lazily_ordered();
+    rockstore::snapshot snap = make_snapshot(rocksh.rocks);
+
     // TODO: All btree_depth_first_traversals took an interruptor.  And that got
     // dropped for rocks_traversal.  Check all callers of rocks_traversal to see
     // what to do about that -- here, key_collector takes the interruptor and
     // uses it to abort the concurrent traversal.
     rocks_traversal(
-        superblock, rocksh.rocks, rocks_kv_prefix, key_range, direction_t::forward,
-        release_superblock_t::KEEP, &key_collector);
+        rocksh.rocks, snap.snap, rocks_kv_prefix, key_range, direction_t::forward,
+        &key_collector);
     if (interruptor->is_pulsed()) {
         /* If the interruptor is pulsed during the traversal, then the traversal
         will stop early but not throw an exception. So we have to throw it here.

@@ -1149,13 +1149,19 @@ void rdb_rget_slice(
         // or hold a rocksdb snapshot once, out here.
         auto cb = [&](const std::pair<store_key_t, uint64_t> &pair, bool is_last) {
             rocks_rget_cb_wrapper wrapper(&callback, pair.second);
+            // Acquire read lock on superblock and make a snapshot.
+            superblock->read_acq_signal()->wait_lazily_ordered();
+            rockstore::snapshot snap = make_snapshot(rocksh.rocks);
+            if (is_last && release_superblock == release_superblock_t::RELEASE) {
+                superblock->release();
+            }
+
             return rocks_traversal(
-                superblock,
                 rocksh.rocks,
+                snap.snap,
                 rocks_kv_prefix,
                 key_range_t::one_key(pair.first),
                 direction,
-                is_last ? release_superblock : release_superblock_t::KEEP,
                 &wrapper);
         };
         if (!reversed(sorting)) {
@@ -1179,8 +1185,13 @@ void rdb_rget_slice(
         }
     } else {
         rocks_rget_cb_wrapper wrapper(&callback, 1);
+        superblock->read_acq_signal()->wait_lazily_ordered();
+        rockstore::snapshot snap = make_snapshot(rocksh.rocks);
+        if (release_superblock == release_superblock_t::RELEASE) {
+            superblock->release();
+        }
         cont = rocks_traversal(
-            superblock, rocksh.rocks, rocks_kv_prefix, range, direction, release_superblock, &wrapper);
+            rocksh.rocks, snap.snap, rocks_kv_prefix, range, direction, &wrapper);
     }
     callback.finish(cont);
 }
@@ -1328,14 +1339,17 @@ void rdb_rget_secondary_slice(
         if (active_range.is_empty()) {
             return continue_bool_t::CONTINUE;
         }
-        sindex_superblock_t sb(superblock);
+        superblock->read_acq_signal()->wait_lazily_ordered();
+        rockstore::snapshot snap = make_snapshot(rocksh.rocks);
+        if (is_last && release_superblock == release_superblock_t::RELEASE) {
+            superblock->reset_buf_lock();
+        }
         return rocks_traversal(
-            &sb,
             rocksh.rocks,
+            snap.snap,
             rocks_kv_prefix,
             active_range,
             direction,
-            is_last ? release_superblock : release_superblock_t::KEEP,
             &wrapper);
     };
     continue_bool_t cont = datumspec.iter(sorting, cb);

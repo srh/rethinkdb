@@ -6,34 +6,24 @@
 #include "buffer_cache/alt.hpp"
 #include "containers/uuid.hpp"
 #include "concurrency/new_semaphore.hpp"
-
-class rockshard;
-class cache_t;
-
-/* Most of the code in the `btree/` directory doesn't "know" about the format of the
-superblock; instead it manipulates the superblock using the abstract `superblock_t`. This
-file provides the concrete superblock implementation used for ReQL primary and sindex
-B-trees. It also provides functions for working with the secondary index block and the
-metainfo, which are unrelated to the B-tree but stored on the ReQL primary superblock.
-
-`btree/secondary_operations.*` and `btree/reql_specific.*` are the only files in the
-`btree/` directory that know about ReQL-specific concepts such as metainfo and sindexes.
-They should probably be moved out of the `btree/` directory. */
+#include "concurrency/promise.hpp"
 
 class binary_blob_t;
+class cache_t;
+class rockshard;
 
 /* `real_superblock_t` represents the superblock for the primary B-tree of a table. */
-class real_superblock_t : public superblock_t {
+class real_superblock_t {
 public:
     static constexpr std::nullptr_t no_passback = nullptr;
 
     explicit real_superblock_t(real_superblock_lock &&sb_buf);
     real_superblock_t(real_superblock_lock &&sb_buf, new_semaphore_in_line_t &&write_semaphore_acq);
 
-    void release() override;
+    void release();
     real_superblock_lock *get() { return &sb_buf_; }
 
-    const signal_t *read_acq_signal() override;
+    const signal_t *read_acq_signal();
     const signal_t *write_acq_signal();
 
 private:
@@ -68,13 +58,13 @@ public:
 
 
 /* `sindex_superblock_t` represents the superblock for a sindex B-tree. */
-class sindex_superblock_t : public superblock_t {
+class sindex_superblock_t {
 public:
     explicit sindex_superblock_t(sindex_superblock_lock *sb_buf);
 
-    void release() override;
+    void release();
 
-    const signal_t *read_acq_signal() override;
+    const signal_t *read_acq_signal();
     const signal_t *write_acq_signal();
 
 private:

@@ -25,23 +25,6 @@ class trace_t;
 
 enum cache_snapshotted_t { CACHE_SNAPSHOTTED_NO, CACHE_SNAPSHOTTED_YES };
 
-/* An abstract superblock provides the starting point for performing B-tree operations.
-This makes it so that the B-tree code doesn't actually have to know about the format of
-the superblock, or about anything else that might be contained in the superblock besides
-the root block ID and the stat block ID. */
-// Under rockstore code, this only serves as a read-write lock (possibly, vestigially).
-class superblock_t {
-public:
-    superblock_t() { }
-    virtual ~superblock_t() { }
-
-    virtual void release() = 0;
-    virtual const signal_t *read_acq_signal() = 0;
-
-private:
-    DISABLE_COPYING(superblock_t);
-};
-
 // TODO: Remove or make use of.
 /* `delete_mode_t` controls how `apply_keyvalue_change()` acts when `kv_loc->value` is
 empty. */
