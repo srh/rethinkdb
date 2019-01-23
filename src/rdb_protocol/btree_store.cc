@@ -624,13 +624,7 @@ optional<uuid_u> store_t::add_sindex_internal(
     if (::get_secondary_index(rocksh(), sindex_block, name, &sindex)) {
         return r_nullopt; // sindex was already created
     } else {
-        {
-            sindex_superblock_lock sb_lock(sindex_block, sindex.id, alt_create_t::create);
-            sindex.opaque_definition = opaque_definition;
-
-            sindex_superblock_t superblock(std::move(sb_lock));
-            btree_slice_t::init_sindex_superblock(&superblock);
-        }
+        sindex.opaque_definition = opaque_definition;
 
         secondary_index_slices.insert(
                 std::make_pair(sindex.id,

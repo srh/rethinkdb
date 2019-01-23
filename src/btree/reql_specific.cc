@@ -61,12 +61,6 @@ void btree_slice_t::init_real_superblock(real_superblock_t *superblock,
     initialize_secondary_indexes(rocksh, &sindex_block);
 }
 
-void btree_slice_t::init_sindex_superblock(sindex_superblock_t *superblock) {
-    superblock->write_acq_signal()->wait_lazily_ordered();
-    // Nothing to do.
-    // TODO: Just get rid of the locking logic, this function entirely?
-}
-
 btree_slice_t::btree_slice_t(cache_t *c, perfmon_collection_t *parent,
                              const std::string &identifier,
                              index_type_t index_type)

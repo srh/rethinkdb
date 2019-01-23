@@ -77,6 +77,8 @@ public:
     const signal_t *read_acq_signal() override;
     const signal_t *write_acq_signal();
 
+    sindex_superblock_lock &get() { return sb_buf_; }
+
 private:
     sindex_superblock_lock sb_buf_;
 };
@@ -101,7 +103,6 @@ public:
             rockshard rocksh,
             const std::vector<char> &metainfo_key,
             const binary_blob_t &metainfo_value);
-    static void init_sindex_superblock(sindex_superblock_t *superblock);
 
     btree_slice_t(cache_t *cache,
                   perfmon_collection_t *parent,

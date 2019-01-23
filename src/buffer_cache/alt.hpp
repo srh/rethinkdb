@@ -154,6 +154,7 @@ public:
     txn_t *txn_;
     rwlock_in_line_t acq_;
 };
+
 class sindex_block_lock {
 public:
     sindex_block_lock() : txn_(nullptr), access_(valgrind_undefined(access_t::read)), acq_() {}
