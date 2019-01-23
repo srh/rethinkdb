@@ -122,7 +122,7 @@ ql::grouped_t<ql::stream_t> read_row_via_sindex(
             &token, &txn, &super_block,
             &dummy_interruptor);
 
-    scoped_ptr_t<sindex_superblock_t> sindex_sb;
+    scoped_ptr_t<sindex_superblock_lock> sindex_sb;
     uuid_u sindex_uuid;
 
     std::vector<char> opaque_definition;

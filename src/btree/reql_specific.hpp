@@ -70,17 +70,15 @@ public:
 /* `sindex_superblock_t` represents the superblock for a sindex B-tree. */
 class sindex_superblock_t : public superblock_t {
 public:
-    explicit sindex_superblock_t(sindex_superblock_lock &&sb_buf);
+    explicit sindex_superblock_t(sindex_superblock_lock *sb_buf);
 
     void release() override;
 
     const signal_t *read_acq_signal() override;
     const signal_t *write_acq_signal();
 
-    sindex_superblock_lock &get() { return sb_buf_; }
-
 private:
-    sindex_superblock_lock sb_buf_;
+    sindex_superblock_lock *sb_buf_;
 };
 
 enum class index_type_t {

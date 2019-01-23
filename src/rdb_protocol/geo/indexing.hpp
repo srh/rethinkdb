@@ -16,7 +16,6 @@ class datum_t;
 namespace rocksdb { class Snapshot; }
 class rockshard;
 class signal_t;
-class sindex_superblock_t;
 
 
 /* Polygons and lines are inserted into an index by computing a coverage of them

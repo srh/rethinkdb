@@ -738,8 +738,6 @@ void store_t::clear_sindex_data(
             sindex.id,
             access_t::write);
         sindex_block.reset_buf_lock();
-        scoped_ptr_t<sindex_superblock_t> sindex_superblock
-            = make_scoped<sindex_superblock_t>(std::move(sindex_superblock_lock));
 
         // TODO: Actually just pass a range delete to rocksdb.
 
@@ -748,9 +746,10 @@ void store_t::clear_sindex_data(
         try {
             std::string rocks_sindex_kv_prefix =
                 rockstore::table_secondary_prefix(table_id, shard_no, sindex_id);
+            sindex_superblock_t sindex_superblock(&sindex_superblock_lock);
             reached_end =
                 (continue_bool_t::CONTINUE == rocks_traversal(
-                    sindex_superblock.get(),
+                    &sindex_superblock,
                     rocks,
                     rocks_sindex_kv_prefix,
                     remaining_range,
@@ -759,7 +758,7 @@ void store_t::clear_sindex_data(
                     &traversal_cb));
         } catch (const interrupted_exc_t &) {
             // It's safe to interrupt in the middle of clearing the index.
-            sindex_superblock.reset();
+            sindex_superblock_lock.reset_buf_lock();
             txn->commit();
             throw;
         }
@@ -771,7 +770,7 @@ void store_t::clear_sindex_data(
             key_range_t::none,
             store_key_t());
 
-        sindex_superblock->write_acq_signal()->wait_lazily_ordered();
+        sindex_superblock_lock.write_acq_signal()->wait_lazily_ordered();
 
         /* 2. Actually delete them */
         const std::vector<store_key_t> &keys = traversal_cb.get_keys();
@@ -781,7 +780,7 @@ void store_t::clear_sindex_data(
             rocks->remove(rocks_kv_location, rockstore::write_options::TODO());
         }
 
-        sindex_superblock.reset();
+        sindex_superblock_lock.reset_buf_lock();
         txn->commit();
     }
 }
@@ -816,16 +815,6 @@ void store_t::drop_sindex(uuid_u sindex_id) THROWS_NOTHING {
         return;
     }
 
-    /* The root node should have been emptied at this point. Delete it */
-    {
-        sindex_superblock_lock sindex_superblock_lock(
-            &sindex_block,
-            sindex.id,
-            access_t::write);
-        sindex_superblock_t sindex_superblock(std::move(sindex_superblock_lock));
-        // TODO: It's possible we need to keep the locking here.
-        sindex_superblock.read_acq_signal()->wait_lazily_ordered();
-    }
     /* Now it's safe to completely delete the index */
     sindex_superblock_lock sindex_superblock_lock(
         &sindex_block,
@@ -942,7 +931,7 @@ MUST_USE bool store_t::acquire_sindex_superblock_for_read(
         const std::string &table_name,
         real_superblock_t *superblock,
         release_superblock_t release_superblock,
-        scoped_ptr_t<sindex_superblock_t> *sindex_sb_out,
+        scoped_ptr_t<sindex_superblock_lock> *sindex_sb_out,
         std::vector<char> *opaque_definition_out,
         uuid_u *sindex_uuid_out)
     THROWS_ONLY(sindex_not_ready_exc_t) {
@@ -971,7 +960,7 @@ MUST_USE bool store_t::acquire_sindex_superblock_for_read(
 
     sindex_superblock_lock superblock_lock(&sindex_block, sindex.id, access_t::read);
     sindex_block.reset_buf_lock();
-    sindex_sb_out->init(new sindex_superblock_t(std::move(superblock_lock)));
+    sindex_sb_out->init(new sindex_superblock_lock(std::move(superblock_lock)));
     return true;
 }
 
@@ -979,7 +968,7 @@ MUST_USE bool store_t::acquire_sindex_superblock_for_write(
         const sindex_name_t &name,
         const std::string &table_name,
         real_superblock_t *superblock,
-        scoped_ptr_t<sindex_superblock_t> *sindex_sb_out,
+        scoped_ptr_t<sindex_superblock_lock> *sindex_sb_out,
         uuid_u *sindex_uuid_out)
     THROWS_ONLY(sindex_not_ready_exc_t) {
     assert_thread();
@@ -1006,14 +995,14 @@ MUST_USE bool store_t::acquire_sindex_superblock_for_write(
         sindex.id,
         access_t::write);
     sindex_block.reset_buf_lock();
-    sindex_sb_out->init(new sindex_superblock_t(std::move(superblock_lock)));
+    sindex_sb_out->init(new sindex_superblock_lock(std::move(superblock_lock)));
     return true;
 }
 
 store_t::sindex_access_t::sindex_access_t(btree_slice_t *_btree,
                                           sindex_name_t _name,
                                           secondary_index_t _sindex,
-                                          scoped_ptr_t<sindex_superblock_t> _superblock)
+                                          scoped_ptr_t<sindex_superblock_lock> _superblock)
     : btree(_btree),
       name(std::move(_name)),
       sindex(std::move(_sindex)),
@@ -1072,7 +1061,7 @@ bool store_t::acquire_sindex_superblocks_for_write(
                         get_sindex_slice(it->second.id),
                         it->first,
                         it->second,
-                        make_scoped<sindex_superblock_t>(std::move(superblock_lock))));
+                        make_scoped<sindex_superblock_lock>(std::move(superblock_lock))));
     }
 
     // return's true if we got all of the sindexes requested.

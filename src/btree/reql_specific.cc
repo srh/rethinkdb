@@ -30,20 +30,20 @@ const signal_t *real_superblock_t::write_acq_signal() {
     return sb_buf_.write_acq_signal();
 }
 
-sindex_superblock_t::sindex_superblock_t(sindex_superblock_lock &&sb_buf)
-    : sb_buf_(std::move(sb_buf)) {}
+sindex_superblock_t::sindex_superblock_t(sindex_superblock_lock *sb_buf)
+    : sb_buf_(sb_buf) {}
 
 void sindex_superblock_t::release() {
-    sb_buf_.reset_buf_lock();
+    sb_buf_->reset_buf_lock();
 }
 
 
 const signal_t *sindex_superblock_t::read_acq_signal() {
-    return sb_buf_.read_acq_signal();
+    return sb_buf_->read_acq_signal();
 }
 
 const signal_t *sindex_superblock_t::write_acq_signal() {
-    return sb_buf_.write_acq_signal();
+    return sb_buf_->write_acq_signal();
 }
 
 // TODO: Remove

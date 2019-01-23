@@ -1269,7 +1269,7 @@ void rdb_rget_secondary_slice(
         const region_t &shard,
         const ql::datumspec_t &datumspec,
         const key_range_t &sindex_region_range,
-        sindex_superblock_t *superblock,
+        sindex_superblock_lock *superblock,
         ql::env_t *ql_env,
         const ql::batchspec_t &batchspec,
         const std::vector<transform_variant_t> &transforms,
@@ -1325,9 +1325,12 @@ void rdb_rget_secondary_slice(
             key_to_unescaped_str(sindex_keyrange.left));
         key_range_t active_range = active_region_range.intersection(sindex_keyrange);
         // This can happen sometimes with truncated keys.
-        if (active_range.is_empty()) return continue_bool_t::CONTINUE;
+        if (active_range.is_empty()) {
+            return continue_bool_t::CONTINUE;
+        }
+        sindex_superblock_t sb(superblock);
         return rocks_traversal(
-            superblock,
+            &sb,
             rocksh.rocks,
             rocks_kv_prefix,
             active_range,
@@ -1947,7 +1950,7 @@ void rdb_update_single_sindex(
     // secondary index updates.
     UNUSED profile::trace_t *const trace = nullptr;
 
-    sindex_superblock_t *superblock = sindex->superblock.get();
+    sindex_superblock_lock *superblock = sindex->superblock.get();
 
     auto cserver = store->changefeed_server(modification->primary_key);
 

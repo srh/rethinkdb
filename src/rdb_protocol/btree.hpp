@@ -163,7 +163,7 @@ void rdb_rget_secondary_slice(
     const region_t &shard,
     const ql::datumspec_t &datumspec,
     const key_range_t &sindex_range,
-    sindex_superblock_t *superblock,
+    sindex_superblock_lock *superblock,
     ql::env_t *ql_env,
     const ql::batchspec_t &batchspec,
     const std::vector<ql::transform_variant_t> &transforms,
