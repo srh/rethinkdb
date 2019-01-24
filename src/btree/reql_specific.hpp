@@ -18,7 +18,7 @@ public:
     static constexpr std::nullptr_t no_passback = nullptr;
 
     explicit real_superblock_t(real_superblock_lock &&sb_buf);
-    real_superblock_t(real_superblock_lock &&sb_buf, new_semaphore_in_line_t &&write_semaphore_acq);
+    real_superblock_t(new_semaphore_in_line_t &&write_semaphore_acq, real_superblock_lock &&sb_buf);
 
     void release();
     real_superblock_lock *get() { return &sb_buf_; }

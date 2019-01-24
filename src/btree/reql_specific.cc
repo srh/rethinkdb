@@ -12,8 +12,8 @@ real_superblock_t::real_superblock_t(real_superblock_lock &&sb_buf)
     : sb_buf_(std::move(sb_buf)) {}
 
 real_superblock_t::real_superblock_t(
-        real_superblock_lock &&sb_buf,
-        new_semaphore_in_line_t &&write_semaphore_acq)
+
+        new_semaphore_in_line_t &&write_semaphore_acq, real_superblock_lock &&sb_buf)
     : write_semaphore_acq_(std::move(write_semaphore_acq)),
       sb_buf_(std::move(sb_buf)) {}
 
@@ -220,7 +220,7 @@ void get_btree_superblock(
         scoped_ptr_t<real_superblock_t> *got_superblock_out) {
     real_superblock_lock tmp_buf(txn, access_t::write);
     scoped_ptr_t<real_superblock_t> tmp_sb(
-        new real_superblock_t(std::move(tmp_buf), std::move(write_sem_acq)));
+        new real_superblock_t(std::move(write_sem_acq), std::move(tmp_buf)));
     *got_superblock_out = std::move(tmp_sb);
 }
 
