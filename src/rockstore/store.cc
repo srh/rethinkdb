@@ -409,5 +409,6 @@ std::string prefix_end(const std::string &prefix) {
     return ret;
 }
 
+// TODO: Use PinnableSlice.  Configure (unconfigure) VerifyChecksums.
 
 }  // namespace rockstore
