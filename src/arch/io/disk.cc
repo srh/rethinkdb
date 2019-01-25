@@ -35,7 +35,7 @@
 // TODO: We don't need the max_concurrent_io_requests option anymore, do we?
 io_backender_t::io_backender_t(rockstore::store *rocks,
                                file_direct_io_mode_t _direct_io_mode,
-                               int max_concurrent_io_requests)
+                               UNUSED int max_concurrent_io_requests)
     : direct_io_mode(_direct_io_mode),
       rocks_(rocks) { }
 
