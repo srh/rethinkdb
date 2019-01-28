@@ -16,7 +16,6 @@ class rockshard;
 class real_superblock_t {
 public:
     explicit real_superblock_t(real_superblock_lock &&sb_buf);
-    real_superblock_t(new_semaphore_in_line_t &&write_semaphore_acq, real_superblock_lock &&sb_buf);
 
     void release();
     real_superblock_lock *get() { return &sb_buf_; }
@@ -25,13 +24,6 @@ public:
     const signal_t *write_acq_signal();
 
 private:
-    /* The write_semaphore_acq_ is empty for reads.
-    For writes it locks the write superblock acquisition semaphore until the
-    sb_buf_ is released.
-    Note that this is used to throttle writes compared to reads, but not required
-    for correctness. */
-    new_semaphore_in_line_t write_semaphore_acq_;
-
     real_superblock_lock sb_buf_;
 };
 

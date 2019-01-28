@@ -117,7 +117,7 @@ store_t::store_t(const region_t &_region,
 
         txn_t txn(general_cache_conn.get(), write_durability_t::HARD, 1);
         {
-            real_superblock_lock sb_lock(&txn, access_t::write);
+            real_superblock_lock sb_lock(&txn, access_t::write, new_semaphore_in_line_t());
             real_superblock_t superblock(std::move(sb_lock));
             // TODO: Make sure store initialization logic doesn't miss out on
             // lock ordering logic, when we go rocks-only.

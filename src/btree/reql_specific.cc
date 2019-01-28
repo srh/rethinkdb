@@ -11,15 +11,9 @@
 real_superblock_t::real_superblock_t(real_superblock_lock &&sb_buf)
     : sb_buf_(std::move(sb_buf)) {}
 
-real_superblock_t::real_superblock_t(
-
-        new_semaphore_in_line_t &&write_semaphore_acq, real_superblock_lock &&sb_buf)
-    : write_semaphore_acq_(std::move(write_semaphore_acq)),
-      sb_buf_(std::move(sb_buf)) {}
 
 void real_superblock_t::release() {
     sb_buf_.reset_buf_lock();
-    write_semaphore_acq_.reset();
 }
 
 const signal_t *real_superblock_t::read_acq_signal() {
@@ -207,7 +201,8 @@ void get_btree_superblock(
         txn_t *txn,
         access_t access,
         scoped_ptr_t<real_superblock_t> *got_superblock_out) {
-    real_superblock_lock tmp_buf(txn, access);
+    // TODO: Is access ever not read access?
+    real_superblock_lock tmp_buf(txn, access, new_semaphore_in_line_t());
     scoped_ptr_t<real_superblock_t> tmp_sb(new real_superblock_t(std::move(tmp_buf)));
     *got_superblock_out = std::move(tmp_sb);
 }
@@ -218,10 +213,8 @@ void get_btree_superblock(
         UNUSED write_access_t access,
         new_semaphore_in_line_t &&write_sem_acq,
         scoped_ptr_t<real_superblock_t> *got_superblock_out) {
-    real_superblock_lock tmp_buf(txn, access_t::write);
-    scoped_ptr_t<real_superblock_t> tmp_sb(
-        new real_superblock_t(std::move(write_sem_acq), std::move(tmp_buf)));
-    *got_superblock_out = std::move(tmp_sb);
+    real_superblock_lock tmp_buf(txn, access_t::write, std::move(write_sem_acq));
+    *got_superblock_out = make_scoped<real_superblock_t>(std::move(tmp_buf));
 }
 
 void get_btree_superblock_and_txn_for_writing(

@@ -10,6 +10,7 @@
 #include "buffer_cache/page_cache.hpp"
 #include "buffer_cache/types.hpp"
 #include "concurrency/rwlock.hpp"
+#include "concurrency/new_semaphore.hpp"
 #include "containers/scoped.hpp"
 #include "containers/two_level_array.hpp"
 #include "containers/uuid.hpp"
@@ -127,8 +128,11 @@ inline void wait_for_rwlock(rwlock_in_line_t *acq, access_t access) {
 
 class real_superblock_lock {
 public:
-    explicit real_superblock_lock(txn_t *txn, access_t access)
-        : txn_(txn), acq_(&txn->cache()->locks_.real_superblock_lock, access) {}
+    explicit real_superblock_lock(
+            txn_t *txn, access_t access, new_semaphore_in_line_t &&write_semaphore_acq)
+        : txn_(txn),
+          write_semaphore_acq_(std::move(write_semaphore_acq)),
+          acq_(&txn->cache()->locks_.real_superblock_lock, access) {}
 
     txn_t *txn() { return txn_; }
 
@@ -138,9 +142,16 @@ public:
     void reset_buf_lock() {
         txn_ = nullptr;
         acq_.reset();
+        write_semaphore_acq_.reset();
     }
 
     txn_t *txn_;
+    // The write_semaphore_acq_ is empty for reads.  For writes it locks the
+    // write superblock acquisition semaphore until acq_ is released.  Note that
+    // this is used to throttle writes compared to reads, but not required for
+    // correctness.
+    // TODO: We should (with rocks) always let reads jump the line ahead of writes?
+    new_semaphore_in_line_t write_semaphore_acq_;
     rwlock_in_line_t acq_;
 };
 
