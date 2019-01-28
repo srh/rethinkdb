@@ -12,6 +12,8 @@
 
 namespace rockstore {
 
+// TODO: Remove rockstore::txn (if we don't make use of it).
+
 // TODO: Move this somewhere?
 bool starts_with(const std::string& x, const std::string& prefix) {
     return x.size() >= prefix.size() &&

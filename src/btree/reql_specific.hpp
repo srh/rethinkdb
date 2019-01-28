@@ -15,8 +15,6 @@ class rockshard;
 /* `real_superblock_t` represents the superblock for the primary B-tree of a table. */
 class real_superblock_t {
 public:
-    static constexpr std::nullptr_t no_passback = nullptr;
-
     explicit real_superblock_t(real_superblock_lock &&sb_buf);
     real_superblock_t(new_semaphore_in_line_t &&write_semaphore_acq, real_superblock_lock &&sb_buf);
 
@@ -38,19 +36,16 @@ private:
 };
 
 
-
 class superblock_passback_guard {
 public:
     superblock_passback_guard(real_superblock_t *_superblock, promise_t<real_superblock_t *> *_pass_back)
-        : superblock(_superblock), pass_back_superblock(_pass_back) {}
+        : superblock(_superblock), pass_back_superblock(_pass_back) {
+        rassert(superblock != nullptr);
+        rassert(pass_back_superblock != nullptr);
+    }
+    DISABLE_COPYING(superblock_passback_guard);
     ~superblock_passback_guard() {
-        if (superblock != nullptr) {
-            if (pass_back_superblock != nullptr) {
-                pass_back_superblock->pulse(superblock);
-            } else {
-                superblock->release();
-            }
-        }
+        pass_back_superblock->pulse(superblock);
     }
     real_superblock_t *superblock;
     promise_t<real_superblock_t *> *pass_back_superblock;

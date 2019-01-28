@@ -232,9 +232,12 @@ void apply_single_key_item(
         }
 
         /* Actually apply the change, releasing the superblock in the process. */
+        // TODO: We no longer release the superblock in that process -- use row-level locking.
         std::vector<rdb_modification_report_t> mod_reports;
+        promise_t<real_superblock_t *> pass_back_superblock;
         apply_item_pair(rocksh, tokens.info->slice, superblock.get(),
-            std::move(item.pairs[0]), &mod_reports, nullptr);
+            std::move(item.pairs[0]), &mod_reports, &pass_back_superblock);
+        pass_back_superblock.wait()->release();
 
         /* Notify that we're done and update the sindexes */
         fifo_enforcer_sink_t::exit_write_t exiter(

@@ -52,13 +52,15 @@ void insert_rows(int start, int finish, store_t *store) {
             rdb_modification_report_t mod_report(pk);
             rapidjson::Document doc;
             doc.Parse(data.c_str());
+            promise_t<real_superblock_t *> pass_back_superblock;
             rdb_set(
                 store->rocksh(),
                 pk,
                 ql::to_datum(doc, limits, reql_version_t::LATEST),
                 false, store->btree.get(), repli_timestamp_t::distant_past,
                 superblock.get(), &response, &mod_report.info,
-                static_cast<profile::trace_t *>(NULL), real_superblock_t::no_passback);
+                static_cast<profile::trace_t *>(NULL), &pass_back_superblock);
+            pass_back_superblock.wait()->release();
 
             store_t::sindex_access_vector_t sindexes;
             store->acquire_all_sindex_superblocks_for_write(&sindex_block, &sindexes);

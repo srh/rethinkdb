@@ -993,10 +993,13 @@ struct rdb_write_visitor_t : public boost::static_visitor<void> {
 
         backfill_debug_key(w.key, strprintf("upsert %" PRIu64, timestamp.longtime));
 
+        // TODO: Previously we didn't pass back the superblock.
         rdb_modification_report_t mod_report(w.key);
+        promise_t<real_superblock_t *> pass_back_superblock;
         rdb_set(store->rocksh(),
                 w.key, w.data, w.overwrite, btree, timestamp, superblock.get(),
-                res, &mod_report.info, trace, real_superblock_t::no_passback);
+                res, &mod_report.info, trace, &pass_back_superblock);
+        pass_back_superblock.wait()->release();
 
         update_sindexes(mod_report);
     }
@@ -1009,10 +1012,14 @@ struct rdb_write_visitor_t : public boost::static_visitor<void> {
 
         backfill_debug_key(d.key, strprintf("delete %" PRIu64, timestamp.longtime));
 
+        // TODO: Previously we didn't pass back the superblock.
         rdb_modification_report_t mod_report(d.key);
+        promise_t<real_superblock_t *> pass_back_superblock;
         rdb_delete(store->rocksh(),
                 d.key, btree, timestamp, superblock.get(),
-                delete_mode_t::REGULAR_QUERY, res, &mod_report.info, trace, real_superblock_t::no_passback);
+                delete_mode_t::REGULAR_QUERY, res, &mod_report.info, trace,
+                &pass_back_superblock);
+        pass_back_superblock.wait()->release();
 
         update_sindexes(mod_report);
     }
