@@ -6,7 +6,7 @@
 #include "containers/archive/vector_stream.hpp"
 #include "rockstore/rockshard.hpp"
 
-store_metainfo_manager_t::store_metainfo_manager_t(rockshard rocksh, real_superblock_t *superblock) {
+store_metainfo_manager_t::store_metainfo_manager_t(rockshard rocksh, real_superblock_lock *superblock) {
     std::vector<std::pair<std::vector<char>, std::vector<char> > > kv_pairs;
     // TODO: this is inefficient, cut out the middleman (vector)
     get_superblock_metainfo(rocksh, superblock, &kv_pairs);
@@ -28,7 +28,7 @@ store_metainfo_manager_t::store_metainfo_manager_t(rockshard rocksh, real_superb
 }
 
 region_map_t<binary_blob_t> store_metainfo_manager_t::get(
-        real_superblock_t *superblock,
+        real_superblock_lock *superblock,
         const region_t &region) const {
     guarantee(superblock != nullptr);
     superblock->read_acq_signal()->wait_lazily_ordered();
@@ -36,7 +36,7 @@ region_map_t<binary_blob_t> store_metainfo_manager_t::get(
 }
 
 void store_metainfo_manager_t::visit(
-        real_superblock_t *superblock,
+        real_superblock_lock *superblock,
         const region_t &region,
         const std::function<void(const region_t &, const binary_blob_t &)> &cb) const {
     guarantee(superblock != nullptr);
@@ -45,7 +45,7 @@ void store_metainfo_manager_t::visit(
 }
 
 void store_metainfo_manager_t::update(
-        real_superblock_t *superblock,
+        real_superblock_lock *superblock,
         rockshard rocksh,
         const region_map_t<binary_blob_t> &new_values) {
     // TODO: Strip out non-rocks writing (but keep superblock write acquisition waiting).

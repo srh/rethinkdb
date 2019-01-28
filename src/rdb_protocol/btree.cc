@@ -33,11 +33,11 @@
 #include "debug.hpp"
 
 void rdb_get(rockshard rocksh, const store_key_t &store_key,
-             real_superblock_t *superblock, point_read_response_t *response) {
+             real_superblock_lock *superblock, point_read_response_t *response) {
     superblock->read_acq_signal()->wait_lazily_ordered();
     std::string loc = rockstore::table_primary_key(rocksh.table_id, rocksh.shard_no, key_to_unescaped_str(store_key));
     std::pair<std::string, bool> val = rocksh.rocks->try_read(loc);
-    superblock->release();
+    superblock->reset_buf_lock();
     if (!val.second) {
         response->data = ql::datum_t::null();
     } else {
@@ -127,7 +127,7 @@ batched_replace_response_t rdb_replace_and_return_superblock(
         rockshard rocksh,
         const btree_loc_info_t &info,
         const one_replace_t *replacer,
-        promise_t<real_superblock_t *> *superblock_promise,
+        promise_t<real_superblock_lock *> *superblock_promise,
         rdb_modification_info_t *mod_info_out,
         profile::trace_t *trace) {
     (void)trace;  // TODO: Use trace?
@@ -287,7 +287,7 @@ void do_a_replace_from_batched_replace(
     btree_loc_info_t &&info,
     const one_replace_t one_replace,
     const ql::configured_limits_t &limits,
-    promise_t<real_superblock_t *> *superblock_promise,
+    promise_t<real_superblock_lock *> *superblock_promise,
     rdb_modification_report_cb_t *mod_cb,
     bool update_pkey_cfeeds,
     batched_replace_response_t *stats_out,
@@ -298,7 +298,7 @@ void do_a_replace_from_batched_replace(
         batched_replaces_fifo_sink, batched_replaces_fifo_token);
     // We need to get in line for this while still holding the superblock so
     // that stamp read operations can't queue-skip.
-    info.superblock->get()->write_acq_signal()->wait_lazily_ordered();
+    info.superblock->write_acq_signal()->wait_lazily_ordered();
     rwlock_in_line_t stamp_spot = mod_cb->get_in_line_for_cfeed_stamp();
 
     rdb_modification_report_t mod_report(*info.key);
@@ -319,7 +319,7 @@ void do_a_replace_from_batched_replace(
 batched_replace_response_t rdb_batched_replace(
     rockshard rocksh,
     const btree_info_t &info,
-    scoped_ptr_t<real_superblock_t> &&superblock,
+    scoped_ptr_t<real_superblock_lock> &&superblock,
     const std::vector<store_key_t> &keys,
     const btree_batched_replacer_t *replacer,
     rdb_modification_report_cb_t *sindex_cb,
@@ -358,12 +358,12 @@ batched_replace_response_t rdb_batched_replace(
             MAX_CONCURRENT_REPLACES, &coro_queue, &callback);
         // We release the superblock either before or after draining on all the
         // write operations depending on the presence of limit changefeeds.
-        scoped_ptr_t<real_superblock_t> current_superblock(std::move(superblock));
+        scoped_ptr_t<real_superblock_lock> current_superblock(std::move(superblock));
         bool update_pkey_cfeeds = sindex_cb->has_pkey_cfeeds(keys);
         {
             auto_drainer_t drainer;
             for (size_t i = 0; i < keys.size(); ++i) {
-                promise_t<real_superblock_t *> superblock_promise;
+                promise_t<real_superblock_lock *> superblock_promise;
                 coro_queue.push(
                     [lock = auto_drainer_t::lock_t(&drainer),
                      rocksh,
@@ -393,8 +393,7 @@ batched_replace_response_t rdb_batched_replace(
                             trace,
                             &conditions);
                      });
-                current_superblock.init(
-                    static_cast<real_superblock_t *>(superblock_promise.wait()));
+                current_superblock.init(superblock_promise.wait());
             }
             if (!update_pkey_cfeeds) {
                 current_superblock.reset(); // Release the superblock early if
@@ -419,11 +418,11 @@ void rdb_set(rockshard rocksh,
              bool overwrite,  /* Right now, via point_write_t::overwrite this is always true. */
              btree_slice_t *slice,
              repli_timestamp_t timestamp,
-             real_superblock_t *superblock,
+             real_superblock_lock *superblock,
              point_write_response_t *response_out,
              rdb_modification_info_t *mod_info,
              profile::trace_t *trace,
-             promise_t<real_superblock_t *> *pass_back_superblock) {
+             promise_t<real_superblock_lock *> *pass_back_superblock) {
     (void)trace;  // TODO: Use trace?
     superblock_passback_guard spb(superblock, pass_back_superblock);
     slice->stats.pm_keys_set.record();
@@ -470,12 +469,12 @@ void rdb_delete(rockshard rocksh,
                 const store_key_t &key,
                 btree_slice_t *slice,
                 repli_timestamp_t timestamp,
-                real_superblock_t *superblock,
+                real_superblock_lock *superblock,
                 delete_mode_t delete_mode,
                 point_delete_response_t *response,
                 rdb_modification_info_t *mod_info,
                 profile::trace_t *trace,
-                promise_t<real_superblock_t *> *pass_back_superblock) {
+                promise_t<real_superblock_lock *> *pass_back_superblock) {
     (void)trace;  // TODO: Use trace?
     superblock_passback_guard spb(superblock, pass_back_superblock);
     slice->stats.pm_keys_set.record();
@@ -1114,7 +1113,7 @@ void rdb_rget_slice(
         const region_t &shard,
         const key_range_t &range,
         const optional<std::map<store_key_t, uint64_t> > &primary_keys,
-        real_superblock_t *superblock,
+        real_superblock_lock *superblock,
         ql::env_t *ql_env,
         const ql::batchspec_t &batchspec,
         const std::vector<transform_variant_t> &transforms,
@@ -1153,7 +1152,7 @@ void rdb_rget_slice(
             superblock->read_acq_signal()->wait_lazily_ordered();
             rockstore::snapshot snap = make_snapshot(rocksh.rocks);
             if (is_last && release_superblock == release_superblock_t::RELEASE) {
-                superblock->release();
+                superblock->reset_buf_lock();
             }
 
             return rocks_traversal(
@@ -1188,7 +1187,7 @@ void rdb_rget_slice(
         superblock->read_acq_signal()->wait_lazily_ordered();
         rockstore::snapshot snap = make_snapshot(rocksh.rocks);
         if (release_superblock == release_superblock_t::RELEASE) {
-            superblock->release();
+            superblock->reset_buf_lock();
         }
         cont = rocks_traversal(
             rocksh.rocks, snap.snap, rocks_kv_prefix, range, direction, &wrapper);
@@ -1562,7 +1561,7 @@ bool rdb_modification_report_cb_t::has_pkey_cfeeds(
 }
 
 void rdb_modification_report_cb_t::finish(
-    btree_slice_t *btree, real_superblock_t *superblock) {
+    btree_slice_t *btree, real_superblock_lock *superblock) {
     auto cservers = store_->access_changefeed_servers();
     for (auto &&pair : *cservers.first) {
         pair.second->foreach_limit(
@@ -2294,7 +2293,7 @@ private:
         // dirty page limit and bring down the whole table.
         // Other than that, the hard durability guarantee is not actually
         // needed here.
-        scoped_ptr_t<real_superblock_t> superblock;
+        scoped_ptr_t<real_superblock_lock> superblock;
         store_->acquire_superblock_for_write(
                 2 + MAX_CHUNK_SIZE,
                 write_durability_t::HARD,
@@ -2304,7 +2303,7 @@ private:
                 interruptor_);
 
         // Acquire the sindex block and release the superblock.
-        sindex_block_lock sindex_block(superblock->get(), access_t::write);
+        sindex_block_lock sindex_block(superblock.get(), access_t::write);
         superblock.reset();
         store_t::sindex_access_vector_t all_sindexes;
         store_->acquire_sindex_superblocks_for_write(
@@ -2379,7 +2378,7 @@ void post_construct_secondary_index_range(
     // The txn must be destructed before the cache_account.
     cache_account_t cache_account;
     scoped_ptr_t<txn_t> txn;
-    scoped_ptr_t<real_superblock_t> superblock;
+    scoped_ptr_t<real_superblock_lock> superblock;
 
     // Start a snapshotted read transaction to traverse the primary btree
     read_token_t read_token;
@@ -2392,7 +2391,7 @@ void post_construct_secondary_index_range(
     superblock->read_acq_signal()->wait_lazily_ordered();
     rockshard rocksh = store->rocksh();
     rockstore::snapshot rocksnap = make_snapshot(rocksh.rocks);
-    superblock->release();
+    superblock->reset_buf_lock();
 
     // Note: This starts a write transaction, which might get throttled.
     // It is important that we construct the `traversal_cb` *after* we've started

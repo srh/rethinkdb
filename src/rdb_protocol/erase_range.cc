@@ -72,7 +72,7 @@ continue_bool_t rdb_erase_small_range(
         btree_slice_t *btree_slice,
         key_tester_t *tester,
         const key_range_t &key_range,
-        real_superblock_t *superblock,
+        real_superblock_lock *superblock,
         signal_t *interruptor,
         uint64_t max_keys_to_erase,
         std::vector<rdb_modification_report_t> *mod_reports_out,

@@ -52,7 +52,7 @@ TPTEST(BtreeMetainfo, MetainfoTest) {
         txn_t txn(&cache_conn, write_durability_t::HARD, 1);
         {
             real_superblock_lock sb_lock(&txn, access_t::write, new_semaphore_in_line_t());
-            real_superblock_t superblock(std::move(sb_lock));
+            real_superblock_lock superblock(std::move(sb_lock));
             btree_slice_t::init_real_superblock(
                 &superblock,
                 rocksh,
@@ -70,7 +70,7 @@ TPTEST(BtreeMetainfo, MetainfoTest) {
         {
             scoped_ptr_t<txn_t> txn;
             {
-                scoped_ptr_t<real_superblock_t> superblock;
+                scoped_ptr_t<real_superblock_lock> superblock;
                 get_btree_superblock_and_txn_for_writing(
                     &cache_conn, nullptr, write_access_t::write, 1,
                     write_durability_t::SOFT, &superblock, &txn);
@@ -86,7 +86,7 @@ TPTEST(BtreeMetainfo, MetainfoTest) {
         }
         {
             scoped_ptr_t<txn_t> txn;
-            scoped_ptr_t<real_superblock_t> superblock;
+            scoped_ptr_t<real_superblock_lock> superblock;
             get_btree_superblock_and_txn_for_reading(
                 &cache_conn, &superblock, &txn);
             std::vector<std::pair<std::vector<char>, std::vector<char> > > read_back;

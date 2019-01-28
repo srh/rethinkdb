@@ -90,7 +90,7 @@ continue_bool_t store_t::send_backfill_pre(
         key_range_t::right_bound_t threshold(pair.first.left);
         while (threshold != pair.first.right) {
             scoped_ptr_t<txn_t> txn;
-            scoped_ptr_t<real_superblock_t> sb;
+            scoped_ptr_t<real_superblock_lock> sb;
             get_btree_superblock_and_txn_for_backfilling(
                 general_cache_conn.get(), btree->get_backfill_account(), &sb, &txn);
 
@@ -218,7 +218,7 @@ continue_bool_t store_t::send_backfill(
         key_range_t::right_bound_t threshold(pair.first.left);
         while (threshold != pair.first.right) {
             scoped_ptr_t<txn_t> txn;
-            scoped_ptr_t<real_superblock_t> sb;
+            scoped_ptr_t<real_superblock_lock> sb;
             get_btree_superblock_and_txn_for_backfilling(
                 general_cache_conn.get(), btree->get_backfill_account(), &sb, &txn);
 

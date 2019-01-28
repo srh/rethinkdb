@@ -19,7 +19,7 @@ values from the leaf nodes. */
 // static const int MAX_CONCURRENT_VALUE_LOADS = 16;
 
 continue_bool_t btree_send_backfill_pre(
-        scoped_ptr_t<real_superblock_t> &&superblock,
+        scoped_ptr_t<real_superblock_lock> &&superblock,
         const key_range_t &range,
         repli_timestamp_t reference_timestamp,
         btree_backfill_pre_item_consumer_t *pre_item_consumer,
@@ -38,7 +38,7 @@ continue_bool_t btree_send_backfill_pre(
 
 continue_bool_t send_all_in_keyrange(
         rockshard rocksh,
-        scoped_ptr_t<real_superblock_t> &&superblock,
+        scoped_ptr_t<real_superblock_lock> &&superblock,
         const key_range_t &range,
         repli_timestamp_t reference_timestamp,
         repli_timestamp_t max_timestamp,
@@ -159,7 +159,7 @@ void ignore_all_pre_items(
 // TODO: Rename (drop the btree prefix)
 continue_bool_t btree_send_backfill(
         rockshard rocksh,
-        scoped_ptr_t<real_superblock_t> &&superblock,
+        scoped_ptr_t<real_superblock_lock> &&superblock,
         const key_range_t &range,
         repli_timestamp_t reference_timestamp,
         repli_timestamp_t max_timestamp,
@@ -186,7 +186,7 @@ continue_bool_t btree_send_backfill(
 
 
 void btree_receive_backfill_item_update_deletion_timestamps(
-        real_superblock_t *superblock,
+        real_superblock_lock *superblock,
         const backfill_item_t &item,
         signal_t *interruptor) {
     (void)superblock, (void)item, (void)interruptor;

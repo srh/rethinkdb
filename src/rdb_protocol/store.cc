@@ -86,7 +86,7 @@ void store_t::help_construct_bring_sindexes_up_to_date() {
     new_write_token(&token);
 
     scoped_ptr_t<txn_t> txn;
-    scoped_ptr_t<real_superblock_t> superblock;
+    scoped_ptr_t<real_superblock_lock> superblock;
     acquire_superblock_for_write(1,
                                  write_durability_t::SOFT,
                                  &token,
@@ -95,7 +95,7 @@ void store_t::help_construct_bring_sindexes_up_to_date() {
                                  &dummy_interruptor);
 
     sindex_block_lock sindex_block(
-        superblock->get(),
+        superblock.get(),
         access_t::write);
 
     superblock.reset();
@@ -142,7 +142,7 @@ void store_t::help_construct_bring_sindexes_up_to_date() {
 
 scoped_ptr_t<sindex_superblock_lock> acquire_sindex_for_read(
     store_t *store,
-    real_superblock_t *superblock,
+    real_superblock_lock *superblock,
     release_superblock_t release_superblock,
     const std::string &table_name,
     const std::string &sindex_id,
@@ -190,14 +190,14 @@ void do_snap_read(
         ql::env_t *env,
         store_t *store,
         btree_slice_t *btree,
-        real_superblock_t *superblock,
+        real_superblock_lock *superblock,
         const rget_read_t &rget,
         rget_read_response_t *res) {
     guarantee(rget.current_shard.has_value());
     if (!rget.sindex.has_value()) {
         superblock->read_acq_signal()->wait_lazily_ordered();
         rockstore::snapshot snap = make_snapshot(rocksh.rocks);
-        superblock->release();
+        superblock->reset_buf_lock();
 
         rdb_rget_snapshot_slice(
             snap.snap,
@@ -287,7 +287,7 @@ void do_read(rockshard rocksh,
              ql::env_t *env,
              store_t *store,
              btree_slice_t *btree,
-             real_superblock_t *superblock,
+             real_superblock_lock *superblock,
              const rget_read_t &rget,
              rget_read_response_t *res,
              release_superblock_t release_superblock,
@@ -491,7 +491,7 @@ struct rdb_read_visitor_t : public boost::static_visitor<void> {
     changefeed_stamp_response_t do_stamp(const changefeed_stamp_t &s,
                                          const region_t &current_shard,
                                          const store_key_t &read_start) {
-        superblock->get()->read_acq_signal()->wait_lazily_ordered();
+        superblock->read_acq_signal()->wait_lazily_ordered();
 
         auto cserver = store->changefeed_server(s.region);
         if (cserver.first != nullptr) {
@@ -516,7 +516,7 @@ struct rdb_read_visitor_t : public boost::static_visitor<void> {
     void operator()(const changefeed_point_stamp_t &s) {
         // Need to wait for the superblock to make sure we get the right changefeed
         // stamp.
-        superblock->get()->read_acq_signal()->wait_lazily_ordered();
+        superblock->read_acq_signal()->wait_lazily_ordered();
 
         response->response = changefeed_point_stamp_response_t();
         auto *res = boost::get<changefeed_point_stamp_response_t>(&response->response);
@@ -758,7 +758,9 @@ struct rdb_read_visitor_t : public boost::static_visitor<void> {
 
     void operator()(const distribution_read_t &dg) {
         superblock->read_acq_signal()->wait_lazily_ordered();
-        superblock->release();
+        // We reset the buf lock early, because rocksdb doesn't offer consistent
+        // access to key range statistics? Or at least we don't really need it.
+        superblock->reset_buf_lock();
         response->response = distribution_read_response_t();
         distribution_read_response_t *res = boost::get<distribution_read_response_t>(&response->response);
         // TODO: Replace max_depth option of distribution_read_t (when we break
@@ -791,7 +793,7 @@ struct rdb_read_visitor_t : public boost::static_visitor<void> {
 
     rdb_read_visitor_t(btree_slice_t *_btree,
                        store_t *_store,
-                       real_superblock_t *_superblock,
+                       real_superblock_lock *_superblock,
                        rdb_context_t *_ctx,
                        read_response_t *_response,
                        profile::trace_t *_trace,
@@ -811,7 +813,7 @@ private:
     signal_t *const interruptor;
     btree_slice_t *const btree;
     store_t *const store;
-    real_superblock_t *const superblock;
+    real_superblock_lock *const superblock;
     profile::trace_t *const trace;
 
     DISABLE_COPYING(rdb_read_visitor_t);
@@ -819,7 +821,7 @@ private:
 
 void store_t::protocol_read(const read_t &_read,
                             read_response_t *response,
-                            real_superblock_t *superblock,
+                            real_superblock_lock *superblock,
                             signal_t *interruptor) {
     scoped_ptr_t<profile::trace_t> trace = ql::maybe_make_profile_trace(_read.profile);
 
@@ -995,11 +997,11 @@ struct rdb_write_visitor_t : public boost::static_visitor<void> {
 
         // TODO: Previously we didn't pass back the superblock.
         rdb_modification_report_t mod_report(w.key);
-        promise_t<real_superblock_t *> pass_back_superblock;
+        promise_t<real_superblock_lock *> pass_back_superblock;
         rdb_set(store->rocksh(),
                 w.key, w.data, w.overwrite, btree, timestamp, superblock.get(),
                 res, &mod_report.info, trace, &pass_back_superblock);
-        pass_back_superblock.wait()->release();
+        pass_back_superblock.wait()->reset_buf_lock();
 
         update_sindexes(mod_report);
     }
@@ -1014,12 +1016,12 @@ struct rdb_write_visitor_t : public boost::static_visitor<void> {
 
         // TODO: Previously we didn't pass back the superblock.
         rdb_modification_report_t mod_report(d.key);
-        promise_t<real_superblock_t *> pass_back_superblock;
+        promise_t<real_superblock_lock *> pass_back_superblock;
         rdb_delete(store->rocksh(),
                 d.key, btree, timestamp, superblock.get(),
                 delete_mode_t::REGULAR_QUERY, res, &mod_report.info, trace,
                 &pass_back_superblock);
-        pass_back_superblock.wait()->release();
+        pass_back_superblock.wait()->reset_buf_lock();
 
         update_sindexes(mod_report);
     }
@@ -1044,7 +1046,7 @@ struct rdb_write_visitor_t : public boost::static_visitor<void> {
 
     rdb_write_visitor_t(btree_slice_t *_btree,
                         store_t *_store,
-                        scoped_ptr_t<real_superblock_t> &&_superblock,
+                        scoped_ptr_t<real_superblock_lock> &&_superblock,
                         repli_timestamp_t _timestamp,
                         rdb_context_t *_ctx,
                         profile::sampler_t *_sampler,
@@ -1060,7 +1062,7 @@ struct rdb_write_visitor_t : public boost::static_visitor<void> {
         timestamp(_timestamp),
         sampler(_sampler),
         trace(_trace),
-        sindex_block(superblock->get(),
+        sindex_block(superblock.get(),
                      access_t::write) {
     }
 
@@ -1078,7 +1080,7 @@ private:
     write_response_t *const response;
     rdb_context_t *const ctx;
     signal_t *const interruptor;
-    scoped_ptr_t<real_superblock_t> superblock;
+    scoped_ptr_t<real_superblock_lock> superblock;
     const repli_timestamp_t timestamp;
     profile::sampler_t *const sampler;
     profile::trace_t *const trace;
@@ -1091,7 +1093,7 @@ private:
 void store_t::protocol_write(const write_t &_write,
                              write_response_t *response,
                              state_timestamp_t timestamp,
-                             scoped_ptr_t<real_superblock_t> superblock,
+                             scoped_ptr_t<real_superblock_lock> superblock,
                              signal_t *interruptor) {
     scoped_ptr_t<profile::trace_t> trace = ql::maybe_make_profile_trace(_write.profile);
 

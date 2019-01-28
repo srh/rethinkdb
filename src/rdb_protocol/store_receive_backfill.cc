@@ -116,7 +116,7 @@ public:
     must be in order. */
     std::function<void(
         const key_range_t::right_bound_t &progress,
-        real_superblock_t *superblock
+        real_superblock_lock *superblock
         )> update_metainfo_cb;
     std::function<void(
         const key_range_t::right_bound_t &progress,
@@ -135,7 +135,7 @@ void apply_empty_range(
     try {
         /* Acquire the superblock */
         scoped_ptr_t<txn_t> txn;
-        scoped_ptr_t<real_superblock_t> superblock;
+        scoped_ptr_t<real_superblock_lock> superblock;
         {
             fifo_enforcer_sink_t::exit_write_t exiter(
                 &tokens.info->btree_fifo_sink, tokens.write_token);
@@ -166,10 +166,10 @@ It doesn't call `on_commit()` or modify the metainfo. */
 void apply_item_pair(
         rockshard rocksh,
         btree_slice_t *slice,
-        real_superblock_t *superblock,
+        real_superblock_lock *superblock,
         backfill_item_t::pair_t &&pair,
         std::vector<rdb_modification_report_t> *mod_reports_out,
-        promise_t<real_superblock_t *> *pass_back_superblock) {
+        promise_t<real_superblock_lock *> *pass_back_superblock) {
     mod_reports_out->resize(mod_reports_out->size() + 1);
     mod_reports_out->back().primary_key = pair.key;
     if (static_cast<bool>(pair.value1)) {
@@ -208,7 +208,7 @@ void apply_single_key_item(
     try {
         /* Acquire the superblock */
         scoped_ptr_t<txn_t> txn;
-        scoped_ptr_t<real_superblock_t> superblock;
+        scoped_ptr_t<real_superblock_lock> superblock;
         sindex_block_lock sindex_block;
         {
             fifo_enforcer_sink_t::exit_write_t exiter(
@@ -226,7 +226,7 @@ void apply_single_key_item(
 
             /* Acquire the sindex block and update the metainfo now, because we'll
             release the superblock soon */
-            sindex_block = sindex_block_lock(superblock->get(), access_t::write);
+            sindex_block = sindex_block_lock(superblock.get(), access_t::write);
             // TODO: This definitely needs to be in a rocksdb transaction, and possibly should be in opposite order.
             tokens.update_metainfo_cb(item.range.right, superblock.get());
         }
@@ -234,10 +234,10 @@ void apply_single_key_item(
         /* Actually apply the change, releasing the superblock in the process. */
         // TODO: We no longer release the superblock in that process -- use row-level locking.
         std::vector<rdb_modification_report_t> mod_reports;
-        promise_t<real_superblock_t *> pass_back_superblock;
+        promise_t<real_superblock_lock *> pass_back_superblock;
         apply_item_pair(rocksh, tokens.info->slice, superblock.get(),
             std::move(item.pairs[0]), &mod_reports, &pass_back_superblock);
-        pass_back_superblock.wait()->release();
+        pass_back_superblock.wait()->reset_buf_lock();
 
         /* Notify that we're done and update the sindexes */
         fifo_enforcer_sink_t::exit_write_t exiter(
@@ -296,7 +296,7 @@ void apply_multi_key_item(
 
             /* Acquire the superblock. */
             scoped_ptr_t<txn_t> txn;
-            scoped_ptr_t<real_superblock_t> superblock;
+            scoped_ptr_t<real_superblock_lock> superblock;
             get_btree_superblock_and_txn_for_writing(tokens.info->cache_conn, nullptr,
                 write_access_t::write, 1, write_durability_t::SOFT, &superblock, &txn);
 
@@ -342,7 +342,7 @@ void apply_multi_key_item(
             /* Apply any pairs from the item that fall within the deleted region */
             while (next_pair < item.pairs.size() &&
                     range_deleted.contains_key(item.pairs[next_pair].key)) {
-                promise_t<real_superblock_t *> pass_back_superblock;
+                promise_t<real_superblock_lock *> pass_back_superblock;
                 apply_item_pair(rocksh, tokens.info->slice, superblock.get(),
                     std::move(item.pairs[next_pair]), &mod_reports,
                     &pass_back_superblock);
@@ -354,9 +354,9 @@ void apply_multi_key_item(
             threshold = range_deleted.right;
 
             /* Acquire the sindex block and update the metainfo */
-            sindex_block_lock sindex_block(superblock->get(), access_t::write);
+            sindex_block_lock sindex_block(superblock.get(), access_t::write);
             tokens.update_metainfo_cb(threshold, superblock.get());
-            superblock->release();
+            superblock->reset_buf_lock();
 
             /* Notify the callback of our progress and update the sindexes */
             tokens.commit_cb(threshold, std::move(txn), std::move(sindex_block),
@@ -423,7 +423,7 @@ continue_bool_t store_t::receive_backfill(
         tokens.update_metainfo_cb = [this, &_region, &metainfo_threshold, &item_producer,
                     &spawn_threshold](
                 const key_range_t::right_bound_t &progress,
-                real_superblock_t *superblock) {
+                real_superblock_lock *superblock) {
             /* Compute the section of metainfo we're applying */
             guarantee(progress >= metainfo_threshold);
             guarantee(progress <= spawn_threshold);

@@ -118,7 +118,7 @@ store_t::store_t(const region_t &_region,
         txn_t txn(general_cache_conn.get(), write_durability_t::HARD, 1);
         {
             real_superblock_lock sb_lock(&txn, access_t::write, new_semaphore_in_line_t());
-            real_superblock_t superblock(std::move(sb_lock));
+            real_superblock_lock superblock(std::move(sb_lock));
             // TODO: Make sure store initialization logic doesn't miss out on
             // lock ordering logic, when we go rocks-only.
             // TODO: Not to mention... file existence logic.
@@ -142,7 +142,7 @@ store_t::store_t(const region_t &_region,
         read_token_t token;
         new_read_token(&token);
         scoped_ptr_t<txn_t> txn;
-        scoped_ptr_t<real_superblock_t> superblock;
+        scoped_ptr_t<real_superblock_lock> superblock;
         acquire_superblock_for_read(&token,
                                     &txn,
                                     &superblock,
@@ -150,8 +150,7 @@ store_t::store_t(const region_t &_region,
 
         metainfo.init(new store_metainfo_manager_t(rocksh(), superblock.get()));
 
-        sindex_block_lock sindex_block(superblock->get(),
-                                access_t::read);
+        sindex_block_lock sindex_block(superblock.get(), access_t::read);
 
         std::map<sindex_name_t, secondary_index_t> sindexes;
         get_secondary_indexes(rocksh(), &sindex_block, &sindexes);
@@ -196,7 +195,7 @@ void store_t::read(
         THROWS_ONLY(interrupted_exc_t) {
     assert_thread();
     scoped_ptr_t<txn_t> txn;
-    scoped_ptr_t<real_superblock_t> superblock;
+    scoped_ptr_t<real_superblock_lock> superblock;
 
     acquire_superblock_for_read(token, &txn, &superblock,
                                 interruptor);
@@ -219,7 +218,7 @@ void store_t::write(
     assert_thread();
 
     scoped_ptr_t<txn_t> txn;
-    scoped_ptr_t<real_superblock_t> real_superblock;
+    scoped_ptr_t<real_superblock_lock> real_superblock;
     // We assume one block per document, plus changes to the stats block and superblock.
     const int expected_change_count = 2 + _write.expected_document_changes();
     acquire_superblock_for_write(expected_change_count, durability, token,
@@ -228,7 +227,7 @@ void store_t::write(
         real_superblock.get(), metainfo_checker.region, metainfo_checker.callback));
     metainfo->update(real_superblock.get(), rocksh(), new_metainfo);
     try {
-        scoped_ptr_t<real_superblock_t> real_supe = std::move(real_superblock);
+        scoped_ptr_t<real_superblock_lock> real_supe = std::move(real_superblock);
         protocol_write(_write, response, timestamp, std::move(real_supe), interruptor);
     } catch (const interrupted_exc_t &) {
         // We hope that the operation itself is interruption-safe (i.e. always
@@ -257,7 +256,7 @@ void store_t::reset_data(
     for (continue_bool_t done_erasing = continue_bool_t::CONTINUE;
          done_erasing == continue_bool_t::CONTINUE;) {
         scoped_ptr_t<txn_t> txn;
-        scoped_ptr_t<real_superblock_t> superblock;
+        scoped_ptr_t<real_superblock_lock> superblock;
 
         const int expected_change_count = 2 + max_erased_per_pass;
         write_token_t token;
@@ -269,8 +268,7 @@ void store_t::reset_data(
                                      &superblock,
                                      interruptor);
 
-        sindex_block_lock sindex_block(superblock->get(),
-                                access_t::write);
+        sindex_block_lock sindex_block(superblock.get(), access_t::write);
 
         /* Note we don't allow interruption during this step; it's too easy to end up in
         an inconsistent state. */
@@ -307,13 +305,12 @@ void store_t::reset_data(
 std::map<std::string, std::pair<sindex_config_t, sindex_status_t> > store_t::sindex_list(
         UNUSED signal_t *interruptor)
         THROWS_ONLY(interrupted_exc_t) {
-    scoped_ptr_t<real_superblock_t> superblock;
+    scoped_ptr_t<real_superblock_lock> superblock;
     scoped_ptr_t<txn_t> txn;
     get_btree_superblock_and_txn_for_reading(general_cache_conn.get(),
         &superblock, &txn);
-    sindex_block_lock sindex_block(superblock->get(),
-        access_t::read);
-    superblock->release();
+    sindex_block_lock sindex_block(superblock.get(), access_t::read);
+    superblock->reset_buf_lock();
 
     std::map<sindex_name_t, secondary_index_t> secondary_indexes;
     get_secondary_indexes(rocksh(), &sindex_block, &secondary_indexes);
@@ -364,14 +361,13 @@ void store_t::sindex_create(
         const sindex_config_t &config,
         UNUSED signal_t *interruptor)
         THROWS_ONLY(interrupted_exc_t) {
-    scoped_ptr_t<real_superblock_t> superblock;
+    scoped_ptr_t<real_superblock_lock> superblock;
     scoped_ptr_t<txn_t> txn;
     get_btree_superblock_and_txn_for_writing(general_cache_conn.get(),
         &write_superblock_acq_semaphore, write_access_t::write, 1,
         write_durability_t::HARD, &superblock, &txn);
-    sindex_block_lock sindex_block(superblock->get(),
-                            access_t::write);
-    superblock->release();
+    sindex_block_lock sindex_block(superblock.get(), access_t::write);
+    superblock->reset_buf_lock();
 
     /* Note that this function allows creating sindexes with older ReQL versions. For
     example, suppose that the user upgrades to a newer version of RethinkDB, and then
@@ -411,14 +407,13 @@ void store_t::sindex_rename_multi(
         const std::map<std::string, std::string> &name_changes,
         UNUSED signal_t *interruptor)
         THROWS_ONLY(interrupted_exc_t) {
-    scoped_ptr_t<real_superblock_t> superblock;
+    scoped_ptr_t<real_superblock_lock> superblock;
     scoped_ptr_t<txn_t> txn;
     get_btree_superblock_and_txn_for_writing(general_cache_conn.get(),
         &write_superblock_acq_semaphore, write_access_t::write, 1,
         write_durability_t::HARD, &superblock, &txn);
-    sindex_block_lock sindex_block(superblock->get(),
-                            access_t::write);
-    superblock->release();
+    sindex_block_lock sindex_block(superblock.get(), access_t::write);
+    superblock->reset_buf_lock();
 
     /* First we remove all the secondary indexes and hide their perfmons, but put the
     definitions and `btree_stats_t`s into `to_put_back` indexed by their new names. Then
@@ -457,14 +452,13 @@ void store_t::sindex_drop(
         const std::string &name,
         UNUSED signal_t *interruptor)
         THROWS_ONLY(interrupted_exc_t) {
-    scoped_ptr_t<real_superblock_t> superblock;
+    scoped_ptr_t<real_superblock_lock> superblock;
     scoped_ptr_t<txn_t> txn;
     get_btree_superblock_and_txn_for_writing(general_cache_conn.get(),
         &write_superblock_acq_semaphore, write_access_t::write, 1,
         write_durability_t::HARD, &superblock, &txn);
-    sindex_block_lock sindex_block(superblock->get(),
-                            access_t::write);
-    superblock->release();
+    sindex_block_lock sindex_block(superblock.get(), access_t::write);
+    superblock->reset_buf_lock();
 
     secondary_index_t sindex;
     bool success = ::get_secondary_index(rocksh(), &sindex_block, sindex_name_t(name), &sindex);
@@ -709,7 +703,7 @@ void store_t::clear_sindex_data(
         write_token_t token;
         new_write_token(&token);
         scoped_ptr_t<txn_t> txn;
-        scoped_ptr_t<real_superblock_t> superblock;
+        scoped_ptr_t<real_superblock_lock> superblock;
         acquire_superblock_for_write(
             // Not really the right value, since many keys will share a leaf node:
             clear_sindex_traversal_cb_t::CHUNK_SIZE,
@@ -720,9 +714,8 @@ void store_t::clear_sindex_data(
             interruptor);
 
         /* Get the sindex block. */
-        sindex_block_lock sindex_block(superblock->get(),
-                                access_t::write);
-        superblock->release();
+        sindex_block_lock sindex_block(superblock.get(), access_t::write);
+        superblock->reset_buf_lock();
 
         secondary_index_t sindex;
         bool found = get_secondary_index(rocksh(), &sindex_block, sindex_id, &sindex);
@@ -793,7 +786,7 @@ void store_t::drop_sindex(uuid_u sindex_id) THROWS_NOTHING {
     write_token_t token;
     new_write_token(&token);
     scoped_ptr_t<txn_t> txn;
-    scoped_ptr_t<real_superblock_t> superblock;
+    scoped_ptr_t<real_superblock_lock> superblock;
     cond_t non_interruptor;
     acquire_superblock_for_write(
         2,
@@ -804,8 +797,8 @@ void store_t::drop_sindex(uuid_u sindex_id) THROWS_NOTHING {
         &non_interruptor);
 
     /* Get the sindex block. */
-    sindex_block_lock sindex_block(superblock->get(), access_t::write);
-    superblock->release();
+    sindex_block_lock sindex_block(superblock.get(), access_t::write);
+    superblock->reset_buf_lock();
 
     secondary_index_t sindex;
     bool found = get_secondary_index(rocksh(), &sindex_block, sindex_id, &sindex);
@@ -869,12 +862,12 @@ std::map<sindex_name_t, secondary_index_t> store_t::get_sindexes() const {
     assert_thread();
 
     scoped_ptr_t<txn_t> txn;
-    scoped_ptr_t<real_superblock_t> superblock;
+    scoped_ptr_t<real_superblock_lock> superblock;
     get_btree_superblock_and_txn_for_reading(
         general_cache_conn.get(), &superblock, &txn);
 
     sindex_block_lock sindex_block(
-        superblock->get(), access_t::read);
+        superblock.get(), access_t::read);
 
     std::map<sindex_name_t, secondary_index_t> sindexes;
     get_secondary_indexes(rocksh(), &sindex_block, &sindexes);
@@ -929,7 +922,7 @@ MUST_USE bool store_t::mark_secondary_index_deleted(
 MUST_USE bool store_t::acquire_sindex_superblock_for_read(
         const sindex_name_t &name,
         const std::string &table_name,
-        real_superblock_t *superblock,
+        real_superblock_lock *superblock,
         release_superblock_t release_superblock,
         scoped_ptr_t<sindex_superblock_lock> *sindex_sb_out,
         std::vector<char> *opaque_definition_out,
@@ -940,9 +933,9 @@ MUST_USE bool store_t::acquire_sindex_superblock_for_read(
     rassert(sindex_uuid_out != NULL);
 
     /* Acquire the sindex block. */
-    sindex_block_lock sindex_block(superblock->get(), access_t::read);
+    sindex_block_lock sindex_block(superblock, access_t::read);
     if (release_superblock == release_superblock_t::RELEASE) {
-        superblock->release();
+        superblock->reset_buf_lock();
     }
 
     /* Figure out what the superblock for this index is. */
@@ -967,7 +960,7 @@ MUST_USE bool store_t::acquire_sindex_superblock_for_read(
 MUST_USE bool store_t::acquire_sindex_superblock_for_write(
         const sindex_name_t &name,
         const std::string &table_name,
-        real_superblock_t *superblock,
+        real_superblock_lock *superblock,
         scoped_ptr_t<sindex_superblock_lock> *sindex_sb_out,
         uuid_u *sindex_uuid_out)
     THROWS_ONLY(sindex_not_ready_exc_t) {
@@ -975,8 +968,8 @@ MUST_USE bool store_t::acquire_sindex_superblock_for_write(
     rassert(sindex_uuid_out != NULL);
 
     /* Get the sindex block. */
-    sindex_block_lock sindex_block(superblock->get(), access_t::write);
-    superblock->release();
+    sindex_block_lock sindex_block(superblock, access_t::write);
+    superblock->reset_buf_lock();
 
     /* Figure out what the superblock for this index is. */
     secondary_index_t sindex;
@@ -1076,7 +1069,7 @@ region_map_t<binary_blob_t> store_t::get_metainfo(
     THROWS_ONLY(interrupted_exc_t) {
     assert_thread();
     scoped_ptr_t<txn_t> txn;
-    scoped_ptr_t<real_superblock_t> superblock;
+    scoped_ptr_t<real_superblock_lock> superblock;
     acquire_superblock_for_read(token,
                                 &txn, &superblock,
                                 interruptor);
@@ -1092,7 +1085,7 @@ void store_t::set_metainfo(const region_map_t<binary_blob_t> &new_metainfo,
 
     scoped_ptr_t<txn_t> txn;
     {
-        scoped_ptr_t<real_superblock_t> superblock;
+        scoped_ptr_t<real_superblock_lock> superblock;
         acquire_superblock_for_write(
             1,
             durability,
@@ -1108,7 +1101,7 @@ void store_t::set_metainfo(const region_map_t<binary_blob_t> &new_metainfo,
 void store_t::acquire_superblock_for_read(
         read_token_t *token,
         scoped_ptr_t<txn_t> *txn_out,
-        scoped_ptr_t<real_superblock_t> *sb_out,
+        scoped_ptr_t<real_superblock_lock> *sb_out,
         signal_t *interruptor)
         THROWS_ONLY(interrupted_exc_t) {
     assert_thread();
@@ -1127,7 +1120,7 @@ void store_t::acquire_superblock_for_write(
         write_durability_t durability,
         write_token_t *token,
         scoped_ptr_t<txn_t> *txn_out,
-        scoped_ptr_t<real_superblock_t> *sb_out,
+        scoped_ptr_t<real_superblock_lock> *sb_out,
         signal_t *interruptor)
         THROWS_ONLY(interrupted_exc_t) {
     assert_thread();

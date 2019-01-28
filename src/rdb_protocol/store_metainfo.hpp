@@ -8,24 +8,24 @@
 #include "containers/uuid.hpp"
 #include "region/region_map.hpp"
 
-class real_superblock_t;
+class real_superblock_lock;
 class rockshard;
 
 class store_metainfo_manager_t {
 public:
-    explicit store_metainfo_manager_t(rockshard rocksh, real_superblock_t *superblock);
+    explicit store_metainfo_manager_t(rockshard rocksh, real_superblock_lock *superblock);
 
     region_map_t<binary_blob_t> get(
-        real_superblock_t *superblock,
+        real_superblock_lock *superblock,
         const region_t &region) const;
 
     void visit(
-        real_superblock_t *superblock,
+        real_superblock_lock *superblock,
         const region_t &region,
         const std::function<void(const region_t &, const binary_blob_t &)> &cb) const;
 
     void update(
-        real_superblock_t *superblock,
+        real_superblock_lock *superblock,
         rockshard rocksh,
         const region_map_t<binary_blob_t> &new_metainfo);
 

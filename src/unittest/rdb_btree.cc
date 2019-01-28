@@ -35,14 +35,14 @@ void insert_rows(int start, int finish, store_t *store) {
         cond_t dummy_interruptor;
         scoped_ptr_t<txn_t> txn;
         {
-            scoped_ptr_t<real_superblock_t> superblock;
+            scoped_ptr_t<real_superblock_lock> superblock;
             write_token_t token;
             store->new_write_token(&token);
             store->acquire_superblock_for_write(
                 1, write_durability_t::SOFT,
                 &token, &txn, &superblock, &dummy_interruptor);
             sindex_block_lock sindex_block(
-                superblock->get(),
+                superblock.get(),
                 access_t::write);
 
             std::string data = strprintf("{\"id\" : %d, \"sid\" : %d}", i, i * i);
@@ -52,7 +52,7 @@ void insert_rows(int start, int finish, store_t *store) {
             rdb_modification_report_t mod_report(pk);
             rapidjson::Document doc;
             doc.Parse(data.c_str());
-            promise_t<real_superblock_t *> pass_back_superblock;
+            promise_t<real_superblock_lock *> pass_back_superblock;
             rdb_set(
                 store->rocksh(),
                 pk,
@@ -60,7 +60,7 @@ void insert_rows(int start, int finish, store_t *store) {
                 false, store->btree.get(), repli_timestamp_t::distant_past,
                 superblock.get(), &response, &mod_report.info,
                 static_cast<profile::trace_t *>(NULL), &pass_back_superblock);
-            pass_back_superblock.wait()->release();
+            pass_back_superblock.wait()->reset_buf_lock();
 
             store_t::sindex_access_vector_t sindexes;
             store->acquire_all_sindex_superblocks_for_write(&sindex_block, &sindexes);
@@ -118,7 +118,7 @@ ql::grouped_t<ql::stream_t> read_row_via_sindex(
     store->new_read_token(&token);
 
     scoped_ptr_t<txn_t> txn;
-    scoped_ptr_t<real_superblock_t> super_block;
+    scoped_ptr_t<real_superblock_lock> super_block;
 
     store->acquire_superblock_for_read(
             &token, &txn, &super_block,
@@ -311,7 +311,7 @@ TPTEST(RDBBtree, SindexEraseRange) {
 
         scoped_ptr_t<txn_t> txn;
         {
-            scoped_ptr_t<real_superblock_t> super_block;
+            scoped_ptr_t<real_superblock_lock> super_block;
             store.acquire_superblock_for_write(
                 1,
                 write_durability_t::SOFT,
@@ -323,7 +323,7 @@ TPTEST(RDBBtree, SindexEraseRange) {
             const hash_region_t<key_range_t> test_range = hash_region_t<key_range_t>::universe();
             rdb_protocol::range_key_tester_t tester(&test_range);
             sindex_block_lock sindex_block(
-                super_block->get(),
+                super_block.get(),
                 access_t::write);
 
             std::vector<rdb_modification_report_t> mod_reports;

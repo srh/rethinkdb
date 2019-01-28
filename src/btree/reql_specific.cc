@@ -7,51 +7,18 @@
 #include "containers/binary_blob.hpp"
 #include "rockstore/store.hpp"
 
-
-real_superblock_t::real_superblock_t(real_superblock_lock &&sb_buf)
-    : sb_buf_(std::move(sb_buf)) {}
-
-
-void real_superblock_t::release() {
-    sb_buf_.reset_buf_lock();
-}
-
-const signal_t *real_superblock_t::read_acq_signal() {
-    return sb_buf_.read_acq_signal();
-}
-
-const signal_t *real_superblock_t::write_acq_signal() {
-    return sb_buf_.write_acq_signal();
-}
-
-sindex_superblock_t::sindex_superblock_t(sindex_superblock_lock *sb_buf)
-    : sb_buf_(sb_buf) {}
-
-void sindex_superblock_t::release() {
-    sb_buf_->reset_buf_lock();
-}
-
-
-const signal_t *sindex_superblock_t::read_acq_signal() {
-    return sb_buf_->read_acq_signal();
-}
-
-const signal_t *sindex_superblock_t::write_acq_signal() {
-    return sb_buf_->write_acq_signal();
-}
-
 // TODO: Remove
 // Run backfilling at a reduced priority
 #define BACKFILL_CACHE_PRIORITY 10
 
-void btree_slice_t::init_real_superblock(real_superblock_t *superblock,
+void btree_slice_t::init_real_superblock(real_superblock_lock *superblock,
                                          rockshard rocksh,
                                          const std::vector<char> &metainfo_key,
                                          const binary_blob_t &metainfo_value) {
     superblock->write_acq_signal()->wait_lazily_ordered();
     set_superblock_metainfo(superblock, rocksh, metainfo_key, metainfo_value);
 
-    sindex_block_lock sindex_block(superblock->get(), access_t::write);
+    sindex_block_lock sindex_block(superblock, access_t::write);
     initialize_secondary_indexes(rocksh, &sindex_block);
 }
 
@@ -117,7 +84,7 @@ void superblock_metainfo_iterator_t::operator++() {
 
 void get_superblock_metainfo(
         rockshard rocksh,
-        real_superblock_t *superblock,
+        real_superblock_lock *superblock,
         std::vector<std::pair<std::vector<char>, std::vector<char> > > *kv_pairs_out) {
     superblock->read_acq_signal()->wait_lazily_ordered();
 
@@ -139,7 +106,7 @@ void get_superblock_metainfo(
     }
 }
 
-void set_superblock_metainfo(real_superblock_t *superblock,
+void set_superblock_metainfo(real_superblock_lock *superblock,
                              rockshard rocksh,
                              const std::vector<char> &key,
                              const binary_blob_t &value) {
@@ -148,7 +115,7 @@ void set_superblock_metainfo(real_superblock_t *superblock,
     set_superblock_metainfo(superblock, rocksh, keys, values);
 }
 
-void set_superblock_metainfo(real_superblock_t *superblock,
+void set_superblock_metainfo(real_superblock_lock *superblock,
                              rockshard rocksh,
                              const std::vector<std::vector<char> > &keys,
                              const std::vector<binary_blob_t> &values) {
@@ -200,11 +167,9 @@ void set_superblock_metainfo(real_superblock_t *superblock,
 void get_btree_superblock(
         txn_t *txn,
         access_t access,
-        scoped_ptr_t<real_superblock_t> *got_superblock_out) {
+        scoped_ptr_t<real_superblock_lock> *got_superblock_out) {
     // TODO: Is access ever not read access?
-    real_superblock_lock tmp_buf(txn, access, new_semaphore_in_line_t());
-    scoped_ptr_t<real_superblock_t> tmp_sb(new real_superblock_t(std::move(tmp_buf)));
-    *got_superblock_out = std::move(tmp_sb);
+    *got_superblock_out = make_scoped<real_superblock_lock>(txn, access, new_semaphore_in_line_t());
 }
 
 /* Variant for writes that go through a superblock write semaphore */
@@ -212,9 +177,8 @@ void get_btree_superblock(
         txn_t *txn,
         UNUSED write_access_t access,
         new_semaphore_in_line_t &&write_sem_acq,
-        scoped_ptr_t<real_superblock_t> *got_superblock_out) {
-    real_superblock_lock tmp_buf(txn, access_t::write, std::move(write_sem_acq));
-    *got_superblock_out = make_scoped<real_superblock_t>(std::move(tmp_buf));
+        scoped_ptr_t<real_superblock_lock> *got_superblock_out) {
+    *got_superblock_out = make_scoped<real_superblock_lock>(txn, access_t::write, std::move(write_sem_acq));
 }
 
 void get_btree_superblock_and_txn_for_writing(
@@ -223,7 +187,7 @@ void get_btree_superblock_and_txn_for_writing(
         UNUSED write_access_t superblock_access,
         int expected_change_count,
         write_durability_t durability,
-        scoped_ptr_t<real_superblock_t> *got_superblock_out,
+        scoped_ptr_t<real_superblock_lock> *got_superblock_out,
         scoped_ptr_t<txn_t> *txn_out) {
     txn_t *txn = new txn_t(cache_conn, durability, expected_change_count);
 
@@ -242,7 +206,7 @@ void get_btree_superblock_and_txn_for_writing(
 void get_btree_superblock_and_txn_for_backfilling(
         cache_conn_t *cache_conn,
         cache_account_t *backfill_account,
-        scoped_ptr_t<real_superblock_t> *got_superblock_out,
+        scoped_ptr_t<real_superblock_lock> *got_superblock_out,
         scoped_ptr_t<txn_t> *txn_out) {
     txn_t *txn = new txn_t(cache_conn, read_access_t::read);
     txn_out->init(txn);
@@ -257,7 +221,7 @@ void get_btree_superblock_and_txn_for_backfilling(
 // secondary index nodes that you could not possibly access.
 void get_btree_superblock_and_txn_for_reading(
         cache_conn_t *cache_conn,
-        scoped_ptr_t<real_superblock_t> *got_superblock_out,
+        scoped_ptr_t<real_superblock_lock> *got_superblock_out,
         scoped_ptr_t<txn_t> *txn_out) {
     txn_t *txn = new txn_t(cache_conn, read_access_t::read);
     txn_out->init(txn);

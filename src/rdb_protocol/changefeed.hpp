@@ -40,7 +40,7 @@ class btree_slice_t;
 class mailbox_manager_t;
 class namespace_interface_access_t;
 class name_resolver_t;
-class real_superblock_t;
+class real_superblock_lock;
 class sindex_superblock_lock;
 struct rdb_modification_report_t;
 struct serializable_env_t;
@@ -383,7 +383,7 @@ typedef index_queue_t<std::string, datum_t, datum_t, limit_order_t> item_queue_t
 
 struct primary_ref_t {
     btree_slice_t *btree;
-    real_superblock_t *superblock;
+    real_superblock_lock *superblock;
 };
 
 struct sindex_ref_t {

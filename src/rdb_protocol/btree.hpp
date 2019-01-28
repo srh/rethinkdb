@@ -30,7 +30,7 @@ class rdb_modification_report_cb_t;
 void rdb_get(
     rockshard rocksh,
     const store_key_t &store_key,
-    real_superblock_t *superblock,
+    real_superblock_lock *superblock,
     point_read_response_t *response);
 
 struct btree_info_t {
@@ -48,7 +48,7 @@ struct btree_info_t {
 
 struct btree_loc_info_t {
     btree_loc_info_t(const btree_info_t *_btree,
-                     real_superblock_t *_superblock,
+                     real_superblock_lock *_superblock,
                      const store_key_t *_key)
         : btree(_btree), superblock(std::move(_superblock)), key(_key) {
         guarantee(btree != nullptr);
@@ -57,7 +57,7 @@ struct btree_loc_info_t {
     }
     const btree_info_t *const btree;
     // Holds ownership of superblock pointer (must call delete on superblock).
-    real_superblock_t *const superblock;
+    real_superblock_lock *const superblock;
     const store_key_t *const key;
 };
 
@@ -78,7 +78,7 @@ struct btree_batched_replacer_t {
 batched_replace_response_t rdb_batched_replace(
     rockshard rocksh,
     const btree_info_t &info,
-    scoped_ptr_t<real_superblock_t> &&superblock,
+    scoped_ptr_t<real_superblock_lock> &&superblock,
     const std::vector<store_key_t> &keys,
     const btree_batched_replacer_t *replacer,
     rdb_modification_report_cb_t *sindex_cb,
@@ -90,22 +90,22 @@ void rdb_set(rockshard rocksh,
              const store_key_t &key, ql::datum_t data,
              bool overwrite,
              btree_slice_t *slice, repli_timestamp_t timestamp,
-             real_superblock_t *superblock,
+             real_superblock_lock *superblock,
              point_write_response_t *response,
              rdb_modification_info_t *mod_info,
              profile::trace_t *trace,
-             promise_t<real_superblock_t *> *pass_back_superblock);
+             promise_t<real_superblock_lock *> *pass_back_superblock);
 
 void rdb_delete(rockshard rocksh,
                 const store_key_t &key,
                 btree_slice_t *slice,
                 repli_timestamp_t timestamp,
-                real_superblock_t *superblock,
+                real_superblock_lock *superblock,
                 delete_mode_t delete_mode,
                 point_delete_response_t *response,
                 rdb_modification_info_t *mod_info,
                 profile::trace_t *trace,
-                promise_t<real_superblock_t *> *pass_back_superblock);
+                promise_t<real_superblock_lock *> *pass_back_superblock);
 
 void rdb_rget_snapshot_slice(
     const rocksdb::Snapshot *snap,
@@ -128,7 +128,7 @@ void rdb_rget_slice(
     const region_t &shard,
     const key_range_t &range,
     const optional<std::map<store_key_t, uint64_t> > &primary_keys,
-    real_superblock_t *superblock,
+    real_superblock_lock *superblock,
     ql::env_t *ql_env,
     const ql::batchspec_t &batchspec,
     const std::vector<ql::transform_variant_t> &transforms,
@@ -317,7 +317,7 @@ public:
                        new_mutex_in_line_t *sindex_spot,
                        rwlock_in_line_t *stamp_spot);
     bool has_pkey_cfeeds(const std::vector<store_key_t> &keys);
-    void finish(btree_slice_t *btree, real_superblock_t *superblock);
+    void finish(btree_slice_t *btree, real_superblock_lock *superblock);
 
 private:
     void on_mod_report_sub(

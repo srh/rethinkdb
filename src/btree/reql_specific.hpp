@@ -12,25 +12,9 @@ class binary_blob_t;
 class cache_t;
 class rockshard;
 
-/* `real_superblock_t` represents the superblock for the primary B-tree of a table. */
-class real_superblock_t {
-public:
-    explicit real_superblock_t(real_superblock_lock &&sb_buf);
-
-    void release();
-    real_superblock_lock *get() { return &sb_buf_; }
-
-    const signal_t *read_acq_signal();
-    const signal_t *write_acq_signal();
-
-private:
-    real_superblock_lock sb_buf_;
-};
-
-
 class superblock_passback_guard {
 public:
-    superblock_passback_guard(real_superblock_t *_superblock, promise_t<real_superblock_t *> *_pass_back)
+    superblock_passback_guard(real_superblock_lock *_superblock, promise_t<real_superblock_lock *> *_pass_back)
         : superblock(_superblock), pass_back_superblock(_pass_back) {
         rassert(superblock != nullptr);
         rassert(pass_back_superblock != nullptr);
@@ -39,23 +23,8 @@ public:
     ~superblock_passback_guard() {
         pass_back_superblock->pulse(superblock);
     }
-    real_superblock_t *superblock;
-    promise_t<real_superblock_t *> *pass_back_superblock;
-};
-
-
-/* `sindex_superblock_t` represents the superblock for a sindex B-tree. */
-class sindex_superblock_t {
-public:
-    explicit sindex_superblock_t(sindex_superblock_lock *sb_buf);
-
-    void release();
-
-    const signal_t *read_acq_signal();
-    const signal_t *write_acq_signal();
-
-private:
-    sindex_superblock_lock *sb_buf_;
+    real_superblock_lock *superblock;
+    promise_t<real_superblock_lock *> *pass_back_superblock;
 };
 
 enum class index_type_t {
@@ -74,7 +43,7 @@ public:
     // the metainfo (with a single key/value pair). Not for use with sindex
     // superblocks.
     static void init_real_superblock(
-            real_superblock_t *superblock,
+            real_superblock_lock *superblock,
             rockshard rocksh,
             const std::vector<char> &metainfo_key,
             const binary_blob_t &metainfo_value);
@@ -150,15 +119,15 @@ private:
 // Metainfo functions
 void get_superblock_metainfo(
     rockshard rocksh,
-    real_superblock_t *superblock,
+    real_superblock_lock *superblock,
     std::vector< std::pair<std::vector<char>, std::vector<char> > > *kv_pairs_out);
 
-void set_superblock_metainfo(real_superblock_t *superblock,
+void set_superblock_metainfo(real_superblock_lock *superblock,
                              rockshard rocksh,
                              const std::vector<char> &key,
                              const binary_blob_t &value);
 
-void set_superblock_metainfo(real_superblock_t *superblock,
+void set_superblock_metainfo(real_superblock_lock *superblock,
                              rockshard rocksh,
                              const std::vector<std::vector<char> > &keys,
                              const std::vector<binary_blob_t> &values);
@@ -167,14 +136,14 @@ void set_superblock_metainfo(real_superblock_t *superblock,
 void get_btree_superblock(
         txn_t *txn,
         access_t access,
-        scoped_ptr_t<real_superblock_t> *got_superblock_out);
+        scoped_ptr_t<real_superblock_lock> *got_superblock_out);
 
 /* Variant for writes that go through a superblock write semaphore */
 void get_btree_superblock(
         txn_t *txn,
         write_access_t access,
         new_semaphore_in_line_t &&write_sem_acq,
-        scoped_ptr_t<real_superblock_t> *got_superblock_out);
+        scoped_ptr_t<real_superblock_lock> *got_superblock_out);
 
 void get_btree_superblock_and_txn_for_writing(
         cache_conn_t *cache_conn,
@@ -182,7 +151,7 @@ void get_btree_superblock_and_txn_for_writing(
         write_access_t superblock_access,
         int expected_change_count,
         write_durability_t durability,
-        scoped_ptr_t<real_superblock_t> *got_superblock_out,
+        scoped_ptr_t<real_superblock_lock> *got_superblock_out,
         scoped_ptr_t<txn_t> *txn_out);
 
 // TODO: The fact that we have this might mean our backfilling logic is wrong
@@ -190,12 +159,12 @@ void get_btree_superblock_and_txn_for_writing(
 void get_btree_superblock_and_txn_for_backfilling(
         cache_conn_t *cache_conn,
         cache_account_t *backfill_account,
-        scoped_ptr_t<real_superblock_t> *got_superblock_out,
+        scoped_ptr_t<real_superblock_lock> *got_superblock_out,
         scoped_ptr_t<txn_t> *txn_out);
 
 void get_btree_superblock_and_txn_for_reading(
         cache_conn_t *cache_conn,
-        scoped_ptr_t<real_superblock_t> *got_superblock_out,
+        scoped_ptr_t<real_superblock_lock> *got_superblock_out,
         scoped_ptr_t<txn_t> *txn_out);
 
 #endif /* BTREE_REQL_SPECIFIC_HPP_ */

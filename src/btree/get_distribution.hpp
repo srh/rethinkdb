@@ -8,7 +8,7 @@
 #include "buffer_cache/types.hpp"
 
 class rockshard;
-class real_superblock_t;
+class real_superblock_lock;
 
 void get_distribution(
     rockshard rocksh, key_range_t key_range, int keys_limit,

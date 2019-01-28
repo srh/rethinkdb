@@ -106,7 +106,7 @@ void resume_construct_sindex(
             write_token_t token;
             store->new_write_token(&token);
             scoped_ptr_t<txn_t> txn;
-            scoped_ptr_t<real_superblock_t> superblock;
+            scoped_ptr_t<real_superblock_lock> superblock;
             try {
                 store->acquire_superblock_for_write(1,
                                                     write_durability_t::SOFT,
@@ -118,7 +118,7 @@ void resume_construct_sindex(
                 return;
             }
             sindex_block_lock sindex_block(
-                superblock->get(),
+                superblock.get(),
                 access_t::write);
             superblock.reset();
 
@@ -215,7 +215,7 @@ void post_construct_and_drain_queue(
             store->new_write_token(&token);
 
             scoped_ptr_t<txn_t> queue_txn;
-            scoped_ptr_t<real_superblock_t> queue_superblock;
+            scoped_ptr_t<real_superblock_lock> queue_superblock;
 
             // We use HARD durability because we want post construction
             // to be throttled if we insert data faster than it can
@@ -232,10 +232,10 @@ void post_construct_and_drain_queue(
                 lock.get_drain_signal());
 
             sindex_block_lock queue_sindex_block(
-                queue_superblock->get(),
+                queue_superblock.get(),
                 access_t::write);
 
-            queue_superblock->release();
+            queue_superblock->reset_buf_lock();
 
             store_t::sindex_access_vector_t sindexes;
             store->acquire_sindex_superblocks_for_write(
@@ -344,7 +344,7 @@ void post_construct_and_drain_queue(
         store->new_write_token(&token);
 
         scoped_ptr_t<txn_t> queue_txn;
-        scoped_ptr_t<real_superblock_t> queue_superblock;
+        scoped_ptr_t<real_superblock_lock> queue_superblock;
 
         cond_t non_interruptor;
         store->acquire_superblock_for_write(
@@ -356,10 +356,10 @@ void post_construct_and_drain_queue(
             &non_interruptor);
 
         sindex_block_lock queue_sindex_block(
-            queue_superblock->get(),
+            queue_superblock.get(),
             access_t::write);
 
-        queue_superblock->release();
+        queue_superblock->reset_buf_lock();
 
         new_mutex_in_line_t acq =
             store->get_in_line_for_sindex_queue(&queue_sindex_block);
