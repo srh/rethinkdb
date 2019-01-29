@@ -155,9 +155,7 @@ scoped_ptr_t<sindex_superblock_lock> acquire_sindex_for_read(
         bool found = store->acquire_sindex_superblock_for_read(
             sindex_name_t(sindex_id),
             table_name,
-            // TODO: The std::move here is on a pointer!
-            std::move(superblock),
-            release_superblock,
+            superblock,
             &sindex_sb,
             &sindex_mapping_data,
             &sindex_uuid);
@@ -187,14 +185,14 @@ void do_snap_read(
         ql::env_t *env,
         store_t *store,
         btree_slice_t *btree,
-        real_superblock_lock *superblock,
+        scoped_ptr_t<real_superblock_lock> superblock,
         const rget_read_t &rget,
         rget_read_response_t *res) {
     guarantee(rget.current_shard.has_value());
     if (!rget.sindex.has_value()) {
         superblock->read_acq_signal()->wait_lazily_ordered();
         rockstore::snapshot snap = make_snapshot(rocksh.rocks);
-        superblock->reset_superblock();
+        superblock.reset();
 
         rdb_rget_snapshot_slice(
             snap.snap,
@@ -219,12 +217,13 @@ void do_snap_read(
             sindex_sb =
                 acquire_sindex_for_read(
                     store,
-                    superblock,
-                    release_superblock_t::RELEASE,
+                    superblock.get(),
+                    release_superblock_t::KEEP,  // TODO: This is unused.
                     rget.table_name,
                     rget.sindex->id,
                     &sindex_info,
                     &sindex_uuid);
+            superblock.reset();
             reql_version_t reql_version =
                 sindex_info.mapping_version_info.latest_compatible_reql_version;
             res->reql_version = reql_version;
@@ -287,7 +286,6 @@ void do_read(rockshard rocksh,
              real_superblock_lock *superblock,
              const rget_read_t &rget,
              rget_read_response_t *res,
-             release_superblock_t release_superblock,
              optional<uuid_u> *sindex_id_out) {
     guarantee(rget.current_shard.has_value());
     if (!rget.sindex.has_value()) {
@@ -308,7 +306,7 @@ void do_read(rockshard rocksh,
             rget.terminal,
             rget.sorting,
             res,
-            release_superblock);
+            release_superblock_t::KEEP);
     } else {
         // rget using a secondary index
         sindex_disk_info_t sindex_info;
@@ -320,7 +318,7 @@ void do_read(rockshard rocksh,
                 acquire_sindex_for_read(
                     store,
                     superblock,
-                    release_superblock,
+                    release_superblock_t::KEEP,
                     rget.table_name,
                     rget.sindex->id,
                     &sindex_info,
@@ -441,8 +439,7 @@ struct rdb_read_visitor_t : public boost::static_visitor<void> {
             // The superblock will instead be released in `store_t::read`
             // shortly after this function returns.
             rget_read_response_t resp;
-            do_read(store->rocksh(), &env, store, btree, superblock, rget, &resp,
-                    release_superblock_t::KEEP,
+            do_read(store->rocksh(), &env, store, btree, superblock.get(), rget, &resp,
                     &sindex_id);
             auto *gs = boost::get<ql::grouped_t<ql::stream_t> >(&resp.result);
             if (gs == NULL) {
@@ -530,7 +527,7 @@ struct rdb_read_visitor_t : public boost::static_visitor<void> {
                                              std::numeric_limits<uint64_t>::max());
             }
             point_read_response_t val;
-            rdb_get(store->rocksh(), s.key, superblock, &val);
+            rdb_get(store->rocksh(), s.key, superblock.get(), &val);
             vres->initial_val = val.data;
         } else {
             res->resp.reset();
@@ -541,7 +538,7 @@ struct rdb_read_visitor_t : public boost::static_visitor<void> {
         response->response = point_read_response_t();
         point_read_response_t *res =
             boost::get<point_read_response_t>(&response->response);
-        rdb_get(store->rocksh(), get.key, superblock, res);
+        rdb_get(store->rocksh(), get.key, superblock.get(), res);
     }
 
     void operator()(const intersecting_geo_read_t &geo_read) {
@@ -588,11 +585,12 @@ struct rdb_read_visitor_t : public boost::static_visitor<void> {
             sindex_sb =
                 acquire_sindex_for_read(
                     store,
-                    superblock,
+                    superblock.get(),
                     release_superblock_t::RELEASE,
                     geo_read.table_name,
                     geo_read.sindex.id,
-                &sindex_info, &sindex_uuid);
+                    &sindex_info, &sindex_uuid);
+            superblock.reset();
         } catch (const ql::exc_t &e) {
             res->result = e;
             return;
@@ -654,11 +652,12 @@ struct rdb_read_visitor_t : public boost::static_visitor<void> {
             sindex_sb =
                 acquire_sindex_for_read(
                     store,
-                    superblock,
+                    superblock.get(),
                     release_superblock_t::RELEASE,
                     geo_read.table_name,
                     geo_read.sindex_id,
-                &sindex_info, &sindex_uuid);
+                    &sindex_info, &sindex_uuid);
+            superblock.reset();
         } catch (const ql::exc_t &e) {
             res->results_or_error = e;
             return;
@@ -750,14 +749,14 @@ struct rdb_read_visitor_t : public boost::static_visitor<void> {
             interruptor,
             rget.serializable_env,
             trace);
-        do_snap_read(store->rocksh(), &ql_env, store, btree, superblock, rget, res);
+        do_snap_read(store->rocksh(), &ql_env, store, btree, std::move(superblock), rget, res);
     }
 
     void operator()(const distribution_read_t &dg) {
         superblock->read_acq_signal()->wait_lazily_ordered();
         // We reset the buf lock early, because rocksdb doesn't offer consistent
         // access to key range statistics? Or at least we don't really need it.
-        superblock->reset_superblock();
+        superblock.reset();
         response->response = distribution_read_response_t();
         distribution_read_response_t *res = boost::get<distribution_read_response_t>(&response->response);
         // TODO: Replace max_depth option of distribution_read_t (when we break
@@ -790,7 +789,7 @@ struct rdb_read_visitor_t : public boost::static_visitor<void> {
 
     rdb_read_visitor_t(btree_slice_t *_btree,
                        store_t *_store,
-                       real_superblock_lock *_superblock,
+                       scoped_ptr_t<real_superblock_lock> &&_superblock,
                        rdb_context_t *_ctx,
                        read_response_t *_response,
                        profile::trace_t *_trace,
@@ -800,7 +799,7 @@ struct rdb_read_visitor_t : public boost::static_visitor<void> {
         interruptor(_interruptor),
         btree(_btree),
         store(_store),
-        superblock(_superblock),
+        superblock(std::move(_superblock)),
         trace(_trace) { }
 
 private:
@@ -810,7 +809,7 @@ private:
     signal_t *const interruptor;
     btree_slice_t *const btree;
     store_t *const store;
-    real_superblock_lock *const superblock;
+    scoped_ptr_t<real_superblock_lock> superblock;
     profile::trace_t *const trace;
 
     DISABLE_COPYING(rdb_read_visitor_t);
@@ -818,7 +817,7 @@ private:
 
 void store_t::protocol_read(const read_t &_read,
                             read_response_t *response,
-                            real_superblock_lock *superblock,
+                            scoped_ptr_t<real_superblock_lock> superblock,
                             signal_t *interruptor) {
     scoped_ptr_t<profile::trace_t> trace = ql::maybe_make_profile_trace(_read.profile);
 
@@ -826,7 +825,7 @@ void store_t::protocol_read(const read_t &_read,
         PROFILE_STARTER_IF_ENABLED(
             _read.profile == profile_bool_t::PROFILE, "Perform read on shard.", trace);
         rdb_read_visitor_t v(btree.get(), this,
-                             superblock,
+                             std::move(superblock),
                              ctx, response, trace.get_or_null(), interruptor);
         boost::apply_visitor(v, _read.read);
     }

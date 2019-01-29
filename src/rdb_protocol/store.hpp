@@ -218,8 +218,6 @@ public:
             const sindex_name_t &name,
             const std::string &table_name,
             real_superblock_lock *superblock,
-            // TODO: Do we use release_superblock?
-            release_superblock_t release_superblock,
             scoped_ptr_t<sindex_superblock_lock> *sindex_sb_out,
             std::vector<char> *opaque_definition_out,
             uuid_u *sindex_uuid_out)
@@ -228,7 +226,7 @@ public:
     MUST_USE bool acquire_sindex_superblock_for_write(
             const sindex_name_t &name,
             const std::string &table_name,
-            real_superblock_lock *superblock,
+            scoped_ptr_t<real_superblock_lock> superblock,
             scoped_ptr_t<sindex_superblock_lock> *sindex_sb_out,
             uuid_u *sindex_uuid_out)
         THROWS_ONLY(sindex_not_ready_exc_t);
@@ -265,7 +263,7 @@ public:
 
     void protocol_read(const read_t &read,
                        read_response_t *response,
-                       real_superblock_lock *superblock,
+                       scoped_ptr_t<real_superblock_lock> superblock,
                        signal_t *interruptor);
 
     void protocol_write(const write_t &write,

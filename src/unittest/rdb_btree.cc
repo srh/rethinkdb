@@ -117,10 +117,10 @@ ql::grouped_t<ql::stream_t> read_row_via_sindex(
     store->new_read_token(&token);
 
     scoped_ptr_t<txn_t> txn;
-    scoped_ptr_t<real_superblock_lock> super_block;
+    scoped_ptr_t<real_superblock_lock> superblock;
 
     store->acquire_superblock_for_read(
-            &token, &txn, &super_block,
+            &token, &txn, &superblock,
             &dummy_interruptor);
 
     scoped_ptr_t<sindex_superblock_lock> sindex_sb;
@@ -130,11 +130,11 @@ ql::grouped_t<ql::stream_t> read_row_via_sindex(
     bool sindex_exists = store->acquire_sindex_superblock_for_read(
             sindex_name,
             "",
-            super_block.get(),
-            release_superblock_t::RELEASE,
+            superblock.get(),
             &sindex_sb,
             &opaque_definition,
             &sindex_uuid);
+    superblock.reset();
     guarantee(sindex_exists);
 
     sindex_disk_info_t sindex_info;
