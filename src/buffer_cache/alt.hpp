@@ -40,7 +40,6 @@ private:
 class lock_state {
 public:
     rwlock_t real_superblock_lock;
-    std::unordered_map<uuid_u, scoped_ptr_t<rwlock_t>> sindex_superblock_locks;
 };
 
 class cache_t : public home_thread_mixin_t {
@@ -58,7 +57,6 @@ public:
 private:
     friend class txn_t;
     friend class real_superblock_lock;
-    friend class sindex_superblock_lock;
 
     // throttler_ can cause the txn_t constructor to block
     alt_txn_throttler_t throttler_;
@@ -140,10 +138,16 @@ public:
 
     const signal_t *read_acq_signal() { return acq_.read_signal(); }
     const signal_t *write_acq_signal() { return acq_.write_signal(); }
-    // Calls added where we used to construct an real_superblock_lock, in order to
+    // Calls added where we used to construct an sindex_block, in order to
     // cautiously preserve locking behavior.
     const signal_t *sindex_block_read_signal() { return acq_.read_signal(); }
     const signal_t *sindex_block_write_signal() { return acq_.write_signal(); }
+
+    // Calls added where we used to construct an sindex_superblock_lock, in order to
+    // describe previous locking behavior
+    const signal_t *sindex_superblock_read_signal() { return acq_.read_signal(); }
+    const signal_t *sindex_superblock_write_signal() { return acq_.write_signal(); }
+
 
     void reset_superblock() {
         txn_ = nullptr;
@@ -161,54 +165,6 @@ public:
     new_semaphore_in_line_t write_semaphore_acq_;
     rwlock_in_line_t acq_;
 };
-
-class sindex_superblock_lock {
-public:
-    sindex_superblock_lock(real_superblock_lock *parent, uuid_u sindex_uuid, access_t access)
-        : sindex_uuid_(sindex_uuid), acq_() {
-        txn_t *txn = parent->txn();
-        wait_for_rwlock(&parent->acq_, access);
-        auto it = txn->cache()->locks_.sindex_superblock_locks.find(sindex_uuid);
-        // TODO: Precisely manage lock construction, building the sindex_superblock_locks at initial
-        // table load?
-        // TODO: Someplace, we need to delete locks.
-        if (it == txn->cache()->locks_.sindex_superblock_locks.end()) {
-            auto res = txn->cache()->locks_.sindex_superblock_locks.emplace(
-                sindex_uuid,
-                make_scoped<rwlock_t>());
-            it = res.first;
-        }
-        acq_.init(it->second.get(), access);
-    }
-
-    sindex_superblock_lock(real_superblock_lock *parent, uuid_u sindex_uuid, alt_create_t)
-        : acq_() {
-        txn_t *txn = parent->txn();
-        wait_for_rwlock(&parent->acq_, access_t::write);
-        auto it = txn->cache()->locks_.sindex_superblock_locks.find(sindex_uuid);
-        guarantee(it == txn->cache()->locks_.sindex_superblock_locks.end());
-        scoped_ptr_t<rwlock_t> the_lock = make_scoped<rwlock_t>();
-        acq_.init(the_lock.get(), access_t::write);
-        txn->cache()->locks_.sindex_superblock_locks.emplace(
-            sindex_uuid, std::move(the_lock));
-    }
-
-    const signal_t *read_acq_signal() { return acq_.read_signal(); }
-    const signal_t *write_acq_signal() { return acq_.write_signal(); }
-
-    void reset_sindex_superblock() {
-        acq_.reset();
-    }
-
-    void mark_deleted_and_reset(real_superblock_lock *real_superblock) {
-        acq_.reset();
-        real_superblock->txn()->cache()->locks_.sindex_superblock_locks.erase(sindex_uuid_);
-    }
-
-    uuid_u sindex_uuid_;
-    rwlock_in_line_t acq_;
-};
-
 
 
 #endif  // BUFFER_CACHE_ALT_HPP_

@@ -37,7 +37,6 @@ class cache_t;
 class internal_disk_backed_queue_t;
 class io_backender_t;
 class real_superblock_lock;
-class sindex_superblock_lock;
 class txn_t;
 struct rdb_modification_report_t;
 namespace rockstore { class store; }
@@ -218,7 +217,6 @@ public:
             const sindex_name_t &name,
             const std::string &table_name,
             real_superblock_lock *superblock,
-            scoped_ptr_t<sindex_superblock_lock> *sindex_sb_out,
             std::vector<char> *opaque_definition_out,
             uuid_u *sindex_uuid_out)
         THROWS_ONLY(sindex_not_ready_exc_t);
@@ -226,22 +224,19 @@ public:
     MUST_USE bool acquire_sindex_superblock_for_write(
             const sindex_name_t &name,
             const std::string &table_name,
-            scoped_ptr_t<real_superblock_lock> superblock,
-            scoped_ptr_t<sindex_superblock_lock> *sindex_sb_out,
+            real_superblock_lock *superblock,
             uuid_u *sindex_uuid_out)
         THROWS_ONLY(sindex_not_ready_exc_t);
 
     struct sindex_access_t {
         sindex_access_t(btree_slice_t *_btree,
                         sindex_name_t _name,
-                        secondary_index_t _sindex,
-                        scoped_ptr_t<sindex_superblock_lock> _superblock);
+                        secondary_index_t _sindex);
         ~sindex_access_t();
 
         btree_slice_t *btree;
         sindex_name_t name;
         secondary_index_t sindex;
-        scoped_ptr_t<sindex_superblock_lock> superblock;
     };
 
     typedef std::vector<scoped_ptr_t<sindex_access_t> > sindex_access_vector_t;

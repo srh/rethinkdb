@@ -299,6 +299,7 @@ void post_construct_and_drain_queue(
                 if (!construction_range_inout->contains_key(mod_report.primary_key)) {
                     rdb_update_sindexes(store->rocksh(),
                                         store,
+                                        queue_superblock.get(),
                                         sindexes,
                                         &mod_report,
                                         NULL,

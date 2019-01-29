@@ -136,7 +136,7 @@ void store_t::help_construct_bring_sindexes_up_to_date() {
     txn->commit();
 }
 
-scoped_ptr_t<sindex_superblock_lock> acquire_sindex_for_read(
+void acquire_sindex_for_read(
     store_t *store,
     real_superblock_lock *superblock,
     release_superblock_t release_superblock,
@@ -147,7 +147,6 @@ scoped_ptr_t<sindex_superblock_lock> acquire_sindex_for_read(
     rassert(sindex_info_out != NULL);
     rassert(sindex_uuid_out != NULL);
 
-    scoped_ptr_t<sindex_superblock_lock> sindex_sb;
     std::vector<char> sindex_mapping_data;
 
     uuid_u sindex_uuid;
@@ -156,7 +155,6 @@ scoped_ptr_t<sindex_superblock_lock> acquire_sindex_for_read(
             sindex_name_t(sindex_id),
             table_name,
             superblock,
-            &sindex_sb,
             &sindex_mapping_data,
             &sindex_uuid);
         // TODO: consider adding some logic on the machine handling the
@@ -176,7 +174,6 @@ scoped_ptr_t<sindex_superblock_lock> acquire_sindex_for_read(
     }
 
     *sindex_uuid_out = sindex_uuid;
-    return sindex_sb;
 }
 
 // TODO: Is sindex_id_out always nullptr?
@@ -211,11 +208,9 @@ void do_snap_read(
         // rget using a secondary index
         sindex_disk_info_t sindex_info;
         uuid_u sindex_uuid;
-        scoped_ptr_t<sindex_superblock_lock> sindex_sb;
         key_range_t sindex_range;
         try {
-            sindex_sb =
-                acquire_sindex_for_read(
+            acquire_sindex_for_read(
                     store,
                     superblock.get(),
                     release_superblock_t::KEEP,  // TODO: This is unused.
@@ -223,7 +218,6 @@ void do_snap_read(
                     rget.sindex->id,
                     &sindex_info,
                     &sindex_uuid);
-            superblock.reset();
             reql_version_t reql_version =
                 sindex_info.mapping_version_info.latest_compatible_reql_version;
             res->reql_version = reql_version;
@@ -245,9 +239,9 @@ void do_snap_read(
                 return;
             }
 
-            sindex_sb->read_acq_signal()->wait_lazily_ordered();
+            superblock->read_acq_signal()->wait_lazily_ordered();
             rockstore::snapshot snap = make_snapshot(rocksh.rocks);
-            sindex_sb->reset_sindex_superblock();
+            superblock.reset();
 
             rdb_rget_secondary_snapshot_slice(
                 snap.snap,
@@ -311,11 +305,9 @@ void do_read(rockshard rocksh,
         // rget using a secondary index
         sindex_disk_info_t sindex_info;
         uuid_u sindex_uuid;
-        scoped_ptr_t<sindex_superblock_lock> sindex_sb;
         key_range_t sindex_range;
         try {
-            sindex_sb =
-                acquire_sindex_for_read(
+            acquire_sindex_for_read(
                     store,
                     superblock,
                     release_superblock_t::KEEP,
@@ -354,7 +346,7 @@ void do_read(rockshard rocksh,
                 *rget.current_shard,
                 rget.sindex->datumspec,
                 sindex_range,
-                sindex_sb.get(),
+                superblock,
                 env,
                 rget.batchspec,
                 rget.transforms,
@@ -364,7 +356,7 @@ void do_read(rockshard rocksh,
                 rget.sindex->require_sindex_val,
                 sindex_info,
                 res,
-                release_superblock_t::RELEASE);
+                release_superblock_t::KEEP);
         } catch (const ql::exc_t &e) {
             res->result = e;
             return;
@@ -580,17 +572,14 @@ struct rdb_read_visitor_t : public boost::static_visitor<void> {
 
         sindex_disk_info_t sindex_info;
         uuid_u sindex_uuid;
-        scoped_ptr_t<sindex_superblock_lock> sindex_sb;
         try {
-            sindex_sb =
-                acquire_sindex_for_read(
+            acquire_sindex_for_read(
                     store,
                     superblock.get(),
                     release_superblock_t::RELEASE,
                     geo_read.table_name,
                     geo_read.sindex.id,
                     &sindex_info, &sindex_uuid);
-            superblock.reset();
         } catch (const ql::exc_t &e) {
             res->result = e;
             return;
@@ -609,10 +598,10 @@ struct rdb_read_visitor_t : public boost::static_visitor<void> {
             return;
         }
 
-        sindex_sb->read_acq_signal()->wait_lazily_ordered();
+        superblock->read_acq_signal()->wait_lazily_ordered();
         rockshard rocksh = store->rocksh();
         rockstore::snapshot snap = make_snapshot(rocksh.rocks);
-        sindex_sb->reset_sindex_superblock();
+        superblock.reset();
 
         guarantee(geo_read.sindex.region);
         rdb_get_intersecting_slice(
@@ -647,17 +636,14 @@ struct rdb_read_visitor_t : public boost::static_visitor<void> {
 
         sindex_disk_info_t sindex_info;
         uuid_u sindex_uuid;
-        scoped_ptr_t<sindex_superblock_lock> sindex_sb;
         try {
-            sindex_sb =
-                acquire_sindex_for_read(
+            acquire_sindex_for_read(
                     store,
                     superblock.get(),
                     release_superblock_t::RELEASE,
                     geo_read.table_name,
                     geo_read.sindex_id,
                     &sindex_info, &sindex_uuid);
-            superblock.reset();
         } catch (const ql::exc_t &e) {
             res->results_or_error = e;
             return;
@@ -674,10 +660,10 @@ struct rdb_read_visitor_t : public boost::static_visitor<void> {
             return;
         }
 
-        sindex_sb->read_acq_signal()->wait_lazily_ordered();
+        superblock->read_acq_signal()->wait_lazily_ordered();
         rockshard rocksh = store->rocksh();
         rockstore::snapshot snap = make_snapshot(rocksh.rocks);
-        sindex_sb->reset_sindex_superblock();
+        superblock.reset();
 
         rdb_get_nearest_slice(
             snap.snap,

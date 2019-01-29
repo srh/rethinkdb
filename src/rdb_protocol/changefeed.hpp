@@ -41,7 +41,6 @@ class mailbox_manager_t;
 class namespace_interface_access_t;
 class name_resolver_t;
 class real_superblock_lock;
-class sindex_superblock_lock;
 struct rdb_modification_report_t;
 struct serializable_env_t;
 struct sindex_disk_info_t;
@@ -388,7 +387,7 @@ struct primary_ref_t {
 
 struct sindex_ref_t {
     btree_slice_t *btree;
-    sindex_superblock_lock *superblock;
+    real_superblock_lock *superblock;
     const sindex_disk_info_t *sindex_info;
     uuid_u sindex_uuid;
 };

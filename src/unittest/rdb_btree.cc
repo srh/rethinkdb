@@ -66,6 +66,7 @@ void insert_rows(int start, int finish, store_t *store) {
             rdb_update_sindexes(
                 store->rocksh(),
                 store,
+                superblock.get(),
                 sindexes,
                 &mod_report,
                 nullptr,
@@ -123,7 +124,6 @@ ql::grouped_t<ql::stream_t> read_row_via_sindex(
             &token, &txn, &superblock,
             &dummy_interruptor);
 
-    scoped_ptr_t<sindex_superblock_lock> sindex_sb;
     uuid_u sindex_uuid;
 
     std::vector<char> opaque_definition;
@@ -131,10 +131,8 @@ ql::grouped_t<ql::stream_t> read_row_via_sindex(
             sindex_name,
             "",
             superblock.get(),
-            &sindex_sb,
             &opaque_definition,
             &sindex_uuid);
-    superblock.reset();
     guarantee(sindex_exists);
 
     sindex_disk_info_t sindex_info;
@@ -159,7 +157,7 @@ ql::grouped_t<ql::stream_t> read_row_via_sindex(
         region_t(),
         ql::datumspec_t(datum_range),
         datum_range.to_sindex_keyrange(reql_version_t::LATEST),
-        sindex_sb.get(),
+        superblock.get(),
         &dummy_env, // env_t
         ql::batchspec_t::default_for(ql::batch_type_t::NORMAL),
         std::vector<ql::transform_variant_t>(),

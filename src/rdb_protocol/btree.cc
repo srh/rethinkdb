@@ -1281,7 +1281,7 @@ void rdb_rget_secondary_slice(
         const region_t &shard,
         const ql::datumspec_t &datumspec,
         const key_range_t &sindex_region_range,
-        sindex_superblock_lock *superblock,
+        real_superblock_lock *superblock,
         ql::env_t *ql_env,
         const ql::batchspec_t &batchspec,
         const std::vector<transform_variant_t> &transforms,
@@ -1327,6 +1327,7 @@ void rdb_rget_secondary_slice(
 
     // TODO: We could make a rocksdb snapshot here, and iterate through that,
     // instead of holding a superblock.
+    // TODO: Or we could wait for the superblock here, or wait for it outside and don't even pass the superblock in.
     direction_t direction = reversed(sorting) ? direction_t::backward : direction_t::forward;
     auto cb = [&](const std::pair<ql::datum_range_t, uint64_t> &pair, bool is_last) {
         key_range_t sindex_keyrange =
@@ -1343,7 +1344,7 @@ void rdb_rget_secondary_slice(
         superblock->read_acq_signal()->wait_lazily_ordered();
         rockstore::snapshot snap = make_snapshot(rocksh.rocks);
         if (is_last && release_superblock == release_superblock_t::RELEASE) {
-            superblock->reset_sindex_superblock();
+            superblock->reset_superblock();
         }
         return rocks_traversal(
             rocksh.rocks,
@@ -1669,6 +1670,7 @@ void rdb_modification_report_cb_t::on_mod_report_sub(
     store_->sindex_queue_push(mod_report, spot);
     rdb_update_sindexes(rocksh,
                         store_,
+                        sindex_block_,
                         sindexes_,
                         &mod_report,
                         keys_available_cond,
@@ -1938,6 +1940,7 @@ void deserialize_sindex_info_or_crash(
 void rdb_update_single_sindex(
         rockshard rocksh,
         store_t *store,
+        real_superblock_lock *superblock,
         const store_t::sindex_access_t *sindex,
         const rdb_modification_report_t *modification,
         size_t *updates_left,
@@ -1965,8 +1968,6 @@ void rdb_update_single_sindex(
     // secondary index updates.
     UNUSED profile::trace_t *const trace = nullptr;
 
-    sindex_superblock_lock *superblock = sindex->superblock.get();
-
     auto cserver = store->changefeed_server(modification->primary_key);
 
     if (modification->info.deleted.first.has()) {
@@ -1993,7 +1994,6 @@ void rdb_update_single_sindex(
                         }
                     }, cserver.second);
             }
-            superblock->write_acq_signal()->wait_lazily_ordered();
             for (auto it = keys.begin(); it != keys.end(); ++it) {
                 std::string rocks_secondary_kv_location
                     = rockstore::table_secondary_key(
@@ -2053,7 +2053,6 @@ void rdb_update_single_sindex(
                         }
                     }, cserver.second);
             }
-            superblock->write_acq_signal()->wait_lazily_ordered();
             for (auto it = keys.begin(); it != keys.end(); ++it) {
                 std::string rocks_secondary_kv_location
                     = rockstore::table_secondary_key(
@@ -2120,6 +2119,7 @@ void rdb_update_single_sindex(
 void rdb_update_sindexes(
     rockshard rocksh,
     store_t *store,
+    real_superblock_lock *superblock,
     const store_t::sindex_access_vector_t &sindexes,
     const rdb_modification_report_t *modification,
     cond_t *keys_available_cond,
@@ -2140,11 +2140,13 @@ void rdb_update_sindexes(
             if (!sindex->sindex.needs_post_construction_range.contains_key(
                     modification->primary_key)) {
                 ++counter;
+                superblock->write_acq_signal()->wait();
                 coro_t::spawn_sometime(
                     std::bind(
                         &rdb_update_single_sindex,
                         rocksh,
                         store,
+                        superblock,
                         sindex.get(),
                         modification,
                         &counter,
@@ -2222,6 +2224,7 @@ public:
             guarantee(wtxn_.has());
             rdb_update_sindexes(store_->rocksh(),
                                 store_,
+                                superblock_.get(),
                                 sindexes_,
                                 &mod_report,
                                 nullptr,
@@ -2252,6 +2255,7 @@ public:
             if (current_chunk_size_ >= MAX_CHUNK_SIZE) {
                 current_chunk_size_ = 0;
                 sindexes_.clear();
+                superblock_.reset();
                 wtxn_->commit();
                 wtxn_.reset();
                 start_write_transaction(&wtxn_acq);
@@ -2295,21 +2299,21 @@ private:
         // dirty page limit and bring down the whole table.
         // Other than that, the hard durability guarantee is not actually
         // needed here.
-        scoped_ptr_t<real_superblock_lock> superblock;
         store_->acquire_superblock_for_write(
                 2 + MAX_CHUNK_SIZE,
                 write_durability_t::HARD,
                 &token,
                 &wtxn_,
-                &superblock,
+                &superblock_,
                 interruptor_);
 
-        // Acquire the sindex block and release the superblock.
-        superblock->sindex_block_write_signal()->wait_lazily_ordered();
+        // Acquire the sindex block and release the superblock.  (We don't
+        // release the superblock anymore.)
+        superblock_->sindex_block_write_signal()->wait_lazily_ordered();
         store_t::sindex_access_vector_t all_sindexes;
         store_->acquire_sindex_superblocks_for_write(
             make_optional(sindexes_to_post_construct_),
-            superblock.get(),
+            superblock_.get(),
             &all_sindexes);
 
         // Filter out indexes that are being deleted. No need to keep post-constructing
@@ -2354,6 +2358,7 @@ private:
     // for too long, other concurrent writes to parts of the secondary index that
     // are already live will also be delayed.
     scoped_ptr_t<txn_t> wtxn_;
+    scoped_ptr_t<real_superblock_lock> superblock_;
     store_t::sindex_access_vector_t sindexes_;
     int current_chunk_size_;
     // Controls access to `sindexes_` and `wtxn_`.
