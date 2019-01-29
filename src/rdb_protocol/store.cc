@@ -136,7 +136,7 @@ void store_t::help_construct_bring_sindexes_up_to_date() {
         }
     }
 
-    sindex_block.reset_buf_lock();
+    sindex_block.reset_sindex_block_lock();
     txn->commit();
 }
 
@@ -197,7 +197,7 @@ void do_snap_read(
     if (!rget.sindex.has_value()) {
         superblock->read_acq_signal()->wait_lazily_ordered();
         rockstore::snapshot snap = make_snapshot(rocksh.rocks);
-        superblock->reset_buf_lock();
+        superblock->reset_superblock();
 
         rdb_rget_snapshot_slice(
             snap.snap,
@@ -251,7 +251,7 @@ void do_snap_read(
 
             sindex_sb->read_acq_signal()->wait_lazily_ordered();
             rockstore::snapshot snap = make_snapshot(rocksh.rocks);
-            sindex_sb->reset_buf_lock();
+            sindex_sb->reset_sindex_superblock();
 
             rdb_rget_secondary_snapshot_slice(
                 snap.snap,
@@ -617,7 +617,7 @@ struct rdb_read_visitor_t : public boost::static_visitor<void> {
         sindex_sb->read_acq_signal()->wait_lazily_ordered();
         rockshard rocksh = store->rocksh();
         rockstore::snapshot snap = make_snapshot(rocksh.rocks);
-        sindex_sb->reset_buf_lock();
+        sindex_sb->reset_sindex_superblock();
 
         guarantee(geo_read.sindex.region);
         rdb_get_intersecting_slice(
@@ -681,7 +681,7 @@ struct rdb_read_visitor_t : public boost::static_visitor<void> {
         sindex_sb->read_acq_signal()->wait_lazily_ordered();
         rockshard rocksh = store->rocksh();
         rockstore::snapshot snap = make_snapshot(rocksh.rocks);
-        sindex_sb->reset_buf_lock();
+        sindex_sb->reset_sindex_superblock();
 
         rdb_get_nearest_slice(
             snap.snap,
@@ -760,7 +760,7 @@ struct rdb_read_visitor_t : public boost::static_visitor<void> {
         superblock->read_acq_signal()->wait_lazily_ordered();
         // We reset the buf lock early, because rocksdb doesn't offer consistent
         // access to key range statistics? Or at least we don't really need it.
-        superblock->reset_buf_lock();
+        superblock->reset_superblock();
         response->response = distribution_read_response_t();
         distribution_read_response_t *res = boost::get<distribution_read_response_t>(&response->response);
         // TODO: Replace max_depth option of distribution_read_t (when we break
@@ -1001,7 +1001,7 @@ struct rdb_write_visitor_t : public boost::static_visitor<void> {
         rdb_set(store->rocksh(),
                 w.key, w.data, w.overwrite, btree, timestamp, superblock.get(),
                 res, &mod_report.info, trace, &pass_back_superblock);
-        pass_back_superblock.wait()->reset_buf_lock();
+        pass_back_superblock.wait()->reset_superblock();
 
         update_sindexes(mod_report);
     }
@@ -1021,7 +1021,7 @@ struct rdb_write_visitor_t : public boost::static_visitor<void> {
                 d.key, btree, timestamp, superblock.get(),
                 delete_mode_t::REGULAR_QUERY, res, &mod_report.info, trace,
                 &pass_back_superblock);
-        pass_back_superblock.wait()->reset_buf_lock();
+        pass_back_superblock.wait()->reset_superblock();
 
         update_sindexes(mod_report);
     }

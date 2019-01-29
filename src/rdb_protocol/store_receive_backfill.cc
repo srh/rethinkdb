@@ -237,7 +237,7 @@ void apply_single_key_item(
         promise_t<real_superblock_lock *> pass_back_superblock;
         apply_item_pair(rocksh, tokens.info->slice, superblock.get(),
             std::move(item.pairs[0]), &mod_reports, &pass_back_superblock);
-        pass_back_superblock.wait()->reset_buf_lock();
+        pass_back_superblock.wait()->reset_superblock();
 
         /* Notify that we're done and update the sindexes */
         fifo_enforcer_sink_t::exit_write_t exiter(
@@ -356,7 +356,7 @@ void apply_multi_key_item(
             /* Acquire the sindex block and update the metainfo */
             sindex_block_lock sindex_block(superblock.get(), access_t::write);
             tokens.update_metainfo_cb(threshold, superblock.get());
-            superblock->reset_buf_lock();
+            superblock->reset_superblock();
 
             /* Notify the callback of our progress and update the sindexes */
             tokens.commit_cb(threshold, std::move(txn), std::move(sindex_block),
@@ -453,7 +453,7 @@ continue_bool_t store_t::receive_backfill(
                 // TODO: We have transactionality to pass in here.
                 update_sindexes(std::move(sindex_block), mod_reports);
             } else {
-                sindex_block.reset_buf_lock();
+                sindex_block.reset_sindex_block_lock();
             }
 
             /* End the transaction and notify that we've made progress */

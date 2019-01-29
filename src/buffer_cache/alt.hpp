@@ -139,7 +139,7 @@ public:
     const signal_t *read_acq_signal() { return acq_.read_signal(); }
     const signal_t *write_acq_signal() { return acq_.write_signal(); }
 
-    void reset_buf_lock() {
+    void reset_superblock() {
         txn_ = nullptr;
         acq_.reset();
         write_semaphore_acq_.reset();
@@ -185,7 +185,7 @@ public:
     const signal_t *read_acq_signal() { return acq_->read_signal(); }
     const signal_t *write_acq_signal() { return acq_->write_signal(); }
 
-    void reset_buf_lock() {
+    void reset_sindex_block_lock() {
         txn_ = nullptr;
         acq_.reset();
     }
@@ -230,7 +230,7 @@ public:
     const signal_t *read_acq_signal() { return acq_.read_signal(); }
     const signal_t *write_acq_signal() { return acq_.write_signal(); }
 
-    void reset_buf_lock() {
+    void reset_sindex_superblock() {
         acq_.reset();
     }
 

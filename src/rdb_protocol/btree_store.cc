@@ -297,7 +297,7 @@ void store_t::reset_data(
             update_sindexes(std::move(sindex_block), mod_reports);
         }
 
-        sindex_block.reset_buf_lock();
+        sindex_block.reset_sindex_block_lock();
         txn->commit();
     }
 }
@@ -310,11 +310,11 @@ std::map<std::string, std::pair<sindex_config_t, sindex_status_t> > store_t::sin
     get_btree_superblock_and_txn_for_reading(general_cache_conn.get(),
         &superblock, &txn);
     sindex_block_lock sindex_block(superblock.get(), access_t::read);
-    superblock->reset_buf_lock();
+    superblock->reset_superblock();
 
     std::map<sindex_name_t, secondary_index_t> secondary_indexes;
     get_secondary_indexes(rocksh(), &sindex_block, &secondary_indexes);
-    sindex_block.reset_buf_lock();
+    sindex_block.reset_sindex_block_lock();
 
     std::map<std::string, std::pair<sindex_config_t, sindex_status_t> > results;
     for (const auto &pair : secondary_indexes) {
@@ -367,7 +367,7 @@ void store_t::sindex_create(
         &write_superblock_acq_semaphore, write_access_t::write, 1,
         write_durability_t::HARD, &superblock, &txn);
     sindex_block_lock sindex_block(superblock.get(), access_t::write);
-    superblock->reset_buf_lock();
+    superblock->reset_superblock();
 
     /* Note that this function allows creating sindexes with older ReQL versions. For
     example, suppose that the user upgrades to a newer version of RethinkDB, and then
@@ -399,7 +399,7 @@ void store_t::sindex_create(
                                      this,
                                      drainer.lock()));
 
-    sindex_block.reset_buf_lock();
+    sindex_block.reset_sindex_block_lock();
     txn->commit();
 }
 
@@ -413,7 +413,7 @@ void store_t::sindex_rename_multi(
         &write_superblock_acq_semaphore, write_access_t::write, 1,
         write_durability_t::HARD, &superblock, &txn);
     sindex_block_lock sindex_block(superblock.get(), access_t::write);
-    superblock->reset_buf_lock();
+    superblock->reset_superblock();
 
     /* First we remove all the secondary indexes and hide their perfmons, but put the
     definitions and `btree_stats_t`s into `to_put_back` indexed by their new names. Then
@@ -444,7 +444,7 @@ void store_t::sindex_rename_multi(
         pair.second.second->rename(&perfmon_collection, "index-" + pair.first);
     }
 
-    sindex_block.reset_buf_lock();
+    sindex_block.reset_sindex_block_lock();
     txn->commit();
 }
 
@@ -458,7 +458,7 @@ void store_t::sindex_drop(
         &write_superblock_acq_semaphore, write_access_t::write, 1,
         write_durability_t::HARD, &superblock, &txn);
     sindex_block_lock sindex_block(superblock.get(), access_t::write);
-    superblock->reset_buf_lock();
+    superblock->reset_superblock();
 
     secondary_index_t sindex;
     bool success = ::get_secondary_index(rocksh(), &sindex_block, sindex_name_t(name), &sindex);
@@ -475,7 +475,7 @@ void store_t::sindex_drop(
                                      sindex,
                                      drainer.lock()));
 
-    sindex_block.reset_buf_lock();
+    sindex_block.reset_sindex_block_lock();
     txn->commit();
 }
 
@@ -545,7 +545,7 @@ void store_t::update_sindexes(
     {
         sindex_access_vector_t sindexes;
         acquire_all_sindex_superblocks_for_write(&sindex_block, &sindexes);
-        sindex_block.reset_buf_lock();
+        sindex_block.reset_sindex_block_lock();
 
         for (size_t i = 0; i < mod_reports.size(); ++i) {
             // TODO: What rocksdb transaction is this with?
@@ -715,7 +715,7 @@ void store_t::clear_sindex_data(
 
         /* Get the sindex block. */
         sindex_block_lock sindex_block(superblock.get(), access_t::write);
-        superblock->reset_buf_lock();
+        superblock->reset_superblock();
 
         secondary_index_t sindex;
         bool found = get_secondary_index(rocksh(), &sindex_block, sindex_id, &sindex);
@@ -730,7 +730,7 @@ void store_t::clear_sindex_data(
             &sindex_block,
             sindex.id,
             access_t::write);
-        sindex_block.reset_buf_lock();
+        sindex_block.reset_sindex_block_lock();
 
         // TODO: Actually just pass a range delete to rocksdb.
 
@@ -751,7 +751,7 @@ void store_t::clear_sindex_data(
                     &traversal_cb));
         } catch (const interrupted_exc_t &) {
             // It's safe to interrupt in the middle of clearing the index.
-            sindex_superblock_lock.reset_buf_lock();
+            sindex_superblock_lock.reset_sindex_superblock();
             txn->commit();
             throw;
         }
@@ -773,7 +773,7 @@ void store_t::clear_sindex_data(
             rocks->remove(rocks_kv_location, rockstore::write_options::TODO());
         }
 
-        sindex_superblock_lock.reset_buf_lock();
+        sindex_superblock_lock.reset_sindex_superblock();
         txn->commit();
     }
 }
@@ -798,7 +798,7 @@ void store_t::drop_sindex(uuid_u sindex_id) THROWS_NOTHING {
 
     /* Get the sindex block. */
     sindex_block_lock sindex_block(superblock.get(), access_t::write);
-    superblock->reset_buf_lock();
+    superblock->reset_superblock();
 
     secondary_index_t sindex;
     bool found = get_secondary_index(rocksh(), &sindex_block, sindex_id, &sindex);
@@ -819,8 +819,8 @@ void store_t::drop_sindex(uuid_u sindex_id) THROWS_NOTHING {
     size_t num_erased = secondary_index_slices.erase(sindex.id);
     guarantee(num_erased == 1);
 
-    sindex_superblock_lock.reset_buf_lock();
-    sindex_block.reset_buf_lock();
+    sindex_superblock_lock.reset_sindex_superblock();
+    sindex_block.reset_sindex_block_lock();
     txn->commit();
 }
 
@@ -935,7 +935,7 @@ MUST_USE bool store_t::acquire_sindex_superblock_for_read(
     /* Acquire the sindex block. */
     sindex_block_lock sindex_block(superblock, access_t::read);
     if (release_superblock == release_superblock_t::RELEASE) {
-        superblock->reset_buf_lock();
+        superblock->reset_superblock();
     }
 
     /* Figure out what the superblock for this index is. */
@@ -952,7 +952,7 @@ MUST_USE bool store_t::acquire_sindex_superblock_for_read(
     }
 
     sindex_superblock_lock superblock_lock(&sindex_block, sindex.id, access_t::read);
-    sindex_block.reset_buf_lock();
+    sindex_block.reset_sindex_block_lock();
     sindex_sb_out->init(new sindex_superblock_lock(std::move(superblock_lock)));
     return true;
 }
@@ -969,7 +969,7 @@ MUST_USE bool store_t::acquire_sindex_superblock_for_write(
 
     /* Get the sindex block. */
     sindex_block_lock sindex_block(superblock, access_t::write);
-    superblock->reset_buf_lock();
+    superblock->reset_superblock();
 
     /* Figure out what the superblock for this index is. */
     secondary_index_t sindex;
@@ -987,7 +987,7 @@ MUST_USE bool store_t::acquire_sindex_superblock_for_write(
         &sindex_block,
         sindex.id,
         access_t::write);
-    sindex_block.reset_buf_lock();
+    sindex_block.reset_sindex_block_lock();
     sindex_sb_out->init(new sindex_superblock_lock(std::move(superblock_lock)));
     return true;
 }

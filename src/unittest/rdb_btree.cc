@@ -60,7 +60,7 @@ void insert_rows(int start, int finish, store_t *store) {
                 false, store->btree.get(), repli_timestamp_t::distant_past,
                 superblock.get(), &response, &mod_report.info,
                 static_cast<profile::trace_t *>(NULL), &pass_back_superblock);
-            pass_back_superblock.wait()->reset_buf_lock();
+            pass_back_superblock.wait()->reset_superblock();
 
             store_t::sindex_access_vector_t sindexes;
             store->acquire_all_sindex_superblocks_for_write(&sindex_block, &sindexes);

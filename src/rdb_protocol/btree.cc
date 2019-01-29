@@ -37,7 +37,7 @@ void rdb_get(rockshard rocksh, const store_key_t &store_key,
     superblock->read_acq_signal()->wait_lazily_ordered();
     std::string loc = rockstore::table_primary_key(rocksh.table_id, rocksh.shard_no, key_to_unescaped_str(store_key));
     std::pair<std::string, bool> val = rocksh.rocks->try_read(loc);
-    superblock->reset_buf_lock();
+    superblock->reset_superblock();
     if (!val.second) {
         response->data = ql::datum_t::null();
     } else {
@@ -1152,7 +1152,7 @@ void rdb_rget_slice(
             superblock->read_acq_signal()->wait_lazily_ordered();
             rockstore::snapshot snap = make_snapshot(rocksh.rocks);
             if (is_last && release_superblock == release_superblock_t::RELEASE) {
-                superblock->reset_buf_lock();
+                superblock->reset_superblock();
             }
 
             return rocks_traversal(
@@ -1187,7 +1187,7 @@ void rdb_rget_slice(
         superblock->read_acq_signal()->wait_lazily_ordered();
         rockstore::snapshot snap = make_snapshot(rocksh.rocks);
         if (release_superblock == release_superblock_t::RELEASE) {
-            superblock->reset_buf_lock();
+            superblock->reset_superblock();
         }
         cont = rocks_traversal(
             rocksh.rocks, snap.snap, rocks_kv_prefix, range, direction, &wrapper);
@@ -1341,7 +1341,7 @@ void rdb_rget_secondary_slice(
         superblock->read_acq_signal()->wait_lazily_ordered();
         rockstore::snapshot snap = make_snapshot(rocksh.rocks);
         if (is_last && release_superblock == release_superblock_t::RELEASE) {
-            superblock->reset_buf_lock();
+            superblock->reset_sindex_superblock();
         }
         return rocks_traversal(
             rocksh.rocks,
@@ -2391,7 +2391,7 @@ void post_construct_secondary_index_range(
     superblock->read_acq_signal()->wait_lazily_ordered();
     rockshard rocksh = store->rocksh();
     rockstore::snapshot rocksnap = make_snapshot(rocksh.rocks);
-    superblock->reset_buf_lock();
+    superblock->reset_superblock();
 
     // Note: This starts a write transaction, which might get throttled.
     // It is important that we construct the `traversal_cb` *after* we've started
