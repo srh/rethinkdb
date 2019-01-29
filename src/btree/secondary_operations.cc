@@ -67,9 +67,9 @@ RDB_IMPL_SERIALIZABLE_2_SINCE_v1_13(sindex_name_t, name, being_deleted);
 
 void get_secondary_indexes_internal(
         rockshard rocksh,
-        sindex_block_lock *sindex_block,
+        real_superblock_lock *superblock,
         std::map<sindex_name_t, secondary_index_t> *sindexes_out) {
-    sindex_block->read_acq_signal()->wait_lazily_ordered();
+    superblock->read_acq_signal()->wait_lazily_ordered();
 
     std::string rocks_sindex_blob = rocksh->read(rockstore::table_sindex_map(rocksh.table_id, rocksh.shard_no));
     string_read_stream_t stream(std::move(rocks_sindex_blob), 0);
@@ -79,9 +79,9 @@ void get_secondary_indexes_internal(
 
 void set_secondary_indexes_internal(
         rockshard rocksh,
-        sindex_block_lock *sindex_block,
+        real_superblock_lock *superblock,
         const std::map<sindex_name_t, secondary_index_t> &sindexes) {
-    sindex_block->write_acq_signal()->wait_lazily_ordered();
+    superblock->write_acq_signal()->wait_lazily_ordered();
 
     // TODO: rocksdb transactionality
     std::string sindex_rocks_blob = serialize_to_string<cluster_version_t::LATEST_DISK>(sindexes);
@@ -90,12 +90,12 @@ void set_secondary_indexes_internal(
 }
 
 void initialize_secondary_indexes(rockshard rocksh,
-                                  sindex_block_lock *sindex_block) {
+                                  real_superblock_lock *sindex_block) {
     set_secondary_indexes_internal(rocksh, sindex_block,
                                    std::map<sindex_name_t, secondary_index_t>());
 }
 
-bool get_secondary_index(rockshard rocksh, sindex_block_lock *sindex_block, const sindex_name_t &name,
+bool get_secondary_index(rockshard rocksh, real_superblock_lock *sindex_block, const sindex_name_t &name,
                          secondary_index_t *sindex_out) {
     std::map<sindex_name_t, secondary_index_t> sindex_map;
 
@@ -110,7 +110,7 @@ bool get_secondary_index(rockshard rocksh, sindex_block_lock *sindex_block, cons
     }
 }
 
-bool get_secondary_index(rockshard rocksh, sindex_block_lock *sindex_block, uuid_u id,
+bool get_secondary_index(rockshard rocksh, real_superblock_lock *sindex_block, uuid_u id,
                          secondary_index_t *sindex_out) {
     std::map<sindex_name_t, secondary_index_t> sindex_map;
 
@@ -124,13 +124,13 @@ bool get_secondary_index(rockshard rocksh, sindex_block_lock *sindex_block, uuid
     return false;
 }
 
-void get_secondary_indexes(rockshard rocksh, sindex_block_lock *sindex_block,
+void get_secondary_indexes(rockshard rocksh, real_superblock_lock *sindex_block,
                            std::map<sindex_name_t, secondary_index_t> *sindexes_out) {
     get_secondary_indexes_internal(rocksh, sindex_block, sindexes_out);
 }
 
 void set_secondary_index(rockshard rocksh,
-                         sindex_block_lock *sindex_block, const sindex_name_t &name,
+                         real_superblock_lock *sindex_block, const sindex_name_t &name,
                          const secondary_index_t &sindex) {
     std::map<sindex_name_t, secondary_index_t> sindex_map;
     get_secondary_indexes_internal(rocksh, sindex_block, &sindex_map);
@@ -141,7 +141,7 @@ void set_secondary_index(rockshard rocksh,
 }
 
 void set_secondary_index(rockshard rocksh,
-                         sindex_block_lock *sindex_block, uuid_u id,
+                         real_superblock_lock *sindex_block, uuid_u id,
                          const secondary_index_t &sindex) {
     std::map<sindex_name_t, secondary_index_t> sindex_map;
     get_secondary_indexes_internal(rocksh, sindex_block, &sindex_map);
@@ -156,7 +156,7 @@ void set_secondary_index(rockshard rocksh,
 }
 
 bool delete_secondary_index(rockshard rocksh,
-                            sindex_block_lock *sindex_block, const sindex_name_t &name) {
+                            real_superblock_lock *sindex_block, const sindex_name_t &name) {
     std::map<sindex_name_t, secondary_index_t> sindex_map;
     get_secondary_indexes_internal(rocksh, sindex_block, &sindex_map);
 

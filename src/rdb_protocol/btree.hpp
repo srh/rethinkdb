@@ -78,7 +78,7 @@ struct btree_batched_replacer_t {
 batched_replace_response_t rdb_batched_replace(
     rockshard rocksh,
     const btree_info_t &info,
-    scoped_ptr_t<real_superblock_lock> &&superblock,
+    real_superblock_lock *superblock,
     const std::vector<store_key_t> &keys,
     const btree_batched_replacer_t *replacer,
     rdb_modification_report_cb_t *sindex_cb,
@@ -304,7 +304,7 @@ class rdb_modification_report_cb_t final {
 public:
     rdb_modification_report_cb_t(
             store_t *store,
-            sindex_block_lock *sindex_block,
+            real_superblock_lock *sindex_block,
             auto_drainer_t::lock_t lock);
     ~rdb_modification_report_cb_t();
 
@@ -333,7 +333,7 @@ private:
     /* Fields initialized by the constructor. */
     auto_drainer_t::lock_t lock_;
     store_t *store_;
-    sindex_block_lock *sindex_block_;
+    real_superblock_lock *sindex_block_;
 
     /* Fields initialized by calls to on_mod_report */
     store_t::sindex_access_vector_t sindexes_;

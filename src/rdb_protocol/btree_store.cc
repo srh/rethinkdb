@@ -117,8 +117,7 @@ store_t::store_t(const region_t &_region,
 
         txn_t txn(general_cache_conn.get(), write_durability_t::HARD, 1);
         {
-            real_superblock_lock sb_lock(&txn, access_t::write, new_semaphore_in_line_t());
-            real_superblock_lock superblock(std::move(sb_lock));
+            real_superblock_lock superblock(&txn, access_t::write, new_semaphore_in_line_t());
             // TODO: Make sure store initialization logic doesn't miss out on
             // lock ordering logic, when we go rocks-only.
             // TODO: Not to mention... file existence logic.
@@ -150,10 +149,10 @@ store_t::store_t(const region_t &_region,
 
         metainfo.init(new store_metainfo_manager_t(rocksh(), superblock.get()));
 
-        sindex_block_lock sindex_block(superblock.get(), access_t::read);
+        superblock->sindex_block_read_signal()->wait();
 
         std::map<sindex_name_t, secondary_index_t> sindexes;
-        get_secondary_indexes(rocksh(), &sindex_block, &sindexes);
+        get_secondary_indexes(rocksh(), superblock.get(), &sindexes);
 
         for (auto it = sindexes.begin(); it != sindexes.end(); ++it) {
             // Deleted secondary indexes should not be added to the perfmons
@@ -268,7 +267,7 @@ void store_t::reset_data(
                                      &superblock,
                                      interruptor);
 
-        sindex_block_lock sindex_block(superblock.get(), access_t::write);
+        superblock->sindex_block_write_signal()->wait();
 
         /* Note we don't allow interruption during this step; it's too easy to end up in
         an inconsistent state. */
@@ -291,13 +290,12 @@ void store_t::reset_data(
                          rocksh(),
                          region_map_t<binary_blob_t>(deleted_region, zero_metainfo));
 
-        superblock.reset();
         if (!mod_reports.empty()) {
             // TODO: Pass along the transactionality from rdb_erase_small_range for rocksdb.
-            update_sindexes(std::move(sindex_block), mod_reports);
+            update_sindexes(std::move(superblock), mod_reports);
+        } else {
+            superblock.reset();
         }
-
-        sindex_block.reset_sindex_block_lock();
         txn->commit();
     }
 }
@@ -309,12 +307,11 @@ std::map<std::string, std::pair<sindex_config_t, sindex_status_t> > store_t::sin
     scoped_ptr_t<txn_t> txn;
     get_btree_superblock_and_txn_for_reading(general_cache_conn.get(),
         &superblock, &txn);
-    sindex_block_lock sindex_block(superblock.get(), access_t::read);
-    superblock->reset_superblock();
+    superblock->sindex_block_read_signal()->wait();
 
     std::map<sindex_name_t, secondary_index_t> secondary_indexes;
-    get_secondary_indexes(rocksh(), &sindex_block, &secondary_indexes);
-    sindex_block.reset_sindex_block_lock();
+    get_secondary_indexes(rocksh(), superblock.get(), &secondary_indexes);
+    superblock.reset();
 
     std::map<std::string, std::pair<sindex_config_t, sindex_status_t> > results;
     for (const auto &pair : secondary_indexes) {
@@ -366,8 +363,7 @@ void store_t::sindex_create(
     get_btree_superblock_and_txn_for_writing(general_cache_conn.get(),
         &write_superblock_acq_semaphore, write_access_t::write, 1,
         write_durability_t::HARD, &superblock, &txn);
-    sindex_block_lock sindex_block(superblock.get(), access_t::write);
-    superblock->reset_superblock();
+    superblock->sindex_block_write_signal()->wait();
 
     /* Note that this function allows creating sindexes with older ReQL versions. For
     example, suppose that the user upgrades to a newer version of RethinkDB, and then
@@ -389,7 +385,7 @@ void store_t::sindex_create(
 
     sindex_name_t sindex_name(name);
     optional<uuid_u> sindex_id = add_sindex_internal(
-        sindex_name, stream.vector(), &sindex_block);
+        sindex_name, stream.vector(), superblock.get());
     guarantee(sindex_id, "sindex_create() called with a sindex name that exists");
 
     // Kick off index post construction
@@ -399,7 +395,7 @@ void store_t::sindex_create(
                                      this,
                                      drainer.lock()));
 
-    sindex_block.reset_sindex_block_lock();
+    superblock.reset();
     txn->commit();
 }
 
@@ -412,8 +408,7 @@ void store_t::sindex_rename_multi(
     get_btree_superblock_and_txn_for_writing(general_cache_conn.get(),
         &write_superblock_acq_semaphore, write_access_t::write, 1,
         write_durability_t::HARD, &superblock, &txn);
-    sindex_block_lock sindex_block(superblock.get(), access_t::write);
-    superblock->reset_superblock();
+    superblock->sindex_block_write_signal()->wait();
 
     /* First we remove all the secondary indexes and hide their perfmons, but put the
     definitions and `btree_stats_t`s into `to_put_back` indexed by their new names. Then
@@ -423,9 +418,9 @@ void store_t::sindex_rename_multi(
     for (const auto &pair : name_changes) {
         secondary_index_t definition;
         bool success = get_secondary_index(
-            rocksh(), &sindex_block, sindex_name_t(pair.first), &definition);
+            rocksh(), superblock.get(), sindex_name_t(pair.first), &definition);
         guarantee(success);
-        success = delete_secondary_index(rocksh(), &sindex_block, sindex_name_t(pair.first));
+        success = delete_secondary_index(rocksh(), superblock.get(), sindex_name_t(pair.first));
         guarantee(success);
 
         auto slice_it = secondary_index_slices.find(definition.id);
@@ -440,11 +435,11 @@ void store_t::sindex_rename_multi(
     }
 
     for (const auto &pair : to_put_back) {
-        set_secondary_index(rocksh(), &sindex_block, sindex_name_t(pair.first), pair.second.first);
+        set_secondary_index(rocksh(), superblock.get(), sindex_name_t(pair.first), pair.second.first);
         pair.second.second->rename(&perfmon_collection, "index-" + pair.first);
     }
 
-    sindex_block.reset_sindex_block_lock();
+    superblock.reset();
     txn->commit();
 }
 
@@ -457,15 +452,14 @@ void store_t::sindex_drop(
     get_btree_superblock_and_txn_for_writing(general_cache_conn.get(),
         &write_superblock_acq_semaphore, write_access_t::write, 1,
         write_durability_t::HARD, &superblock, &txn);
-    sindex_block_lock sindex_block(superblock.get(), access_t::write);
-    superblock->reset_superblock();
+    superblock->sindex_block_write_signal()->wait();
 
     secondary_index_t sindex;
-    bool success = ::get_secondary_index(rocksh(), &sindex_block, sindex_name_t(name), &sindex);
+    bool success = ::get_secondary_index(rocksh(), superblock.get(), sindex_name_t(name), &sindex);
     guarantee(success, "sindex_drop() called on sindex that doesn't exist");
 
     /* Mark the secondary index as deleted */
-    success = mark_secondary_index_deleted(&sindex_block, sindex_name_t(name));
+    success = mark_secondary_index_deleted(superblock.get(), sindex_name_t(name));
     guarantee(success);
 
     /* Clear the sindex later. It starts its own transaction and we don't
@@ -475,11 +469,11 @@ void store_t::sindex_drop(
                                      sindex,
                                      drainer.lock()));
 
-    sindex_block.reset_sindex_block_lock();
+    superblock.reset();
     txn->commit();
 }
 
-new_mutex_in_line_t store_t::get_in_line_for_sindex_queue(sindex_block_lock *sindex_block) {
+new_mutex_in_line_t store_t::get_in_line_for_sindex_queue(real_superblock_lock *superblock) {
     assert_thread();
     // The line for the sindex queue is there to guarantee that we push things to
     // the sindex queue(s) in the same order in which we held the sindex block.
@@ -488,9 +482,8 @@ new_mutex_in_line_t store_t::get_in_line_for_sindex_queue(sindex_block_lock *sin
     // Pushing data to those queues can take a while, and we wouldn't want to block
     // other transactions while we are doing that.
 
-    guarantee(!sindex_block->empty());
-    guarantee(sindex_block->access() == access_t::write);
-    sindex_block->write_acq_signal()->wait();
+    guarantee(superblock->access() == access_t::write);
+    superblock->write_acq_signal()->wait();
     return new_mutex_in_line_t(&sindex_queue_mutex);
 }
 
@@ -539,13 +532,13 @@ void store_t::emergency_deregister_sindex_queue(
 }
 
 void store_t::update_sindexes(
-            sindex_block_lock &&sindex_block,
+            scoped_ptr_t<real_superblock_lock> &&superblock,
             const std::vector<rdb_modification_report_t> &mod_reports) {
-    new_mutex_in_line_t acq = get_in_line_for_sindex_queue(&sindex_block);
+    new_mutex_in_line_t acq = get_in_line_for_sindex_queue(superblock.get());
     {
         sindex_access_vector_t sindexes;
-        acquire_all_sindex_superblocks_for_write(&sindex_block, &sindexes);
-        sindex_block.reset_sindex_block_lock();
+        acquire_all_sindex_superblocks_for_write(superblock.get(), &sindexes);
+        superblock.reset();
 
         for (size_t i = 0; i < mod_reports.size(); ++i) {
             // TODO: What rocksdb transaction is this with?
@@ -613,7 +606,7 @@ microtime_t store_t::get_sindex_start_time(uuid_u const &id) {
 optional<uuid_u> store_t::add_sindex_internal(
         const sindex_name_t &name,
         const std::vector<char> &opaque_definition,
-        sindex_block_lock *sindex_block) {
+        real_superblock_lock *sindex_block) {
     secondary_index_t sindex;
     if (::get_secondary_index(rocksh(), sindex_block, name, &sindex)) {
         return r_nullopt; // sindex was already created
@@ -713,12 +706,10 @@ void store_t::clear_sindex_data(
             &superblock,
             interruptor);
 
-        /* Get the sindex block. */
-        sindex_block_lock sindex_block(superblock.get(), access_t::write);
-        superblock->reset_superblock();
+        superblock->sindex_block_write_signal()->wait();
 
         secondary_index_t sindex;
-        bool found = get_secondary_index(rocksh(), &sindex_block, sindex_id, &sindex);
+        bool found = get_secondary_index(rocksh(), superblock.get(), sindex_id, &sindex);
         if (!found) {
             // The index got dropped by someone else. That's ok, there's nothing left
             // to do for us.
@@ -727,10 +718,10 @@ void store_t::clear_sindex_data(
 
         /* Clear part of the index data */
         sindex_superblock_lock sindex_superblock_lock(
-            &sindex_block,
+            superblock.get(),
             sindex.id,
             access_t::write);
-        sindex_block.reset_sindex_block_lock();
+        superblock.reset();
 
         // TODO: Actually just pass a range delete to rocksdb.
 
@@ -796,12 +787,10 @@ void store_t::drop_sindex(uuid_u sindex_id) THROWS_NOTHING {
         &superblock,
         &non_interruptor);
 
-    /* Get the sindex block. */
-    sindex_block_lock sindex_block(superblock.get(), access_t::write);
-    superblock->reset_superblock();
+    superblock->sindex_block_write_signal()->wait();
 
     secondary_index_t sindex;
-    bool found = get_secondary_index(rocksh(), &sindex_block, sindex_id, &sindex);
+    bool found = get_secondary_index(rocksh(), superblock.get(), sindex_id, &sindex);
     if (!found) {
         // The index got dropped by someone else. That's ok, there's nothing left for us
         // to do.
@@ -810,17 +799,17 @@ void store_t::drop_sindex(uuid_u sindex_id) THROWS_NOTHING {
 
     /* Now it's safe to completely delete the index */
     sindex_superblock_lock sindex_superblock_lock(
-        &sindex_block,
+        superblock.get(),
         sindex.id,
         access_t::write);
     sindex_superblock_lock.write_acq_signal()->wait_lazily_ordered();
     sindex_superblock_lock.mark_deleted();
-    ::delete_secondary_index(rocksh(), &sindex_block, compute_sindex_deletion_name(sindex.id));
+    ::delete_secondary_index(rocksh(), superblock.get(), compute_sindex_deletion_name(sindex.id));
     size_t num_erased = secondary_index_slices.erase(sindex.id);
     guarantee(num_erased == 1);
 
     sindex_superblock_lock.reset_sindex_superblock();
-    sindex_block.reset_sindex_block_lock();
+    superblock.reset();
     txn->commit();
 }
 
@@ -866,17 +855,14 @@ std::map<sindex_name_t, secondary_index_t> store_t::get_sindexes() const {
     get_btree_superblock_and_txn_for_reading(
         general_cache_conn.get(), &superblock, &txn);
 
-    sindex_block_lock sindex_block(
-        superblock.get(), access_t::read);
-
     std::map<sindex_name_t, secondary_index_t> sindexes;
-    get_secondary_indexes(rocksh(), &sindex_block, &sindexes);
+    get_secondary_indexes(rocksh(), superblock.get(), &sindexes);
 
     return sindexes;
 }
 
 bool store_t::mark_index_up_to_date(uuid_u id,
-                                    sindex_block_lock *sindex_block,
+                                    real_superblock_lock *sindex_block,
                                     const key_range_t &except_for_remaining_range)
     THROWS_NOTHING {
     secondary_index_t sindex;
@@ -892,7 +878,7 @@ bool store_t::mark_index_up_to_date(uuid_u id,
 }
 
 MUST_USE bool store_t::mark_secondary_index_deleted(
-        sindex_block_lock *sindex_block,
+        real_superblock_lock *sindex_block,
         const sindex_name_t &name) {
     secondary_index_t sindex;
     bool success = get_secondary_index(rocksh(), sindex_block, name, &sindex);
@@ -919,6 +905,7 @@ MUST_USE bool store_t::mark_secondary_index_deleted(
     return true;
 }
 
+// TODO: Make this and the write version take superblock by value.
 MUST_USE bool store_t::acquire_sindex_superblock_for_read(
         const sindex_name_t &name,
         const std::string &table_name,
@@ -933,14 +920,15 @@ MUST_USE bool store_t::acquire_sindex_superblock_for_read(
     rassert(sindex_uuid_out != NULL);
 
     /* Acquire the sindex block. */
-    sindex_block_lock sindex_block(superblock, access_t::read);
-    if (release_superblock == release_superblock_t::RELEASE) {
-        superblock->reset_superblock();
-    }
+    // TODO: We don't release the superblock ever, any more.  Which is fine, correctness-wise.  Maybe remove the unused parameter.
+    // if (release_superblock == release_superblock_t::RELEASE) {
+    superblock->sindex_block_read_signal()->wait();
+    // }  // TODO remove this commented line too.
 
     /* Figure out what the superblock for this index is. */
     secondary_index_t sindex;
-    if (!::get_secondary_index(rocksh(), &sindex_block, name, &sindex)) {
+    if (!::get_secondary_index(rocksh(), superblock, name, &sindex)) {
+        superblock->reset_superblock();
         return false;
     }
 
@@ -948,11 +936,12 @@ MUST_USE bool store_t::acquire_sindex_superblock_for_read(
     *sindex_uuid_out = sindex.id;
 
     if (!sindex.is_ready()) {
+        superblock->reset_superblock();
         throw sindex_not_ready_exc_t(name.name, sindex, table_name);
     }
 
-    sindex_superblock_lock superblock_lock(&sindex_block, sindex.id, access_t::read);
-    sindex_block.reset_sindex_block_lock();
+    sindex_superblock_lock superblock_lock(superblock, sindex.id, access_t::read);
+    superblock->reset_superblock();
     sindex_sb_out->init(new sindex_superblock_lock(std::move(superblock_lock)));
     return true;
 }
@@ -968,26 +957,27 @@ MUST_USE bool store_t::acquire_sindex_superblock_for_write(
     rassert(sindex_uuid_out != NULL);
 
     /* Get the sindex block. */
-    sindex_block_lock sindex_block(superblock, access_t::write);
-    superblock->reset_superblock();
+    superblock->sindex_block_write_signal()->wait();
 
     /* Figure out what the superblock for this index is. */
     secondary_index_t sindex;
-    if (!::get_secondary_index(rocksh(), &sindex_block, name, &sindex)) {
+    if (!::get_secondary_index(rocksh(), superblock, name, &sindex)) {
+        superblock->reset_superblock();
         return false;
     }
     *sindex_uuid_out = sindex.id;
 
     if (!sindex.is_ready()) {
+        superblock->reset_superblock();
         throw sindex_not_ready_exc_t(name.name, sindex, table_name);
     }
 
 
     sindex_superblock_lock superblock_lock(
-        &sindex_block,
+        superblock,
         sindex.id,
         access_t::write);
-    sindex_block.reset_sindex_block_lock();
+    superblock->reset_superblock();
     sindex_sb_out->init(new sindex_superblock_lock(std::move(superblock_lock)));
     return true;
 }
@@ -1006,30 +996,22 @@ store_t::sindex_access_t::~sindex_access_t() { }
 
 
 void store_t::acquire_all_sindex_superblocks_for_write(
-        real_superblock_lock *parent,
+        real_superblock_lock *superblock,
         sindex_access_vector_t *sindex_sbs_out)
     THROWS_ONLY(sindex_not_ready_exc_t) {
     assert_thread();
 
-    /* Get the sindex block. */
-    sindex_block_lock sindex_block(parent, access_t::write);
+    superblock->sindex_block_write_signal()->wait_lazily_ordered();
 
-    acquire_all_sindex_superblocks_for_write(&sindex_block, sindex_sbs_out);
-}
-
-void store_t::acquire_all_sindex_superblocks_for_write(
-        sindex_block_lock *sindex_block,
-        sindex_access_vector_t *sindex_sbs_out)
-    THROWS_ONLY(sindex_not_ready_exc_t) {
     acquire_sindex_superblocks_for_write(
             r_nullopt,
-            sindex_block,
+            superblock,
             sindex_sbs_out);
 }
 
 bool store_t::acquire_sindex_superblocks_for_write(
             optional<std::set<uuid_u> > sindexes_to_acquire, //none means acquire all sindexes
-            sindex_block_lock *sindex_block,
+            real_superblock_lock *sindex_block,
             sindex_access_vector_t *sindex_sbs_out)
     THROWS_ONLY(sindex_not_ready_exc_t) {
     assert_thread();

@@ -319,7 +319,7 @@ void do_a_replace_from_batched_replace(
 batched_replace_response_t rdb_batched_replace(
     rockshard rocksh,
     const btree_info_t &info,
-    scoped_ptr_t<real_superblock_lock> &&superblock,
+    real_superblock_lock *superblock,
     const std::vector<store_key_t> &keys,
     const btree_batched_replacer_t *replacer,
     rdb_modification_report_cb_t *sindex_cb,
@@ -356,9 +356,11 @@ batched_replace_response_t rdb_batched_replace(
         const size_t MAX_CONCURRENT_REPLACES = 8;
         coro_pool_t<std::function<void()> > coro_pool(
             MAX_CONCURRENT_REPLACES, &coro_queue, &callback);
+        // We do not release the superblock. This comment was before the rocks replacement.
+        // TODO: Should we release... something... early?  Where?
         // We release the superblock either before or after draining on all the
         // write operations depending on the presence of limit changefeeds.
-        scoped_ptr_t<real_superblock_lock> current_superblock(std::move(superblock));
+        // TODO: Okay, continue
         bool update_pkey_cfeeds = sindex_cb->has_pkey_cfeeds(keys);
         {
             auto_drainer_t drainer;
@@ -369,7 +371,7 @@ batched_replace_response_t rdb_batched_replace(
                      rocksh,
                      &sink,
                      source_token = source.enter_write(),
-                     info = btree_loc_info_t(&info, current_superblock.release(), &keys[i]),
+                     info = btree_loc_info_t(&info, superblock, &keys[i]),
                      one_replace = one_replace_t(replacer, i),
                      limits,
                      &superblock_promise,
@@ -393,17 +395,17 @@ batched_replace_response_t rdb_batched_replace(
                             trace,
                             &conditions);
                      });
-                current_superblock.init(superblock_promise.wait());
+                superblock_promise.wait();
             }
             if (!update_pkey_cfeeds) {
-                current_superblock.reset(); // Release the superblock early if
-                                            // we don't need to finish.
+                // TODO: We don't do this anymore.  (Should we?)
+                // current_superblock.reset(); // Release the superblock early if
+                //                             // we don't need to finish.
             }
         }
         // This needs to happen after draining.
         if (update_pkey_cfeeds) {
-            guarantee(current_superblock.has());
-            sindex_cb->finish(info.slice, current_superblock.get());
+            sindex_cb->finish(info.slice, superblock);
         }
     }
 
@@ -1529,7 +1531,7 @@ RDB_IMPL_SERIALIZABLE_2_SINCE_v1_13(rdb_modification_report_t, primary_key, info
 
 rdb_modification_report_cb_t::rdb_modification_report_cb_t(
         store_t *store,
-        sindex_block_lock *sindex_block,
+        real_superblock_lock *sindex_block,
         auto_drainer_t::lock_t lock)
     : lock_(lock), store_(store),
       sindex_block_(sindex_block) {
@@ -2303,12 +2305,11 @@ private:
                 interruptor_);
 
         // Acquire the sindex block and release the superblock.
-        sindex_block_lock sindex_block(superblock.get(), access_t::write);
-        superblock.reset();
+        superblock->sindex_block_write_signal()->wait_lazily_ordered();
         store_t::sindex_access_vector_t all_sindexes;
         store_->acquire_sindex_superblocks_for_write(
             make_optional(sindexes_to_post_construct_),
-            &sindex_block,
+            superblock.get(),
             &all_sindexes);
 
         // Filter out indexes that are being deleted. No need to keep post-constructing

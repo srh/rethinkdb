@@ -121,7 +121,7 @@ public:
     std::function<void(
         const key_range_t::right_bound_t &progress,
         scoped_ptr_t<txn_t> &&txn,
-        sindex_block_lock &&sindex_block,
+        scoped_ptr_t<real_superblock_lock> &&superblock,
         std::vector<rdb_modification_report_t> &&mod_reports
         )> commit_cb;
 };
@@ -152,7 +152,7 @@ void apply_empty_range(
         fifo_enforcer_sink_t::exit_write_t exiter(
             &tokens.info->commit_fifo_sink, tokens.write_token);
         exiter.wait_lazily_unordered();
-        tokens.commit_cb(empty_range, std::move(txn), sindex_block_lock(),
+        tokens.commit_cb(empty_range, std::move(txn), scoped_ptr_t<real_superblock_lock>(),
             std::vector<rdb_modification_report_t>());
 
     } catch (const interrupted_exc_t &exc) {
@@ -209,7 +209,6 @@ void apply_single_key_item(
         /* Acquire the superblock */
         scoped_ptr_t<txn_t> txn;
         scoped_ptr_t<real_superblock_lock> superblock;
-        sindex_block_lock sindex_block;
         {
             fifo_enforcer_sink_t::exit_write_t exiter(
                 &tokens.info->btree_fifo_sink, tokens.write_token);
@@ -226,7 +225,7 @@ void apply_single_key_item(
 
             /* Acquire the sindex block and update the metainfo now, because we'll
             release the superblock soon */
-            sindex_block = sindex_block_lock(superblock.get(), access_t::write);
+            superblock->sindex_block_write_signal()->wait();
             // TODO: This definitely needs to be in a rocksdb transaction, and possibly should be in opposite order.
             tokens.update_metainfo_cb(item.range.right, superblock.get());
         }
@@ -245,7 +244,7 @@ void apply_single_key_item(
         /* Note: This must not be interruptible, or we might miss updating secondary
         indexes. */
         exiter.wait_lazily_unordered();
-        tokens.commit_cb(item.range.right, std::move(txn), std::move(sindex_block),
+        tokens.commit_cb(item.range.right, std::move(txn), std::move(superblock),
             std::move(mod_reports));
 
     } catch (const interrupted_exc_t &exc) {
@@ -354,12 +353,11 @@ void apply_multi_key_item(
             threshold = range_deleted.right;
 
             /* Acquire the sindex block and update the metainfo */
-            sindex_block_lock sindex_block(superblock.get(), access_t::write);
+            superblock->sindex_block_write_signal()->wait();
             tokens.update_metainfo_cb(threshold, superblock.get());
-            superblock->reset_superblock();
 
             /* Notify the callback of our progress and update the sindexes */
-            tokens.commit_cb(threshold, std::move(txn), std::move(sindex_block),
+            tokens.commit_cb(threshold, std::move(txn), std::move(superblock),
                 std::move(mod_reports));
         }
 
@@ -446,14 +444,14 @@ continue_bool_t store_t::receive_backfill(
         tokens.commit_cb = [this, item_producer, &commit_threshold, &metainfo_threshold](
                 const key_range_t::right_bound_t &progress,
                 scoped_ptr_t<txn_t> &&txn,
-                sindex_block_lock &&sindex_block,
+                scoped_ptr_t<real_superblock_lock> &&superblock,
                 std::vector<rdb_modification_report_t> &&mod_reports) {
             /* Apply the modifications */
             if (!mod_reports.empty()) {
                 // TODO: We have transactionality to pass in here.
-                update_sindexes(std::move(sindex_block), mod_reports);
+                update_sindexes(std::move(superblock), mod_reports);
             } else {
-                sindex_block.reset_sindex_block_lock();
+                superblock.reset();
             }
 
             /* End the transaction and notify that we've made progress */

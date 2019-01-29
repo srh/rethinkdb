@@ -17,9 +17,7 @@ void btree_slice_t::init_real_superblock(real_superblock_lock *superblock,
                                          const binary_blob_t &metainfo_value) {
     superblock->write_acq_signal()->wait_lazily_ordered();
     set_superblock_metainfo(superblock, rocksh, metainfo_key, metainfo_value);
-
-    sindex_block_lock sindex_block(superblock, access_t::write);
-    initialize_secondary_indexes(rocksh, &sindex_block);
+    initialize_secondary_indexes(rocksh, superblock);
 }
 
 btree_slice_t::btree_slice_t(cache_t *c, perfmon_collection_t *parent,

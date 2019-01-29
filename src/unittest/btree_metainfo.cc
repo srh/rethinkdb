@@ -52,9 +52,8 @@ TPTEST(BtreeMetainfo, MetainfoTest) {
         txn_t txn(&cache_conn, write_durability_t::HARD, 1);
         {
             real_superblock_lock sb_lock(&txn, access_t::write, new_semaphore_in_line_t());
-            real_superblock_lock superblock(std::move(sb_lock));
             btree_slice_t::init_real_superblock(
-                &superblock,
+                &sb_lock,
                 rocksh,
                 std::vector<char>(),
                 binary_blob_t());

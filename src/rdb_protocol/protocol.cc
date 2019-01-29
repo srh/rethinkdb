@@ -117,10 +117,7 @@ void resume_construct_sindex(
             } catch (const interrupted_exc_t &) {
                 return;
             }
-            sindex_block_lock sindex_block(
-                superblock.get(),
-                access_t::write);
-            superblock.reset();
+            superblock->sindex_block_write_signal()->wait_lazily_ordered();
 
             /* We register our modification queue here.
              * We must register it before calling post_construct_and_drain_queue to
@@ -142,19 +139,19 @@ void resume_construct_sindex(
 
             secondary_index_t sindex;
             bool found_index =
-                get_secondary_index(store->rocksh(), &sindex_block, sindex_to_construct, &sindex);
+                get_secondary_index(store->rocksh(), superblock.get(), sindex_to_construct, &sindex);
             if (!found_index || sindex.being_deleted) {
                 // The index was deleted. Abort construction.
-                sindex_block.reset_sindex_block_lock();
+                superblock.reset();
                 txn->commit();
                 return;
             }
 
             new_mutex_in_line_t acq =
-                store->get_in_line_for_sindex_queue(&sindex_block);
+                store->get_in_line_for_sindex_queue(superblock.get());
             store->register_sindex_queue(mod_queue.get(), remaining_range, &acq);
 
-            sindex_block.reset_sindex_block_lock();
+            superblock.reset();
             txn->commit();
         }
 
@@ -231,16 +228,12 @@ void post_construct_and_drain_queue(
                 &queue_superblock,
                 lock.get_drain_signal());
 
-            sindex_block_lock queue_sindex_block(
-                queue_superblock.get(),
-                access_t::write);
-
-            queue_superblock->reset_superblock();
+            queue_superblock->sindex_block_write_signal()->wait();
 
             store_t::sindex_access_vector_t sindexes;
             store->acquire_sindex_superblocks_for_write(
                     make_optional(sindexes_to_bring_up_to_date),
-                    &queue_sindex_block,
+                    queue_superblock.get(),
                     &sindexes);
 
             // Pretend that the indexes in `sindexes` have been post-constructed up to
@@ -258,19 +251,19 @@ void post_construct_and_drain_queue(
                 // We throw here because that's consistent with how
                 // `post_construct_secondary_index_range` signals the fact that all
                 // indexes have been deleted.
-                queue_sindex_block.reset_sindex_block_lock();
+                queue_superblock.reset();
                 queue_txn->commit();
                 throw interrupted_exc_t();
             }
 
             new_mutex_in_line_t acq =
-                store->get_in_line_for_sindex_queue(&queue_sindex_block);
+                store->get_in_line_for_sindex_queue(queue_superblock.get());
             acq.acq_signal()->wait_lazily_unordered();
 
             while (mod_queue->size() > 0) {
                 if (lock.get_drain_signal()->is_pulsed()) {
                     sindexes.clear();
-                    queue_sindex_block.reset_sindex_block_lock();
+                    queue_superblock.reset();
                     queue_txn->commit();
                     throw interrupted_exc_t();
                 }
@@ -293,7 +286,7 @@ void post_construct_and_drain_queue(
                     } catch (const interrupted_exc_t &) {
                         mod_queue->available->unset_callback();
                         sindexes.clear();
-                        queue_sindex_block.reset_sindex_block_lock();
+                        queue_superblock.reset();
                         queue_txn->commit();
                         throw;
                     }
@@ -317,12 +310,12 @@ void post_construct_and_drain_queue(
             // Mark parts of the index up to date (except for what remains in
             // `construction_range_inout`).
             store->mark_index_up_to_date(sindex_id_to_bring_up_to_date,
-                                         &queue_sindex_block,
+                                         queue_superblock.get(),
                                          *construction_range_inout);
             store->deregister_sindex_queue(mod_queue.get(), &acq);
 
             sindexes.clear();
-            queue_sindex_block.reset_sindex_block_lock();
+            queue_superblock.reset();
             queue_txn->commit();
 
             return;
@@ -355,17 +348,13 @@ void post_construct_and_drain_queue(
             &queue_superblock,
             &non_interruptor);
 
-        sindex_block_lock queue_sindex_block(
-            queue_superblock.get(),
-            access_t::write);
-
-        queue_superblock->reset_superblock();
+        queue_superblock->sindex_block_write_signal()->wait();
 
         new_mutex_in_line_t acq =
-            store->get_in_line_for_sindex_queue(&queue_sindex_block);
+            store->get_in_line_for_sindex_queue(queue_superblock.get());
         store->deregister_sindex_queue(mod_queue.get(), &acq);
 
-        queue_sindex_block.reset_sindex_block_lock();
+        queue_superblock.reset();
         queue_txn->commit();
     }
 }

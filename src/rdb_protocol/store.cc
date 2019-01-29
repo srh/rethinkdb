@@ -46,7 +46,7 @@ void store_t::note_reshard(const region_t &shard_region) {
 reql_version_t update_sindex_last_compatible_version(
         rockshard rocksh,
         secondary_index_t *sindex,
-        sindex_block_lock *sindex_block) {
+        real_superblock_lock *sindex_block) {
     sindex_disk_info_t sindex_info;
     deserialize_sindex_info_or_crash(sindex->opaque_definition, &sindex_info);
 
@@ -94,11 +94,7 @@ void store_t::help_construct_bring_sindexes_up_to_date() {
                                  &superblock,
                                  &dummy_interruptor);
 
-    sindex_block_lock sindex_block(
-        superblock.get(),
-        access_t::write);
-
-    superblock.reset();
+    superblock->sindex_block_write_signal()->wait();
 
     auto clear_sindex = [this](uuid_u sindex_id,
                                auto_drainer_t::lock_t store_keepalive) {
@@ -120,7 +116,7 @@ void store_t::help_construct_bring_sindexes_up_to_date() {
     // Kick off coroutines to finish the respective operations
     {
         std::map<sindex_name_t, secondary_index_t> sindexes;
-        get_secondary_indexes(rocksh(), &sindex_block, &sindexes);
+        get_secondary_indexes(rocksh(), superblock.get(), &sindexes);
         for (auto it = sindexes.begin(); it != sindexes.end(); ++it) {
             if (it->second.being_deleted) {
                 coro_t::spawn_sometime(std::bind(clear_sindex,
@@ -136,7 +132,7 @@ void store_t::help_construct_bring_sindexes_up_to_date() {
         }
     }
 
-    sindex_block.reset_sindex_block_lock();
+    superblock.reset();
     txn->commit();
 }
 
@@ -159,7 +155,8 @@ scoped_ptr_t<sindex_superblock_lock> acquire_sindex_for_read(
         bool found = store->acquire_sindex_superblock_for_read(
             sindex_name_t(sindex_id),
             table_name,
-            superblock,
+            // TODO: The std::move here is on a pointer!
+            std::move(superblock),
             release_superblock,
             &sindex_sb,
             &sindex_mapping_data,
@@ -930,7 +927,7 @@ struct rdb_write_visitor_t : public boost::static_visitor<void> {
             br.serializable_env,
             trace);
         rdb_modification_report_cb_t sindex_cb(
-            store, &sindex_block,
+            store, superblock.get(),
             auto_drainer_t::lock_t(&store->drainer));
 
         counted_t<const ql::func_t> write_hook;
@@ -948,7 +945,7 @@ struct rdb_write_visitor_t : public boost::static_visitor<void> {
             rdb_batched_replace(
                 store->rocksh(),
                 btree_info_t(btree, timestamp, datum_string_t(br.pkey)),
-                std::move(superblock),
+                superblock.get(),
                 br.keys,
                 &replacer,
                 &sindex_cb,
@@ -959,7 +956,7 @@ struct rdb_write_visitor_t : public boost::static_visitor<void> {
 
     void operator()(const batched_insert_t &bi) {
         rdb_modification_report_cb_t sindex_cb(
-            store, &sindex_block,
+            store, superblock.get(),
             auto_drainer_t::lock_t(&store->drainer));
         ql::env_t ql_env(
             ctx,
@@ -978,7 +975,7 @@ struct rdb_write_visitor_t : public boost::static_visitor<void> {
             rdb_batched_replace(
                 store->rocksh(),
                 btree_info_t(btree, timestamp, datum_string_t(bi.pkey)),
-                std::move(superblock),
+                superblock.get(),
                 keys,
                 &replacer,
                 &sindex_cb,
@@ -1001,7 +998,7 @@ struct rdb_write_visitor_t : public boost::static_visitor<void> {
         rdb_set(store->rocksh(),
                 w.key, w.data, w.overwrite, btree, timestamp, superblock.get(),
                 res, &mod_report.info, trace, &pass_back_superblock);
-        pass_back_superblock.wait()->reset_superblock();
+        pass_back_superblock.wait();
 
         update_sindexes(mod_report);
     }
@@ -1021,7 +1018,7 @@ struct rdb_write_visitor_t : public boost::static_visitor<void> {
                 d.key, btree, timestamp, superblock.get(),
                 delete_mode_t::REGULAR_QUERY, res, &mod_report.info, trace,
                 &pass_back_superblock);
-        pass_back_superblock.wait()->reset_superblock();
+        pass_back_superblock.wait();
 
         update_sindexes(mod_report);
     }
@@ -1061,9 +1058,7 @@ struct rdb_write_visitor_t : public boost::static_visitor<void> {
         superblock(std::move(_superblock)),
         timestamp(_timestamp),
         sampler(_sampler),
-        trace(_trace),
-        sindex_block(superblock.get(),
-                     access_t::write) {
+        trace(_trace) {
     }
 
 private:
@@ -1072,7 +1067,7 @@ private:
         // This copying of the mod_report is inefficient, but it seems this
         // function is only used for unit tests at the moment anyway.
         mod_reports.push_back(mod_report);
-        store->update_sindexes(std::move(sindex_block), mod_reports);
+        store->update_sindexes(std::move(superblock), mod_reports);
     }
 
     btree_slice_t *const btree;
@@ -1084,7 +1079,6 @@ private:
     const repli_timestamp_t timestamp;
     profile::sampler_t *const sampler;
     profile::trace_t *const trace;
-    sindex_block_lock sindex_block;
     profile::event_log_t event_log_out;
 
     DISABLE_COPYING(rdb_write_visitor_t);
