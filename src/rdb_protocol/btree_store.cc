@@ -803,12 +803,12 @@ void store_t::drop_sindex(uuid_u sindex_id) THROWS_NOTHING {
         sindex.id,
         access_t::write);
     sindex_superblock_lock.write_acq_signal()->wait_lazily_ordered();
-    sindex_superblock_lock.mark_deleted();
+
+    sindex_superblock_lock.mark_deleted_and_reset(superblock.get());
     ::delete_secondary_index(rocksh(), superblock.get(), compute_sindex_deletion_name(sindex.id));
     size_t num_erased = secondary_index_slices.erase(sindex.id);
     guarantee(num_erased == 1);
 
-    sindex_superblock_lock.reset_sindex_superblock();
     superblock.reset();
     txn->commit();
 }

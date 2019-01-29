@@ -165,7 +165,7 @@ public:
 class sindex_superblock_lock {
 public:
     sindex_superblock_lock(real_superblock_lock *parent, uuid_u sindex_uuid, access_t access)
-        : acq_() {
+        : sindex_uuid_(sindex_uuid), acq_() {
         txn_t *txn = parent->txn();
         wait_for_rwlock(&parent->acq_, access);
         auto it = txn->cache()->locks_.sindex_superblock_locks.find(sindex_uuid);
@@ -200,10 +200,12 @@ public:
         acq_.reset();
     }
 
-    void mark_deleted() {
-        // TODO: Implement for real (remove from sindex_superblock_locks -- force caller to hold parent lock, see if that's reasonable)
+    void mark_deleted_and_reset(real_superblock_lock *real_superblock) {
+        acq_.reset();
+        real_superblock->txn()->cache()->locks_.sindex_superblock_locks.erase(sindex_uuid_);
     }
 
+    uuid_u sindex_uuid_;
     rwlock_in_line_t acq_;
 };
 
