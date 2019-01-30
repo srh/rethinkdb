@@ -159,7 +159,7 @@ void set_superblock_metainfo(real_superblock_lock *superblock,
         meta_prefix + rockstore::TABLE_METADATA_METAINFO_KEY(),
         rocksdb::Slice(metainfo.data(), metainfo.size()));
     guarantee(status.ok());
-    rocksh->write_batch(std::move(batch), rockstore::write_options::TODO());
+    rocksh.rocks->write_batch(std::move(batch), rockstore::write_options::TODO());
 }
 
 void get_btree_superblock(

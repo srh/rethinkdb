@@ -13,7 +13,6 @@ public:
     rockstore::store *rocks;
     namespace_id_t table_id;
     int shard_no;
-    rockstore::store *operator->() const { return rocks; }
 };
 
 #endif  // RETHINKDB_ROCKSTORE_ROCKSHARD_HPP_
