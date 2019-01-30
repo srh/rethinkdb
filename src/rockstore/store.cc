@@ -127,7 +127,7 @@ store::read_all_prefixed(std::string prefix) {
 }
 
 
-void store::put(const std::string &key, const std::string &value,
+void store::deprecated_put(const std::string &key, const std::string &value,
                 const write_options &opts) {
     rocksdb::Status status;
     linux_thread_pool_t::run_in_blocker_pool([&]() {
@@ -140,7 +140,7 @@ void store::put(const std::string &key, const std::string &value,
     return;
 }
 
-void store::insert(const std::string &key, const std::string &value,
+void store::deprecated_insert(const std::string &key, const std::string &value,
                    const write_options &opts) {
     rocksdb::Status status;
     bool existed = false;
@@ -165,10 +165,10 @@ void store::insert(const std::string &key, const std::string &value,
     return;
 }
 
-void store::write_batch(rocksdb::WriteBatch&& batch, const write_options &opts) {
+void store::write_batch(rocksdb::WriteBatch *batch, const write_options &opts) {
     rocksdb::Status status;
     linux_thread_pool_t::run_in_blocker_pool([&]() {
-        status = db_->Write(to_rocks(opts), &batch);
+        status = db_->Write(to_rocks(opts), batch);
     });
     if (!status.ok()) {
         // TODO
@@ -191,7 +191,7 @@ void store::sync(const write_options &opts) {
     return;
 }
 
-void store::remove(const std::string &key, const write_options &opts) {
+void store::deprecated_remove(const std::string &key, const write_options &opts) {
     rocksdb::Status status;
     linux_thread_pool_t::run_in_blocker_pool([&]() {
         status = db_->Delete(to_rocks(opts), key);

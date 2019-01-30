@@ -116,15 +116,13 @@ store_t::store_t(const region_t &_region,
         guarantee(!res);
 
         txn_t txn(general_cache_conn.get(), write_durability_t::HARD, 1);
-        {
-            real_superblock_lock superblock(&txn, access_t::write, new_semaphore_in_line_t());
-            // TODO: Make sure store initialization logic doesn't miss out on
-            // lock ordering logic, when we go rocks-only.
-            // TODO: Not to mention... file existence logic.
-            btree_slice_t::init_real_superblock(
-                &superblock, rocksh(), key.vector(), binary_blob_t());
-        }
-        txn.commit();
+        auto superblock = make_scoped<real_superblock_lock>(&txn, access_t::write, new_semaphore_in_line_t());
+        // TODO: Make sure store initialization logic doesn't miss out on
+        // lock ordering logic, when we go rocks-only.
+        // TODO: Not to mention... file existence logic.
+        btree_slice_t::init_real_superblock(
+            superblock.get(), rocksh(), key.vector(), binary_blob_t());
+        txn.commit(rocks, std::move(superblock));
     }
 
     btree.init(new btree_slice_t(cache.get(),
@@ -225,18 +223,8 @@ void store_t::write(
     DEBUG_ONLY_CODE(metainfo->visit(
         real_superblock.get(), metainfo_checker.region, metainfo_checker.callback));
     metainfo->update(real_superblock.get(), rocksh(), new_metainfo);
-    try {
-        scoped_ptr_t<real_superblock_lock> real_supe = std::move(real_superblock);
-        protocol_write(_write, response, timestamp, std::move(real_supe), interruptor);
-    } catch (const interrupted_exc_t &) {
-        // We hope that the operation itself is interruption-safe (i.e. always
-        // either completes all necessary changes that are part of the
-        // transaction, or doesn't perform any changes at all).
-        // Hence it should be save to commit here even when interrupted.
-        txn->commit();
-        throw;
-    }
-    txn->commit();
+    scoped_ptr_t<real_superblock_lock> real_supe = std::move(real_superblock);
+    protocol_write(std::move(txn), _write, response, timestamp, std::move(real_supe), interruptor);
 }
 
 void store_t::reset_data(
@@ -292,11 +280,10 @@ void store_t::reset_data(
 
         if (!mod_reports.empty()) {
             // TODO: Pass along the transactionality from rdb_erase_small_range for rocksdb.
-            update_sindexes(std::move(superblock), mod_reports);
+            update_sindexes(txn.get(), std::move(superblock), mod_reports);
         } else {
-            superblock.reset();
+            txn->commit(rocks, std::move(superblock));
         }
-        txn->commit();
     }
 }
 
@@ -395,8 +382,7 @@ void store_t::sindex_create(
                                      this,
                                      drainer.lock()));
 
-    superblock.reset();
-    txn->commit();
+    txn->commit(rocks, std::move(superblock));
 }
 
 void store_t::sindex_rename_multi(
@@ -439,8 +425,7 @@ void store_t::sindex_rename_multi(
         pair.second.second->rename(&perfmon_collection, "index-" + pair.first);
     }
 
-    superblock.reset();
-    txn->commit();
+    txn->commit(rocks, std::move(superblock));
 }
 
 void store_t::sindex_drop(
@@ -469,8 +454,7 @@ void store_t::sindex_drop(
                                      sindex,
                                      drainer.lock()));
 
-    superblock.reset();
-    txn->commit();
+    txn->commit(rocks, std::move(superblock));
 }
 
 new_mutex_in_line_t store_t::get_in_line_for_sindex_queue(real_superblock_lock *superblock) {
@@ -531,7 +515,9 @@ void store_t::emergency_deregister_sindex_queue(
     deregister_sindex_queue(disk_backed_queue, &acq);
 }
 
+// TODO: Move in txn scoped pointer.
 void store_t::update_sindexes(
+            txn_t *txn,
             scoped_ptr_t<real_superblock_lock> &&superblock,
             const std::vector<rdb_modification_report_t> &mod_reports) {
     new_mutex_in_line_t acq = get_in_line_for_sindex_queue(superblock.get());
@@ -551,8 +537,9 @@ void store_t::update_sindexes(
                                 NULL,
                                 NULL);
         }
-        superblock.reset();
     }
+
+    txn->commit(rocks, std::move(superblock));
 
     // Write mod reports onto the sindex queue. We are in line for the
     // sindex_queue mutex and can already release all other locks.
@@ -739,8 +726,7 @@ void store_t::clear_sindex_data(
                     &traversal_cb));
         } catch (const interrupted_exc_t &) {
             // It's safe to interrupt in the middle of clearing the index.
-            superblock.reset();
-            txn->commit();
+            txn->commit(rocks, std::move(superblock));
             throw;
         }
 
@@ -758,11 +744,10 @@ void store_t::clear_sindex_data(
         for (size_t i = 0; i < keys.size(); ++i) {
             std::string rocks_kv_location =
                 rockstore::table_secondary_key(table_id, shard_no, sindex_id, key_to_unescaped_str(keys[i]));
-            rocks->remove(rocks_kv_location, rockstore::write_options::TODO());
+            superblock->txn()->batch.Delete(rocks_kv_location);
         }
 
-        superblock.reset();
-        txn->commit();
+        txn->commit(rocks, std::move(superblock));
     }
 }
 
@@ -800,8 +785,7 @@ void store_t::drop_sindex(uuid_u sindex_id) THROWS_NOTHING {
     size_t num_erased = secondary_index_slices.erase(sindex.id);
     guarantee(num_erased == 1);
 
-    superblock.reset();
-    txn->commit();
+    txn->commit(rocks, std::move(superblock));
 }
 
 bool secondary_indexes_are_equivalent(const std::vector<char> &left,
@@ -1034,18 +1018,18 @@ void store_t::set_metainfo(const region_map_t<binary_blob_t> &new_metainfo,
     assert_thread();
 
     scoped_ptr_t<txn_t> txn;
-    {
-        scoped_ptr_t<real_superblock_lock> superblock;
-        acquire_superblock_for_write(
-            1,
-            durability,
-            token,
-            &txn,
-            &superblock,
-            interruptor);
-        metainfo->update(superblock.get(), rocksh(), new_metainfo);
-    }
-    txn->commit();
+
+    scoped_ptr_t<real_superblock_lock> superblock;
+    acquire_superblock_for_write(
+        1,
+        durability,
+        token,
+        &txn,
+        &superblock,
+        interruptor);
+    metainfo->update(superblock.get(), rocksh(), new_metainfo);
+
+    txn->commit(rocks, std::move(superblock));
 }
 
 void store_t::acquire_superblock_for_read(

@@ -57,17 +57,21 @@ public:
 
     // Overwrites what's there.
     // Throws std::runtime_error.
-    void put(const std::string &key, const std::string &value, const write_options &opts);
+    void deprecated_put(const std::string &key, const std::string &value, const write_options &opts);
 
     // Throws std::runtime_error.
     // TODO: This isn't an atomic op, is it?  Rename this?  Suitable for metadata?
-    void insert(const std::string &key, const std::string &value, const write_options &opts);
+    void deprecated_insert(const std::string &key, const std::string &value, const write_options &opts);
+
+private:
+    // TODO: Remove, unused.
+    // Throws std::runtime_error.
+    void deprecated_remove(const std::string &key, const write_options &opts);
+
+public:
 
     // Throws std::runtime_error.
-    void remove(const std::string &key, const write_options &opts);
-
-    // Throws std::runtime_error.
-    void write_batch(rocksdb::WriteBatch&& batch, const write_options &opts);
+    void write_batch(rocksdb::WriteBatch *batch, const write_options &opts);
 
     void sync(const write_options &opts);
 

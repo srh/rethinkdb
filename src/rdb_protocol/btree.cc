@@ -47,13 +47,14 @@ void rdb_get(rockshard rocksh, const store_key_t &store_key,
 }
 
 void kv_location_delete(rockstore::store *rocks,
+                        real_superblock_lock *superblock,
                         const std::string &rocks_kv_location,
                         repli_timestamp_t timestamp,
                         delete_mode_t delete_mode) {
+    (void)rocks;  // TODO
     (void)timestamp;  // TODO: Use with WAL?
     (void)delete_mode;  // TODO: Use this with WAL?
-    // TODO: We need to update the rocks secondary indexes (after primary key deletion), _transactionally_.
-    rocks->remove(rocks_kv_location, rockstore::write_options::TODO());
+    superblock->txn()->batch.Delete(rocks_kv_location);
 }
 
 ql::serialization_result_t datum_serialize_to_string(const ql::datum_t &datum, std::string *out) {
@@ -75,9 +76,11 @@ ql::serialization_result_t datum_serialize_to_string(const ql::datum_t &datum, s
 
 MUST_USE ql::serialization_result_t
 kv_location_set(rockstore::store *rocks,
+                real_superblock_lock *superblock,
                 const std::string &rocks_kv_location,
                 ql::datum_t data,
                 repli_timestamp_t timestamp) THROWS_NOTHING {
+    (void)rocks;  // TODO
     (void)timestamp;  // TODO: Put in WAL
 
     std::string str;
@@ -86,9 +89,7 @@ kv_location_set(rockstore::store *rocks,
     if (bad(res)) {
         return res;
     }
-    // TODO: Apply this write to secondary indexes transactionally, too (just
-    // like after the primary key remove call).
-    rocks->put(rocks_kv_location, str, rockstore::write_options::TODO());
+    superblock->txn()->batch.Put(rocks_kv_location, str);
 
     return ql::serialization_result_t::SUCCESS;
 }
@@ -97,14 +98,16 @@ kv_location_set(rockstore::store *rocks,
 MUST_USE ql::serialization_result_t
 kv_location_set_secondary(
         rockstore::store *rocks,
+        real_superblock_lock *superblock,
         const std::string &rocks_kv_location,
         const ql::datum_t &value_datum) {
+    (void)rocks;  // TODO
     // TODO: Avoid having to reserialize the value again (for each secondary index on top of the primary).
     std::string str;
     ql::serialization_result_t res =
         datum_serialize_to_string(value_datum, &str);
     guarantee(!bad(res));
-    rocks->put(rocks_kv_location, str, rockstore::write_options::TODO());
+    superblock->txn()->batch.Put(rocks_kv_location, str);
     // TODO: Useless return value;
     return ql::serialization_result_t::SUCCESS;
 }
@@ -173,13 +176,13 @@ batched_replace_response_t rdb_replace_and_return_superblock(
 
             /* Now that the change has passed validation, write it to disk */
             if (new_val.get_type() == ql::datum_t::R_NULL) {
-                kv_location_delete(rocksh.rocks, rocks_kv_location,
+                kv_location_delete(rocksh.rocks, info.superblock, rocks_kv_location,
                                    info.btree->timestamp,
                                    delete_mode_t::REGULAR_QUERY);
             } else {
                 r_sanity_check(new_val.get_field(primary_key, ql::NOTHROW).has());
                 ql::serialization_result_t res =
-                    kv_location_set(rocksh.rocks, rocks_kv_location,
+                    kv_location_set(rocksh.rocks, info.superblock, rocks_kv_location,
                                     new_val,
                                     info.btree->timestamp);
                 if (res & ql::serialization_result_t::ARRAY_TOO_BIG) {
@@ -451,7 +454,7 @@ void rdb_set(rockshard rocksh,
         // TODO: We don't do kv_location_delete in case of R_NULL value?
         // (I think the value can't be R_NULL because backfilling code is what calls this.)
         ql::serialization_result_t res =
-            kv_location_set(rocksh.rocks, rocks_kv_location,
+            kv_location_set(rocksh.rocks, superblock, rocks_kv_location,
                             data, timestamp);
         if (res & ql::serialization_result_t::ARRAY_TOO_BIG) {
             rfail_typed_target(&data, "Array too large for disk writes "
@@ -493,7 +496,7 @@ void rdb_delete(rockshard rocksh,
     if (exists) {
         superblock->write_acq_signal()->wait_lazily_ordered();
         mod_info->deleted.first = datum_deserialize_from_vec(maybe_value.first.data(), maybe_value.first.size());
-        kv_location_delete(rocksh.rocks, rocks_kv_location, timestamp, delete_mode);
+        kv_location_delete(rocksh.rocks, superblock, rocks_kv_location, timestamp, delete_mode);
     }
     response->result = (exists ? point_delete_result_t::DELETED : point_delete_result_t::MISSING);
 }
@@ -2004,7 +2007,7 @@ void rdb_update_single_sindex(
 
                 // TODO: We could do a SingleDelete for secondary index removals.
 
-                rocksh.rocks->remove(rocks_secondary_kv_location, rockstore::write_options::TODO());
+                superblock->txn()->batch.Delete(rocks_secondary_kv_location);
             }
         } catch (const ql::base_exc_t &) {
             // Do nothing (it wasn't actually in the index).
@@ -2067,6 +2070,7 @@ void rdb_update_single_sindex(
                 ql::serialization_result_t res =
                     kv_location_set_secondary(
                         rocksh.rocks,
+                        superblock,
                         rocks_secondary_kv_location,
                         modification->info.added.first /* copy of the value here */);
                 // this particular context cannot fail AT THE MOMENT.
@@ -2191,7 +2195,7 @@ public:
     ~post_construct_traversal_helper_t() {
         sindexes_.clear();
         if (wtxn_.has()) {
-            wtxn_->commit();
+            wtxn_->commit(store_->rocksh().rocks, std::move(superblock_));
         }
     }
 
@@ -2255,8 +2259,7 @@ public:
             if (current_chunk_size_ >= MAX_CHUNK_SIZE) {
                 current_chunk_size_ = 0;
                 sindexes_.clear();
-                superblock_.reset();
-                wtxn_->commit();
+                wtxn_->commit(store_->rocksh().rocks, std::move(superblock_));
                 wtxn_.reset();
                 start_write_transaction(&wtxn_acq);
             }

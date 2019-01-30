@@ -87,7 +87,7 @@ public:
             // TODO: Handle this transactionally (so we aren't stuck in an
             // invalid state after putting the existence key but not creating
             // the stores.)
-            rocks->put(existence_key, "1", rockstore::write_options::TODO());
+            rocks->deprecated_put(existence_key, "1", rockstore::write_options::TODO());
         }
     }
 
@@ -270,7 +270,7 @@ void real_table_persistence_interface_t::destroy_multistore(
 
     rocksdb::WriteBatch batch;
     batch.DeleteRange(prefix, end_prefix);
-    io_backender->rocks()->write_batch(std::move(batch), rockstore::write_options::TODO());
+    io_backender->rocks()->write_batch(&batch, rockstore::write_options::TODO());
 }
 
 bool real_table_persistence_interface_t::is_gc_active() const {

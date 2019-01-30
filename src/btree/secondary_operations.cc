@@ -1,11 +1,14 @@
 // Copyright 2010-2014 RethinkDB, all rights reserved.
 #include "btree/secondary_operations.hpp"
 
+#include "rocksdb/options.h"
+
 #include "btree/operations.hpp"
 #include "buffer_cache/alt.hpp"
 #include "containers/archive/string_stream.hpp"
 #include "containers/archive/vector_stream.hpp"
 #include "containers/archive/versioned.hpp"
+#include "debug.hpp"
 #include "rockstore/store.hpp"
 
 // TODO: Remove old serialization versions, or maybe even serialization versioning.
@@ -71,7 +74,15 @@ void get_secondary_indexes_internal(
         std::map<sindex_name_t, secondary_index_t> *sindexes_out) {
     superblock->read_acq_signal()->wait_lazily_ordered();
 
-    std::string rocks_sindex_blob = rocksh.rocks->read(rockstore::table_sindex_map(rocksh.table_id, rocksh.shard_no));
+    std::string kv_location = rockstore::table_sindex_map(rocksh.table_id, rocksh.shard_no);
+
+    txn_t *txn = superblock->txn();
+    std::string rocks_sindex_blob;
+    rocksdb::Status status = txn->batch.GetFromBatch(rocksdb::DBOptions(), kv_location, &rocks_sindex_blob);
+    if (!status.ok()) {
+        rocks_sindex_blob = rocksh.rocks->read(kv_location);
+    }
+
     string_read_stream_t stream(std::move(rocks_sindex_blob), 0);
     archive_result_t res = deserialize<cluster_version_t::v2_4_is_latest_disk>(&stream, sindexes_out);
     guarantee_deserialization(res, "sindex_map");
@@ -86,7 +97,7 @@ void set_secondary_indexes_internal(
     // TODO: rocksdb transactionality
     std::string sindex_rocks_blob = serialize_to_string<cluster_version_t::LATEST_DISK>(sindexes);
     std::string sindex_rocks_key = rockstore::table_sindex_map(rocksh.table_id, rocksh.shard_no);
-    rocksh.rocks->put(sindex_rocks_key, sindex_rocks_blob, rockstore::write_options::TODO());
+    superblock->txn()->batch.Put(sindex_rocks_key, sindex_rocks_blob);
 }
 
 void initialize_secondary_indexes(rockshard rocksh,

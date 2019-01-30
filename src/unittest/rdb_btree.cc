@@ -34,8 +34,8 @@ void insert_rows(int start, int finish, store_t *store) {
     for (int i = start; i < finish; ++i) {
         cond_t dummy_interruptor;
         scoped_ptr_t<txn_t> txn;
+        scoped_ptr_t<real_superblock_lock> superblock;
         {
-            scoped_ptr_t<real_superblock_lock> superblock;
             write_token_t token;
             store->new_write_token(&token);
             store->acquire_superblock_for_write(
@@ -76,7 +76,7 @@ void insert_rows(int start, int finish, store_t *store) {
             new_mutex_in_line_t acq = store->get_in_line_for_sindex_queue(superblock.get());
             store->sindex_queue_push(mod_report, &acq);
         }
-        txn->commit();
+        txn->commit(store->rocksh().rocks, std::move(superblock));
     }
 }
 
@@ -334,9 +334,8 @@ TPTEST(RDBBtree, SindexEraseRange) {
                 &mod_reports,
                 &deleted_range);
 
-            store.update_sindexes(std::move(superblock), mod_reports);
+            store.update_sindexes(txn.get(), std::move(superblock), mod_reports);
         }
-        txn->commit();
     }
 
     check_keys_are_NOT_present(&store, sindex_name);

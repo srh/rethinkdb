@@ -132,8 +132,7 @@ void store_t::help_construct_bring_sindexes_up_to_date() {
         }
     }
 
-    superblock.reset();
-    txn->commit();
+    txn->commit(rocks, std::move(superblock));
 }
 
 void acquire_sindex_for_read(
@@ -905,68 +904,80 @@ private:
 struct rdb_write_visitor_t : public boost::static_visitor<void> {
     // TODO: Do reads from rockstore when performing these writes.
     void operator()(const batched_replace_t &br) {
-        ql::env_t ql_env(
-            ctx,
-            ql::return_empty_normal_batches_t::NO,
-            interruptor,
-            br.serializable_env,
-            trace);
-        rdb_modification_report_cb_t sindex_cb(
-            store, superblock.get(),
-            auto_drainer_t::lock_t(&store->drainer));
-
-        counted_t<const ql::func_t> write_hook;
-        if (br.write_hook.has_value()) {
-            write_hook = br.write_hook->compile_wire_func();
-        }
-
-        func_replacer_t replacer(&ql_env,
-                                 br.pkey,
-                                 br.f,
-                                 write_hook,
-                                 br.return_changes);
-
-        response->response =
-            rdb_batched_replace(
-                store->rocksh(),
-                btree_info_t(btree, timestamp, datum_string_t(br.pkey)),
-                superblock.get(),
-                br.keys,
-                &replacer,
-                &sindex_cb,
-                ql_env.limits(),
-                sampler,
+        try {
+            ql::env_t ql_env(
+                ctx,
+                ql::return_empty_normal_batches_t::NO,
+                interruptor,
+                br.serializable_env,
                 trace);
+            rdb_modification_report_cb_t sindex_cb(
+                store, superblock.get(),
+                auto_drainer_t::lock_t(&store->drainer));
+
+            counted_t<const ql::func_t> write_hook;
+            if (br.write_hook.has_value()) {
+                write_hook = br.write_hook->compile_wire_func();
+            }
+
+            func_replacer_t replacer(&ql_env,
+                                    br.pkey,
+                                    br.f,
+                                    write_hook,
+                                    br.return_changes);
+
+            response->response =
+                rdb_batched_replace(
+                    store->rocksh(),
+                    btree_info_t(btree, timestamp, datum_string_t(br.pkey)),
+                    superblock.get(),
+                    br.keys,
+                    &replacer,
+                    &sindex_cb,
+                    ql_env.limits(),
+                    sampler,
+                    trace);
+        } catch (const interrupted_exc_t &exc) {
+            txn->commit(store->rocksh().rocks, std::move(superblock));
+            throw;
+        }
+        txn->commit(store->rocksh().rocks, std::move(superblock));
     }
 
     void operator()(const batched_insert_t &bi) {
-        rdb_modification_report_cb_t sindex_cb(
-            store, superblock.get(),
-            auto_drainer_t::lock_t(&store->drainer));
-        ql::env_t ql_env(
-            ctx,
-            ql::return_empty_normal_batches_t::NO,
-            interruptor,
-            bi.serializable_env,
-            trace);
-        datum_replacer_t replacer(&ql_env,
-                                  bi);
-        std::vector<store_key_t> keys;
-        keys.reserve(bi.inserts.size());
-        for (auto it = bi.inserts.begin(); it != bi.inserts.end(); ++it) {
-            keys.emplace_back(it->get_field(datum_string_t(bi.pkey)).print_primary());
-        }
-        response->response =
-            rdb_batched_replace(
-                store->rocksh(),
-                btree_info_t(btree, timestamp, datum_string_t(bi.pkey)),
-                superblock.get(),
-                keys,
-                &replacer,
-                &sindex_cb,
-                bi.limits,
-                sampler,
+        try {
+            rdb_modification_report_cb_t sindex_cb(
+                store, superblock.get(),
+                auto_drainer_t::lock_t(&store->drainer));
+            ql::env_t ql_env(
+                ctx,
+                ql::return_empty_normal_batches_t::NO,
+                interruptor,
+                bi.serializable_env,
                 trace);
+            datum_replacer_t replacer(&ql_env,
+                                    bi);
+            std::vector<store_key_t> keys;
+            keys.reserve(bi.inserts.size());
+            for (auto it = bi.inserts.begin(); it != bi.inserts.end(); ++it) {
+                keys.emplace_back(it->get_field(datum_string_t(bi.pkey)).print_primary());
+            }
+            response->response =
+                rdb_batched_replace(
+                    store->rocksh(),
+                    btree_info_t(btree, timestamp, datum_string_t(bi.pkey)),
+                    superblock.get(),
+                    keys,
+                    &replacer,
+                    &sindex_cb,
+                    bi.limits,
+                    sampler,
+                    trace);
+        } catch (const interrupted_exc_t &exc) {
+            txn->commit(store->rocksh().rocks, std::move(superblock));
+            throw;
+        }
+        txn->commit(store->rocksh().rocks, std::move(superblock));
     }
 
     void operator()(const point_write_t &w) {
@@ -984,7 +995,6 @@ struct rdb_write_visitor_t : public boost::static_visitor<void> {
                 w.key, w.data, w.overwrite, btree, timestamp, superblock.get(),
                 res, &mod_report.info, trace, &pass_back_superblock);
         pass_back_superblock.wait();
-
         update_sindexes(mod_report);
     }
 
@@ -1004,7 +1014,6 @@ struct rdb_write_visitor_t : public boost::static_visitor<void> {
                 delete_mode_t::REGULAR_QUERY, res, &mod_report.info, trace,
                 &pass_back_superblock);
         pass_back_superblock.wait();
-
         update_sindexes(mod_report);
     }
 
@@ -1020,13 +1029,18 @@ struct rdb_write_visitor_t : public boost::static_visitor<void> {
         // cache guarantees that.  (Right now it will force _all_ preceding write
         // transactions to flush, on any conn, because they all touch the metainfo in
         // the superblock.)
+        // TODO: More like, txn->no-commit.
+        txn->commit(store->rocksh().rocks, std::move(superblock));
     }
 
     void operator()(const dummy_write_t &) {
         response->response = dummy_write_response_t();
+        // TODO: More like, txn->no-commit?
+        txn->commit(store->rocksh().rocks, std::move(superblock));
     }
 
-    rdb_write_visitor_t(btree_slice_t *_btree,
+    rdb_write_visitor_t(scoped_ptr_t<txn_t> &&_txn,
+                        btree_slice_t *_btree,
                         store_t *_store,
                         scoped_ptr_t<real_superblock_lock> &&_superblock,
                         repli_timestamp_t _timestamp,
@@ -1035,6 +1049,7 @@ struct rdb_write_visitor_t : public boost::static_visitor<void> {
                         profile::trace_t *_trace,
                         write_response_t *_response,
                         signal_t *_interruptor) :
+        txn(std::move(_txn)),
         btree(_btree),
         store(_store),
         response(_response),
@@ -1052,9 +1067,10 @@ private:
         // This copying of the mod_report is inefficient, but it seems this
         // function is only used for unit tests at the moment anyway.
         mod_reports.push_back(mod_report);
-        store->update_sindexes(std::move(superblock), mod_reports);
+        store->update_sindexes(txn.get(), std::move(superblock), mod_reports);
     }
 
+    scoped_ptr_t<txn_t> txn;
     btree_slice_t *const btree;
     store_t *const store;
     write_response_t *const response;
@@ -1069,7 +1085,8 @@ private:
     DISABLE_COPYING(rdb_write_visitor_t);
 };
 
-void store_t::protocol_write(const write_t &_write,
+void store_t::protocol_write(scoped_ptr_t<txn_t> txn,
+                             const write_t &_write,
                              write_response_t *response,
                              state_timestamp_t timestamp,
                              scoped_ptr_t<real_superblock_lock> superblock,
@@ -1078,15 +1095,16 @@ void store_t::protocol_write(const write_t &_write,
 
     {
         profile::sampler_t start_write("Perform write on shard.", trace);
-        rdb_write_visitor_t v(btree.get(),
-                              this,
-                              std::move(superblock),
-                              timestamp.to_repli_timestamp(),
-                              ctx,
-                              &start_write,
-                              trace.get_or_null(),
-                              response,
-                              interruptor);
+        rdb_write_visitor_t v(std::move(txn),
+                            btree.get(),
+                            this,
+                            std::move(superblock),
+                            timestamp.to_repli_timestamp(),
+                            ctx,
+                            &start_write,
+                            trace.get_or_null(),
+                            response,
+                            interruptor);
         boost::apply_visitor(v, _write.write);
     }
 

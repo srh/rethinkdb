@@ -50,15 +50,15 @@ TPTEST(BtreeMetainfo, MetainfoTest) {
 
     {
         txn_t txn(&cache_conn, write_durability_t::HARD, 1);
-        {
-            real_superblock_lock sb_lock(&txn, access_t::write, new_semaphore_in_line_t());
-            btree_slice_t::init_real_superblock(
-                &sb_lock,
-                rocksh,
-                std::vector<char>(),
-                binary_blob_t());
-        }
-        txn.commit();
+
+        auto sb_lock = make_scoped<real_superblock_lock>(&txn, access_t::write, new_semaphore_in_line_t());
+        btree_slice_t::init_real_superblock(
+            sb_lock.get(),
+            rocksh,
+            std::vector<char>(),
+            binary_blob_t());
+
+        txn.commit(rocksh.rocks, std::move(sb_lock));
     }
 
     for (int i = 0; i < 3; ++i) {
@@ -68,20 +68,20 @@ TPTEST(BtreeMetainfo, MetainfoTest) {
         }
         {
             scoped_ptr_t<txn_t> txn;
-            {
-                scoped_ptr_t<real_superblock_lock> superblock;
-                get_btree_superblock_and_txn_for_writing(
-                    &cache_conn, nullptr, write_access_t::write, 1,
-                    write_durability_t::SOFT, &superblock, &txn);
-                std::vector<std::vector<char> > keys;
-                std::vector<binary_blob_t> values;
-                for (const auto &pair : metainfo) {
-                    keys.push_back(string_to_vector(pair.first));
-                    values.push_back(string_to_blob(pair.second));
-                }
-                set_superblock_metainfo(superblock.get(), rocksh, keys, values);
+
+            scoped_ptr_t<real_superblock_lock> superblock;
+            get_btree_superblock_and_txn_for_writing(
+                &cache_conn, nullptr, write_access_t::write, 1,
+                write_durability_t::SOFT, &superblock, &txn);
+            std::vector<std::vector<char> > keys;
+            std::vector<binary_blob_t> values;
+            for (const auto &pair : metainfo) {
+                keys.push_back(string_to_vector(pair.first));
+                values.push_back(string_to_blob(pair.second));
             }
-            txn->commit();
+            set_superblock_metainfo(superblock.get(), rocksh, keys, values);
+
+            txn->commit(rocksh.rocks, std::move(superblock));
         }
         {
             scoped_ptr_t<txn_t> txn;

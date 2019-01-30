@@ -142,8 +142,7 @@ void resume_construct_sindex(
                 get_secondary_index(store->rocksh(), superblock.get(), sindex_to_construct, &sindex);
             if (!found_index || sindex.being_deleted) {
                 // The index was deleted. Abort construction.
-                superblock.reset();
-                txn->commit();
+                txn->commit(store->rocks, std::move(superblock));
                 return;
             }
 
@@ -151,8 +150,7 @@ void resume_construct_sindex(
                 store->get_in_line_for_sindex_queue(superblock.get());
             store->register_sindex_queue(mod_queue.get(), remaining_range, &acq);
 
-            superblock.reset();
-            txn->commit();
+            txn->commit(store->rocks, std::move(superblock));
         }
 
         // This updates `remaining_range`.
@@ -251,8 +249,7 @@ void post_construct_and_drain_queue(
                 // We throw here because that's consistent with how
                 // `post_construct_secondary_index_range` signals the fact that all
                 // indexes have been deleted.
-                queue_superblock.reset();
-                queue_txn->commit();
+                queue_txn->commit(store->rocksh().rocks, std::move(queue_superblock));
                 throw interrupted_exc_t();
             }
 
@@ -263,8 +260,7 @@ void post_construct_and_drain_queue(
             while (mod_queue->size() > 0) {
                 if (lock.get_drain_signal()->is_pulsed()) {
                     sindexes.clear();
-                    queue_superblock.reset();
-                    queue_txn->commit();
+                    queue_txn->commit(store->rocksh().rocks, std::move(queue_superblock));
                     throw interrupted_exc_t();
                 }
                 // The `disk_backed_queue_wrapper` can sometimes be non-empty, but not
@@ -286,8 +282,7 @@ void post_construct_and_drain_queue(
                     } catch (const interrupted_exc_t &) {
                         mod_queue->available->unset_callback();
                         sindexes.clear();
-                        queue_superblock.reset();
-                        queue_txn->commit();
+                        queue_txn->commit(store->rocksh().rocks, std::move(queue_superblock));
                         throw;
                     }
                     mod_queue->available->unset_callback();
@@ -316,8 +311,7 @@ void post_construct_and_drain_queue(
             store->deregister_sindex_queue(mod_queue.get(), &acq);
 
             sindexes.clear();
-            queue_superblock.reset();
-            queue_txn->commit();
+            queue_txn->commit(store->rocksh().rocks, std::move(queue_superblock));
 
             return;
         }
@@ -355,8 +349,7 @@ void post_construct_and_drain_queue(
             store->get_in_line_for_sindex_queue(queue_superblock.get());
         store->deregister_sindex_queue(mod_queue.get(), &acq);
 
-        queue_superblock.reset();
-        queue_txn->commit();
+        queue_txn->commit(store->rocksh().rocks, std::move(queue_superblock));
     }
 }
 

@@ -61,7 +61,7 @@ metadata_file_t::write_txn_t::write_txn_t(
     { }
 
 void metadata_file_t::write_txn_t::commit() {
-    file->rocks->write_batch(std::move(batch), file->rocks_options);
+    file->rocks->write_batch(&batch, file->rocks_options);
 }
 
 void metadata_file_t::write_txn_t::write_bin(
@@ -108,7 +108,7 @@ metadata_file_t::metadata_file_t(
     // TODO: Make use of perfmon with rockstore, to track metadata writes.
     (void)perfmon_parent;
 
-    rocks->insert(METADATA_VERSION_KEY, rockstore::VERSION(), rocks_options);
+    rocks->deprecated_insert(METADATA_VERSION_KEY, rockstore::VERSION(), rocks_options);
 
     {
         cond_t non_interruptor;

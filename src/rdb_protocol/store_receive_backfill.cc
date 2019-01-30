@@ -447,16 +447,15 @@ continue_bool_t store_t::receive_backfill(
                 scoped_ptr_t<real_superblock_lock> &&superblock,
                 std::vector<rdb_modification_report_t> &&mod_reports) {
             /* Apply the modifications */
+            /* Also, end the transaction and notify that we've made progress */
             if (!mod_reports.empty()) {
                 // TODO: We have transactionality to pass in here.
-                update_sindexes(std::move(superblock), mod_reports);
+                update_sindexes(txn.get(), std::move(superblock), mod_reports);
             } else {
-                superblock.reset();
+                txn->commit(rocks, std::move(superblock));
             }
 
-            /* End the transaction and notify that we've made progress */
             // TODO: We probably have to sync to disk at some point?
-            txn->commit();
             txn.reset();
             guarantee(progress >= commit_threshold);
             guarantee(progress <= metainfo_threshold);

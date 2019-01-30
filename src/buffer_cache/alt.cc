@@ -5,6 +5,7 @@
 #include "arch/types.hpp"
 #include "arch/runtime/coroutines.hpp"
 #include "concurrency/auto_drainer.hpp"
+#include "rockstore/store.hpp"
 #include "utils.hpp"
 
 #define ALT_DEBUG 0
@@ -135,7 +136,7 @@ txn_t::~txn_t() {
         "terminating the server. Please report this bug.");
 }
 
-void txn_t::commit() {
+void txn_t::commit(rockstore::store *rocks, scoped_ptr_t<real_superblock_lock> superblock) {
     cache_->assert_thread();
     (void)durability_;  // TODO: Use this field (for rocksdb writing in txn commit)
 
@@ -143,7 +144,8 @@ void txn_t::commit() {
     guarantee(access_ == access_t::write);
     is_committed_ = true;
 
-    // TODO: Have txn_t::commit actually do something (like with rocksdb transactions).
+    rocks->write_batch(batch.GetWriteBatch(), rockstore::write_options::TODO());
+    superblock.reset();
 }
 
 void txn_t::set_account(cache_account_t *cache_account) {

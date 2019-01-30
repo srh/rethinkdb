@@ -138,7 +138,7 @@ continue_bool_t rdb_erase_small_range(
         // TODO: repli_timestamp_t::invalid, delete_mode_t::ERASE was used.
         // Maybe kv_location_delete should be called, for good form?
         // Erase the entry from rocksdb.
-        rocksh.rocks->remove(rocks_kv_location, rockstore::write_options::TODO());
+        superblock->txn()->batch.Delete(rocks_kv_location);
 
         guarantee(key >= deleted_out->right.key());
         *deleted_out = key_range_t(key_range_t::closed, key_range.left,

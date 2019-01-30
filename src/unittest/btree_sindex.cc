@@ -28,12 +28,12 @@ TPTEST(BTreeSindex, LowLevelOps) {
 
     {
         txn_t txn(&cache_conn, write_durability_t::HARD, 1);
-        {
-            real_superblock_lock sb_lock(&txn, access_t::write, new_semaphore_in_line_t());
-            btree_slice_t::init_real_superblock(
-                &sb_lock, rockshard(io_backender.rocks(), table_id, 0), std::vector<char>(), binary_blob_t());
-        }
-        txn.commit();
+
+        auto sb_lock = make_scoped<real_superblock_lock>(&txn, access_t::write, new_semaphore_in_line_t());
+        btree_slice_t::init_real_superblock(
+            sb_lock.get(), rockshard(io_backender.rocks(), table_id, 0), std::vector<char>(), binary_blob_t());
+
+        txn.commit(rocksh.rocks, std::move(sb_lock));
     }
 
     order_source_t order_source;
@@ -42,18 +42,18 @@ TPTEST(BTreeSindex, LowLevelOps) {
 
     {
         scoped_ptr_t<txn_t> txn;
-        {
-            scoped_ptr_t<real_superblock_lock> superblock;
-            get_btree_superblock_and_txn_for_writing(&cache_conn, nullptr,
-                write_access_t::write, 1,
-                write_durability_t::SOFT,
-                &superblock, &txn);
 
-            superblock->sindex_block_write_signal()->wait();
+        scoped_ptr_t<real_superblock_lock> superblock;
+        get_btree_superblock_and_txn_for_writing(&cache_conn, nullptr,
+            write_access_t::write, 1,
+            write_durability_t::SOFT,
+            &superblock, &txn);
 
-            initialize_secondary_indexes(rockshard(io_backender.rocks(), table_id, 0), superblock.get());
-        }
-        txn->commit();
+        superblock->sindex_block_write_signal()->wait();
+
+        initialize_secondary_indexes(rockshard(io_backender.rocks(), table_id, 0), superblock.get());
+
+        txn->commit(io_backender.rocks(), std::move(superblock));
     }
 
     for (int i = 0; i < 100; ++i) {
@@ -67,60 +67,58 @@ TPTEST(BTreeSindex, LowLevelOps) {
         mirror[name] = s;
 
         scoped_ptr_t<txn_t> txn;
-        {
-            scoped_ptr_t<real_superblock_lock> superblock;
-            get_btree_superblock_and_txn_for_writing(
-                &cache_conn,
-                nullptr,
-                write_access_t::write,
-                1,
-                write_durability_t::SOFT,
-                &superblock,
-                &txn);
+        scoped_ptr_t<real_superblock_lock> superblock;
+        get_btree_superblock_and_txn_for_writing(
+            &cache_conn,
+            nullptr,
+            write_access_t::write,
+            1,
+            write_durability_t::SOFT,
+            &superblock,
+            &txn);
 
-            superblock->sindex_block_write_signal()->wait();
+        superblock->sindex_block_write_signal()->wait();
 
-            set_secondary_index(rocksh, superblock.get(), name, s);
-        }
-        txn->commit();
+        set_secondary_index(rocksh, superblock.get(), name, s);
+
+        txn->commit(rocksh.rocks, std::move(superblock));
     }
 
     {
         scoped_ptr_t<txn_t> txn;
-        {
-            scoped_ptr_t<real_superblock_lock> superblock;
-            get_btree_superblock_and_txn_for_writing(
-                &cache_conn,
-                nullptr,
-                write_access_t::write,
-                1,
-                write_durability_t::SOFT,
-                &superblock,
-                &txn);
+        scoped_ptr_t<real_superblock_lock> superblock;
+        get_btree_superblock_and_txn_for_writing(
+            &cache_conn,
+            nullptr,
+            write_access_t::write,
+            1,
+            write_durability_t::SOFT,
+            &superblock,
+            &txn);
 
-            superblock->sindex_block_write_signal()->wait();
+        superblock->sindex_block_write_signal()->wait();
 
-            std::map<sindex_name_t, secondary_index_t> sindexes;
-            get_secondary_indexes(rocksh, superblock.get(), &sindexes);
+        std::map<sindex_name_t, secondary_index_t> sindexes;
+        get_secondary_indexes(rocksh, superblock.get(), &sindexes);
 
-            auto it = sindexes.begin();
-            auto jt = mirror.begin();
+        auto it = sindexes.begin();
+        auto jt = mirror.begin();
 
-            for (;;) {
-                if (it == sindexes.end()) {
-                    ASSERT_TRUE(jt == mirror.end());
-                    break;
-                }
-                ASSERT_TRUE(jt != mirror.end());
-
-                ASSERT_TRUE(it->first == jt->first);
-                ASSERT_TRUE(
-                    it->second.opaque_definition == jt->second.opaque_definition);
-                ++it;
-                ++jt;
+        for (;;) {
+            if (it == sindexes.end()) {
+                ASSERT_TRUE(jt == mirror.end());
+                break;
             }
+            ASSERT_TRUE(jt != mirror.end());
+
+            ASSERT_TRUE(it->first == jt->first);
+            ASSERT_TRUE(
+                it->second.opaque_definition == jt->second.opaque_definition);
+            ++it;
+            ++jt;
         }
-        txn->commit();
+
+        txn->commit(rocksh.rocks, std::move(superblock));
     }
 }
 

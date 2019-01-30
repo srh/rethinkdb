@@ -7,6 +7,8 @@
 #include <utility>
 #include <unordered_map>
 
+#include "rocksdb/utilities/write_batch_with_index.h"
+
 #include "buffer_cache/page_cache.hpp"
 #include "buffer_cache/types.hpp"
 #include "concurrency/rwlock.hpp"
@@ -17,6 +19,8 @@
 #include "repli_timestamp.hpp"
 
 class perfmon_collection_t;
+namespace rockstore { class store; }
+class real_superblock_lock;
 
 // TODO: Throttling has to be done globally.  But beware of deadlock.
 class alt_txn_throttler_t {
@@ -81,13 +85,18 @@ public:
     // destructed.
     // There is no roll-back / abort! Destructing an uncommitted
     // write-transaction will terminate the server.
-    void commit();
+    void commit(rockstore::store *rocks, scoped_ptr_t<real_superblock_lock> superblock);
 
     cache_t *cache() { return cache_; }
     access_t access() const { return access_; }
 
     void set_account(cache_account_t *cache_account);
     cache_account_t *account() { return cache_account_; }
+
+    // TODO: Add status checks to every usage.
+    // TODO: It would be nice to just avoid duplicate secondary index writing, so
+    // we can use a plain WriteBatch.
+    rocksdb::WriteBatchWithIndex batch;
 
 private:
     void help_construct(int64_t expected_change_count, cache_conn_t *cache_conn);
@@ -114,6 +123,7 @@ private:
 // TODO: Public/private properly.
 // TODO: Move impls to .cc file.
 
+// TODO: Remove.
 inline void wait_for_rwlock(rwlock_in_line_t *acq, access_t access) {
     if (access == access_t::read) {
         acq->read_signal()->wait_lazily_ordered();
@@ -147,7 +157,6 @@ public:
     // describe previous locking behavior
     const signal_t *sindex_superblock_read_signal() { return acq_.read_signal(); }
     const signal_t *sindex_superblock_write_signal() { return acq_.write_signal(); }
-
 
     void reset_superblock() {
         txn_ = nullptr;

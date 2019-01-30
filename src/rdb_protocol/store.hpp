@@ -188,6 +188,7 @@ public:
     // Updates the live sindexes, and pushes modification reports onto the sindex
     // queues of non-live indexes.
     void update_sindexes(
+            txn_t *txn,
             scoped_ptr_t<real_superblock_lock> &&sindex_block,
             const std::vector<rdb_modification_report_t> &mod_reports);
 
@@ -261,7 +262,8 @@ public:
                        scoped_ptr_t<real_superblock_lock> superblock,
                        signal_t *interruptor);
 
-    void protocol_write(const write_t &write,
+    void protocol_write(scoped_ptr_t<txn_t> txn,
+                        const write_t &write,
                         write_response_t *response,
                         state_timestamp_t timestamp,
                         scoped_ptr_t<real_superblock_lock> superblock,
