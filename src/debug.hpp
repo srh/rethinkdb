@@ -78,6 +78,15 @@ private:
     std::string message;
 };
 
+// debugf enter/exit.
+class debugf_ee {
+public:
+    explicit debugf_ee(const char *msg, ...) ATTR_FORMAT(printf, 2, 3);
+    ~debugf_ee();
+private:
+    std::string message;
+};
+
 // TODO: make this more efficient (use `clock_monotonic` and use a vector of
 // integers rather than accumulating a string).
 class debug_timer_t {

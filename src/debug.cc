@@ -100,6 +100,18 @@ debugf_in_dtor_t::~debugf_in_dtor_t() {
     debugf("%s", message.c_str());
 }
 
+debugf_ee::debugf_ee(const char *msg, ...) {
+    va_list arguments;
+    va_start(arguments, msg);
+    message = vstrprintf(msg, arguments);
+    va_end(arguments);
+    debugf("enter: %s", message.c_str());
+}
+
+debugf_ee::~debugf_ee() {
+    debugf("exit: %s", message.c_str());
+}
+
 debug_timer_t::debug_timer_t(std::string _name)
     : start(current_microtime()), last(start), name(_name), out("\n") {
     tick("start");
