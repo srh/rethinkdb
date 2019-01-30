@@ -123,15 +123,6 @@ private:
 // TODO: Public/private properly.
 // TODO: Move impls to .cc file.
 
-// TODO: Remove.
-inline void wait_for_rwlock(rwlock_in_line_t *acq, access_t access) {
-    if (access == access_t::read) {
-        acq->read_signal()->wait_lazily_ordered();
-    } else {
-        acq->write_signal()->wait_lazily_ordered();
-    }
-}
-
 class real_superblock_lock {
 public:
     real_superblock_lock() = delete;
