@@ -50,7 +50,7 @@ private:
             rockstore::store *rocks,
             const scoped_ptr_t<new_semaphore_in_line_t> &,
             UNUSED auto_drainer_t::lock_t keepalive) {
-        rocks->sync(rockstore::write_options(true));
+        rocks->sync();
     }
 
     /* Destructor order matters here. We have to destroy `drainer` first, because that
@@ -499,7 +499,7 @@ continue_bool_t store_t::receive_backfill(
     use increasingly large amounts of the unsaved data limit if `receive_backfill()` is
     called repeatedly. */
     // TODO: Make sure this affects our rocksdb transaction that we made.
-    rocks->sync(rockstore::write_options::TODO());
+    rocks->sync();
 
     return result;
 }

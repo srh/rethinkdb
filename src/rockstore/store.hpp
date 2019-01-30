@@ -73,7 +73,7 @@ public:
     // Throws std::runtime_error.
     void write_batch(rocksdb::WriteBatch *batch, const write_options &opts);
 
-    void sync(const write_options &opts);
+    void sync();
 
     rocksdb::OptimisticTransactionDB *db() { return db_.get(); }
 

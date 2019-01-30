@@ -1020,9 +1020,10 @@ struct rdb_write_visitor_t : public boost::static_visitor<void> {
     void operator()(const sync_t &) {
         sampler->new_sample();
         response->response = sync_response_t();
+        superblock->write_acq_signal()->wait();
 
         // TODO: Can't sync individual tables anymore (can we?).
-        store->rocks->sync(rockstore::write_options::TODO());
+        store->rocks->sync();
 
         // We know this sync_t operation will force all preceding write transactions
         // (on our cache_conn_t) to flush before or at the same time, because the

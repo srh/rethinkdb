@@ -177,9 +177,7 @@ void store::write_batch(rocksdb::WriteBatch *batch, const write_options &opts) {
     return;
 }
 
-void store::sync(const write_options &opts) {
-    // TODO: Use opts somehow? (There's no soft durability sync is there?)
-    (void)opts;
+void store::sync() {
     rocksdb::Status status;
     linux_thread_pool_t::run_in_blocker_pool([&]() {
         status = db_->SyncWAL();

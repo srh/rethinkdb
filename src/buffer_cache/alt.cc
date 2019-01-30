@@ -144,7 +144,9 @@ void txn_t::commit(rockstore::store *rocks, scoped_ptr_t<real_superblock_lock> s
     guarantee(access_ == access_t::write);
     is_committed_ = true;
 
-    rocks->write_batch(batch.GetWriteBatch(), rockstore::write_options::TODO());
+    bool sync = durability_ == write_durability_t::SOFT ? false : true;
+
+    rocks->write_batch(batch.GetWriteBatch(), rockstore::write_options(sync));
     superblock.reset();
 }
 
