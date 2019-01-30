@@ -24,42 +24,6 @@ namespace rockstore {
 // TODO: All the callers of these methods need to be on a transaction (except for metadata).
 // TODO: The rockstore should have a cache memory limit.
 
-class txn final {
-public:
-    // TODO: Make these methods all use "untracked" operations?  Since we are
-    // protected by in-memory locking.  (Right?)
-
-    // Throws std::runtime_error.
-    std::string read(const std::string &key);
-    // Throws std::runtime_error.  False if value not found.
-    std::pair<std::string, bool> try_read(const std::string &key);
-
-    std::vector<std::pair<std::string, std::string>> read_all_prefixed(const std::string &prefix);
-
-    // Overwrites what's there.
-    // Throws std::runtime_error.
-    void put(const std::string &key, const std::string &value);
-
-    // Throws std::runtime_error.
-    // TODO: This isn't an atomic op, is it?  Rename this?  Suitable for metadata?
-    void insert(const std::string &key, const std::string &value);
-
-    // Throws std::runtime_error.
-    void remove(const std::string &key);
-
-    void commit();
-
-    txn();
-    ~txn();
-    txn(txn &&movee);
-    txn &operator=(txn &&movee);
-
-private:
-    friend class store;
-    explicit txn(scoped_ptr_t<rocksdb::Transaction> &&tx);
-    scoped_ptr_t<rocksdb::Transaction> txn_;
-    bool committed_;
-};
 
 // TODO: Make things private and such?
 struct snapshot {
@@ -106,8 +70,6 @@ public:
     void write_batch(rocksdb::WriteBatch&& batch, const write_options &opts);
 
     void sync(const write_options &opts);
-
-    txn begin(const write_options &opts);
 
     rocksdb::OptimisticTransactionDB *db() { return db_.get(); }
 
