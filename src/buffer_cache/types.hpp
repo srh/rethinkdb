@@ -5,6 +5,7 @@
 #include <limits.h>
 #include <stdint.h>
 
+#include "buffer_cache/cache_account.hpp"
 #include "containers/archive/archive.hpp"
 
 // write_durability_t::INVALID is an invalid value, notably it can't be serialized.

@@ -92,7 +92,7 @@ continue_bool_t store_t::send_backfill_pre(
             scoped_ptr_t<txn_t> txn;
             scoped_ptr_t<real_superblock_lock> sb;
             get_btree_superblock_and_txn_for_backfilling(
-                general_cache_conn.get(), btree->get_backfill_account(), &sb, &txn);
+                general_cache_conn.get(), &backfill_account_, &sb, &txn);
 
             limiting_btree_backfill_pre_item_consumer_t
                 limiter(pre_item_consumer, &threshold);
@@ -220,7 +220,7 @@ continue_bool_t store_t::send_backfill(
             scoped_ptr_t<txn_t> txn;
             scoped_ptr_t<real_superblock_lock> sb;
             get_btree_superblock_and_txn_for_backfilling(
-                general_cache_conn.get(), btree->get_backfill_account(), &sb, &txn);
+                general_cache_conn.get(), &backfill_account_, &sb, &txn);
 
             pre_item_producer->rewind(threshold);
             pre_item_adapter_t pre_item_adapter(pre_item_producer);

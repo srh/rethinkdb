@@ -56,15 +56,11 @@ public:
     ~btree_slice_t();
 
     cache_t *cache() { return cache_; }
-    cache_account_t *get_backfill_account() { return &backfill_account_; }
 
     btree_stats_t stats;
 
 private:
     cache_t *cache_;
-
-    // Cache account to be used when backfilling.
-    cache_account_t backfill_account_;
 
     DISABLE_COPYING(btree_slice_t);
 };

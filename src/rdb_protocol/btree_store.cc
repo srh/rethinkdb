@@ -23,6 +23,10 @@
 #include "rdb_protocol/store_metainfo.hpp"
 #include "stl_utils.hpp"
 
+// TODO: Remove
+// Run backfilling at a reduced priority
+#define BACKFILL_CACHE_PRIORITY 10
+
 // The maximal number of writes that can be in line for a superblock acquisition
 // at a time (including the write that's currently holding the superblock, if any).
 // This is to throttle writes compared to reads.
@@ -129,6 +133,7 @@ store_t::store_t(const region_t &_region,
                                  &perfmon_collection,
                                  "primary",
                                  index_type_t::PRIMARY));
+    backfill_account_ = cache->create_cache_account(BACKFILL_CACHE_PRIORITY);
 
     // Initialize sindex slices and metainfo
     {

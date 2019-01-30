@@ -337,6 +337,7 @@ public:
     scoped_ptr_t<cache_t> cache;
     scoped_ptr_t<cache_conn_t> general_cache_conn;
     scoped_ptr_t<btree_slice_t> btree;
+    cache_account_t backfill_account_;
     io_backender_t *io_backender_;
     base_path_t base_path_;
     perfmon_membership_t perfmon_collection_membership;
