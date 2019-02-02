@@ -25,8 +25,7 @@ int sized_strcmp(const uint8_t *str1, int len1, const uint8_t *str2, int len2) {
 
 bool unescaped_str_to_key(const char *str, int len, store_key_t *buf) {
     if (len <= MAX_KEY_SIZE) {
-        memcpy(buf->contents(), str, len);
-        buf->set_size(uint8_t(len));
+        *buf = store_key_t(std::string(str, len));
         return true;
     } else {
         return false;
@@ -34,14 +33,14 @@ bool unescaped_str_to_key(const char *str, int len, store_key_t *buf) {
 }
 
 std::string key_to_unescaped_str(const store_key_t &key) {
-    return std::string(reinterpret_cast<const char *>(key.contents()), key.size());
+    return std::string(reinterpret_cast<const char *>(key.data()), key.size());
 }
 
 std::string key_to_debug_str(const store_key_t &key) {
     std::string s;
     s.push_back('"');
     for (int i = 0; i < key.size(); i++) {
-        uint8_t c = key.contents()[i];
+        uint8_t c = key.data()[i];
         if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_') {
             s.push_back(c);
         } else {
@@ -140,7 +139,7 @@ void debug_print(printf_buffer_t *buf, const store_key_t &k) {
     if (k == store_key_max) {
         buf->appendf("MAX_KEY");
     } else {
-        debug_print_quoted_string(buf, k.contents(), k.size());
+        debug_print_quoted_string(buf, k.data(), k.size());
     }
 }
 

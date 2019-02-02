@@ -150,7 +150,7 @@ S2CellId key_to_s2cellid(const std::string &sid) {
 /* Returns the S2CellId corresponding to the given key, which must be a correctly
 formatted sindex key. */
 S2CellId btree_key_to_s2cellid(const store_key_t &key) {
-    std::string tmp(reinterpret_cast<const char *>(key.contents()), key.size());
+    std::string tmp(reinterpret_cast<const char *>(key.data()), key.size());
     return key_to_s2cellid(
         datum_t::extract_secondary(tmp));
 }
@@ -180,11 +180,11 @@ std::pair<S2CellId, bool> order_btree_key_relative_to_s2cellid_keys(
     /* A well-formed sindex key will start with the characters 'GC'. */
     uint8_t first_char = 'G';
     if (key_or_null == nullptr || key_or_null->size() == 0) return before_all;
-    if (key_or_null->contents()[0] < first_char) return before_all;
-    if (key_or_null->contents()[0] > first_char) return after_all;
+    if (key_or_null->data()[0] < first_char) return before_all;
+    if (key_or_null->data()[0] > first_char) return after_all;
     if (key_or_null->size() == 1) return before_all;
-    if (key_or_null->contents()[1] < 'C') return before_all;
-    if (key_or_null->contents()[1] > 'C') return after_all;
+    if (key_or_null->data()[1] < 'C') return before_all;
+    if (key_or_null->data()[1] > 'C') return after_all;
 
     /* A well-formed sindex key will next have 16 hexadecimal digits, using lowercase
     letters. If `key_or_null` starts with such a well-formed string, we'll set
@@ -199,7 +199,7 @@ std::pair<S2CellId, bool> order_btree_key_relative_to_s2cellid_keys(
             inside_cell = false;
             break;
         }
-        uint8_t hex_digit = key_or_null->contents()[i + 2];
+        uint8_t hex_digit = key_or_null->data()[i + 2];
         if (hex_digit >= '0' && hex_digit <= '9') {
             /* The string is still valid, so keep going. */
             cell_number += static_cast<uint64_t>(hex_digit - '0') << (4 * (15 - i));

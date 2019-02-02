@@ -34,7 +34,7 @@ uint64_t hash_region_hasher(const uint8_t *s, ssize_t len) {
 }
 
 uint64_t hash_region_hasher(const store_key_t &key) {
-    return hash_region_hasher(key.contents(), key.size());
+    return hash_region_hasher(key.data(), key.size());
 }
 
 const hash_region_t<key_range_t> *double_lookup(int i, const std::vector<hash_region_t<key_range_t> > &vec) {
@@ -228,7 +228,7 @@ MUST_USE region_join_result_t region_join(const std::vector< hash_region_t<key_r
 
 
 
-// hash_value must equal hash_region_hasher(key.contents(), key.size()).
+// hash_value must equal hash_region_hasher(key.data(), key.size()).
 bool region_contains_key_with_precomputed_hash(const hash_region_t<key_range_t> &region,
                                                const store_key_t &key,
                                                uint64_t hash_value) {

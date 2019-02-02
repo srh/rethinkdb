@@ -66,7 +66,7 @@ ql::datum_t convert_debug_multi_table_manager_bcard_timestamp_to_datum(
 ql::datum_t convert_debug_store_key_to_datum(const store_key_t &store_key) {
     return ql::datum_t::binary(datum_string_t(
         store_key.size(),
-        reinterpret_cast<const char *>(store_key.contents())));
+        reinterpret_cast<const char *>(store_key.data())));
 }
 
 ql::datum_t convert_debug_region_to_datum(const region_t &region) {

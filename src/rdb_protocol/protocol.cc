@@ -357,7 +357,7 @@ void post_construct_and_drain_queue(
 bool range_key_tester_t::key_should_be_erased(const store_key_t &key) {
     uint64_t h = hash_region_hasher(key);
     return delete_range->beg <= h && h < delete_range->end
-        && delete_range->inner.contains_key(key.contents(), key.size());
+        && delete_range->inner.contains_key(key.data(), key.size());
 }
 
 }  // namespace rdb_protocol
@@ -404,8 +404,8 @@ key_range_t sindex_key_range(const store_key_t &start,
         // included in the range.
         end_key = end;
         guarantee(end_key.size() > 0);
-        guarantee(end_key.contents()[end_key.size() - 1] == 0);
-        end_key.contents()[end_key.size() - 1] = 1;
+        guarantee(end_key.str().back() == 0);
+        end_key.str().back() = 1;
     } else {
         end_key = end;
     }

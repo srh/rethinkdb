@@ -12,7 +12,7 @@ will lie in the range `in1 <= out <= in2`. */
 static store_key_t interpolate_key(store_key_t in1, store_key_t in2, double fraction) {
     rassert(in1 <= in2);
     rassert(fraction >= 0 && fraction <= 1);
-    const uint8_t *in1_buf = in1.contents(), *in2_buf = in2.contents();
+    const uint8_t *in1_buf = in1.data(), *in2_buf = in2.data();
     uint8_t out_buf[MAX_KEY_SIZE];
 
     /* Calculate the shared prefix of `in1` and `in2` */

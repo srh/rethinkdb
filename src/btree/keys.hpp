@@ -7,6 +7,7 @@
 #include <string.h>
 
 #include <string>
+#include <vector>
 
 #include "arch/compiler.hpp"
 #include "config/args.hpp"
@@ -48,48 +49,37 @@ public:
         assign(sz, buf);
     }
 
-    store_key_t(const store_key_t &_key) {
-        assign(_key.size(), _key.contents());
+    explicit store_key_t(std::string &&s) : str_(std::move(s)) {
+        rassert(str_.size() <= MAX_KEY_SIZE);
     }
 
-    explicit store_key_t(const std::string &s) {
-        assign(s.size(), reinterpret_cast<const uint8_t *>(s.data()));
+    explicit store_key_t(const std::string &s) : str_(s) {
+        rassert(str_.size() <= MAX_KEY_SIZE);
     }
 
-private:
-    ATTR_PACKED(struct btree_key_t {
-        uint8_t size;
-        uint8_t contents[];
-        uint16_t full_size() const {
-            return size + offsetof(btree_key_t, contents);
-        }
-    });
-
-    btree_key_t *btree_key() { return reinterpret_cast<btree_key_t *>(buffer); }
-    const btree_key_t *btree_key() const {
-        return reinterpret_cast<const btree_key_t *>(buffer);
-    }
-public:
+    // TODO: Any callers?
     void set_size(int s) {
         rassert(s <= MAX_KEY_SIZE);
-        btree_key()->size = s;
+        str_.resize(s);
     }
-    int size() const { return btree_key()->size; }
-    uint8_t *contents() { return btree_key()->contents; }
-    const uint8_t *contents() const { return btree_key()->contents; }
+    int size() const { return str_.size(); }
+    const uint8_t *data() const { return reinterpret_cast<const uint8_t *>(str_.data()); }
 
     void assign(int sz, const uint8_t *buf) {
-        set_size(sz);
-        memcpy(contents(), buf, sz);
+        str_.assign(reinterpret_cast<const char *>(buf), sz);
+        rassert(sz <= MAX_KEY_SIZE);
     }
 
     void assign(const store_key_t &key) {
-        assign(key.size(), key.contents());
+        str_ = key.str_;
     }
 
     static store_key_t min() {
         return store_key_t();
     }
+
+    std::string &str() { return str_; }
+    const std::string &str() const { return str_; }
 
     static store_key_t max() {
         uint8_t buf[MAX_KEY_SIZE];
@@ -100,56 +90,57 @@ public:
     }
 
     bool increment() {
-        if (size() < MAX_KEY_SIZE) {
-            contents()[size()] = 0;
-            set_size(size() + 1);
+        if (str_.size() < MAX_KEY_SIZE) {
+            str_.push_back(0);
             return true;
         }
-        while (size() > 0 && contents()[size()-1] == 255) {
-            set_size(size() - 1);
+        while (str_.size() > 0 && static_cast<uint8_t>(str_.back()) == 255) {
+            str_.pop_back();
         }
-        if (size() == 0) {
+        if (str_.empty()) {
             /* We were the largest possible key. Oops. Restore our previous
             state and return `false`. */
             *this = store_key_t::max();
             return false;
         }
-        (reinterpret_cast<uint8_t *>(contents()))[size()-1]++;
+        str_.back() = 1 + static_cast<uint8_t>(str_.back());
         return true;
     }
 
+    // TODO: It would be nice if we never called this.
     bool decrement() {
-        if (size() == 0) {
+        if (str_.empty()) {
             return false;
-        } else if ((reinterpret_cast<uint8_t *>(contents()))[size()-1] > 0) {
-            (reinterpret_cast<uint8_t *>(contents()))[size()-1]--;
-            for (int i = size(); i < MAX_KEY_SIZE; i++) {
-                contents()[i] = 255;
+        } else if (str_.back() != 0) {
+            str_.back() = static_cast<uint8_t>(str_.back()) - 1;
+            for (int i = str_.size(); i < MAX_KEY_SIZE; i++) {
+                str_.push_back(static_cast<char>(255));
             }
-            set_size(MAX_KEY_SIZE);
             return true;
         } else {
-            set_size(size() - 1);
+            str_.pop_back();
             return true;
         }
     }
 
     int compare(const store_key_t& k) const {
-        return sized_strcmp(contents(), size(), k.contents(), k.size());
+        return sized_strcmp(data(), size(), k.data(), k.size());
     }
 
     // The wire format of serialize_for_metainfo must not change.
     void serialize_for_metainfo(write_message_t *wm) const {
         uint8_t sz = size();
         serialize_universal(wm, sz);
-        wm->append(contents(), sz);
+        wm->append(data(), sz);
     }
 
     archive_result_t deserialize_for_metainfo(read_stream_t *s) {
         uint8_t sz;
         archive_result_t res = deserialize_universal(s, &sz);
         if (bad(res)) { return res; }
-        int64_t num_read = force_read(s, contents(), sz);
+        std::string buf;
+        buf.resize(sz);
+        int64_t num_read = force_read(s, &buf[0], sz);
         if (num_read == -1) {
             return archive_result_t::SOCK_ERROR;
         }
@@ -157,7 +148,7 @@ public:
             return archive_result_t::SOCK_EOF;
         }
         rassert(num_read == sz);
-        set_size(sz);
+        str_ = std::move(buf);
         return archive_result_t::SUCCESS;
     }
 
@@ -172,14 +163,14 @@ public:
     }
 
 private:
-    char buffer[sizeof(btree_key_t) + MAX_KEY_SIZE];
+    std::string str_;
 };
 
 static const store_key_t store_key_max = store_key_t::max();
 static const store_key_t store_key_min = store_key_t::min();
 
 inline bool operator==(const store_key_t &k1, const store_key_t &k2) {
-    return k1.size() == k2.size() && memcmp(k1.contents(), k2.contents(), k1.size()) == 0;
+    return k1.size() == k2.size() && memcmp(k1.data(), k2.data(), k1.size()) == 0;
 }
 
 inline bool operator!=(const store_key_t &k1, const store_key_t &k2) {
@@ -287,19 +278,6 @@ public:
         return key_range_t(key_range_t::none, k, key_range_t::none, k);
     }
 
-    static key_range_t with_prefix(const store_key_t &prefix) THROWS_NOTHING {
-        if (prefix.size() == 0) {
-            return key_range_t::universe();
-        } else {
-            store_key_t right = prefix;
-            right.set_size(MAX_KEY_SIZE);
-            for (size_t i = prefix.size(); i < MAX_KEY_SIZE; ++i) {
-                right.contents()[i] = 0xFF;
-            }
-            return key_range_t(closed, prefix, closed, right);
-        }
-    }
-
     bool is_empty() const {
         if (right.unbounded) {
             return false;
@@ -317,9 +295,9 @@ public:
     }
 
     bool contains_key(const uint8_t *key, uint8_t size) const {
-        bool left_ok = sized_strcmp(left.contents(), left.size(), key, size) <= 0;
+        bool left_ok = sized_strcmp(left.data(), left.size(), key, size) <= 0;
         bool right_ok = right.unbounded ||
-            sized_strcmp(key, size, right.key().contents(), right.key().size()) < 0;
+            sized_strcmp(key, size, right.key().data(), right.key().size()) < 0;
         return left_ok && right_ok;
     }
 
