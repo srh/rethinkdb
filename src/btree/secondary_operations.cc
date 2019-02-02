@@ -166,6 +166,11 @@ void set_secondary_index(rockshard rocksh,
     set_secondary_indexes_internal(rocksh, sindex_block, sindex_map);
 }
 
+void set_secondary_indexes(rockshard rocksh, real_superblock_lock *sindex_block,
+        const std::map<sindex_name_t, secondary_index_t> &sindexes) {
+    set_secondary_indexes_internal(rocksh, sindex_block, sindexes);
+}
+
 bool delete_secondary_index(rockshard rocksh,
                             real_superblock_lock *sindex_block, const sindex_name_t &name) {
     std::map<sindex_name_t, secondary_index_t> sindex_map;

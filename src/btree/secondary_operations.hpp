@@ -107,6 +107,7 @@ bool get_secondary_index(rockshard rocksh, real_superblock_lock *sindex_block, u
 void get_secondary_indexes(rockshard rocksh, real_superblock_lock *sindex_block,
                            std::map<sindex_name_t, secondary_index_t> *sindexes_out);
 
+// TODO: Check if any of these functions are unused.
 /* Overwrites existing values with the same id. */
 void set_secondary_index(rockshard rocksh, real_superblock_lock *sindex_block,
                          const sindex_name_t &name, const secondary_index_t &sindex);
@@ -115,6 +116,9 @@ void set_secondary_index(rockshard rocksh, real_superblock_lock *sindex_block,
 // TODO: Unclear why we have redundant id/sindex.id parameters.
 void set_secondary_index(rockshard rocksh, real_superblock_lock *sindex_block, uuid_u id,
                          const secondary_index_t &sindex);
+
+void set_secondary_indexes(rockshard rocksh, real_superblock_lock *sindex_block,
+        const std::map<sindex_name_t, secondary_index_t> &sindexes);
 
 // XXX note this just drops the entry. It doesn't cleanup the btree that it points
 // to. `drop_sindex` Does both and should be used publicly.

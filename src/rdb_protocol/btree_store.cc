@@ -401,34 +401,34 @@ void store_t::sindex_rename_multi(
         write_durability_t::HARD, &superblock, &txn);
     superblock->sindex_block_write_signal()->wait();
 
+    std::map<sindex_name_t, secondary_index_t> sindex_map;
+    get_secondary_indexes(rocksh(), superblock.get(), &sindex_map);
+
     /* First we remove all the secondary indexes and hide their perfmons, but put the
     definitions and `btree_stats_t`s into `to_put_back` indexed by their new names. Then
     we go through and put them all back under their new names. */
     std::map<std::string, std::pair<secondary_index_t, btree_stats_t *> > to_put_back;
 
     for (const auto &pair : name_changes) {
-        secondary_index_t definition;
-        bool success = get_secondary_index(
-            rocksh(), superblock.get(), sindex_name_t(pair.first), &definition);
-        guarantee(success);
-        success = delete_secondary_index(rocksh(), superblock.get(), sindex_name_t(pair.first));
-        guarantee(success);
-
+        auto it = sindex_map.find(sindex_name_t(pair.first));
+        guarantee(it != sindex_map.end());
+        secondary_index_t definition = it->second;
+        sindex_map.erase(it);
         auto slice_it = secondary_index_slices.find(definition.id);
         guarantee(slice_it != secondary_index_slices.end());
-        guarantee(slice_it->second.has());
         slice_it->second->assert_thread();
         btree_stats_t *stats = &slice_it->second->stats;
         stats->hide();
 
-        to_put_back.insert(std::make_pair(
-            pair.second, std::make_pair(definition, stats)));
+        to_put_back.emplace(pair.second, std::make_pair(definition, stats));
     }
 
     for (const auto &pair : to_put_back) {
-        set_secondary_index(rocksh(), superblock.get(), sindex_name_t(pair.first), pair.second.first);
+        sindex_map[sindex_name_t(pair.first)] = pair.second.first;
         pair.second.second->rename(&perfmon_collection, "index-" + pair.first);
     }
+
+    set_secondary_indexes(rocksh(), superblock.get(), sindex_map);
 
     txn->commit(rocks, std::move(superblock));
 }
