@@ -433,6 +433,12 @@ void store_t::sindex_rename_multi(
     txn->commit(rocks, std::move(superblock));
 }
 
+sindex_name_t compute_sindex_deletion_name(uuid_u sindex_uuid) {
+    sindex_name_t result("_DEL_" + uuid_to_str(sindex_uuid));
+    result.being_deleted = true;
+    return result;
+}
+
 void store_t::sindex_drop(
         const std::string &name,
         UNUSED signal_t *interruptor)
@@ -444,13 +450,29 @@ void store_t::sindex_drop(
         write_durability_t::HARD, &superblock, &txn);
     superblock->sindex_block_write_signal()->wait();
 
-    secondary_index_t sindex;
-    bool success = ::get_secondary_index(rocksh(), superblock.get(), sindex_name_t(name), &sindex);
-    guarantee(success, "sindex_drop() called on sindex that doesn't exist");
+    std::map<sindex_name_t, secondary_index_t> sindex_map;
+    get_secondary_indexes(rocksh(), superblock.get(), &sindex_map);
+    auto it = sindex_map.find(sindex_name_t(name));
+    guarantee(it != sindex_map.end(), "sindex_drop() called on sindex that doesn't exist");
+    secondary_index_t sindex = it->second;
 
-    /* Mark the secondary index as deleted */
-    success = mark_secondary_index_deleted(superblock.get(), sindex_name_t(name));
-    guarantee(success);
+    // Delete the current entry
+    sindex_map.erase(it);
+
+    // Insert the new entry under a different name
+    const sindex_name_t sindex_del_name = compute_sindex_deletion_name(sindex.id);
+    sindex.being_deleted = true;
+    sindex_map[sindex_del_name] = sindex;
+
+    // Write
+    set_secondary_indexes(rocksh(), superblock.get(), sindex_map);
+
+    // Hide the index from the perfmon collection
+    auto slice_it = secondary_index_slices.find(sindex.id);
+    guarantee(slice_it != secondary_index_slices.end());
+    guarantee(slice_it->second.has());
+    slice_it->second->assert_thread();
+    slice_it->second->stats.hide();
 
     /* Clear the sindex later. It starts its own transaction and we don't
     want to deadlock because we're still holding locks. */
@@ -618,12 +640,6 @@ optional<uuid_u> store_t::add_sindex_internal(
         ::set_secondary_index(rocksh(), sindex_block, name, sindex);
         return make_optional(sindex.id);
     }
-}
-
-sindex_name_t compute_sindex_deletion_name(uuid_u sindex_uuid) {
-    sindex_name_t result("_DEL_" + uuid_to_str(sindex_uuid));
-    result.being_deleted = true;
-    return result;
 }
 
 class clear_sindex_traversal_cb_t
@@ -855,34 +871,6 @@ bool store_t::mark_index_up_to_date(uuid_u id,
     }
 
     return found;
-}
-
-MUST_USE bool store_t::mark_secondary_index_deleted(
-        real_superblock_lock *sindex_block,
-        const sindex_name_t &name) {
-    secondary_index_t sindex;
-    bool success = get_secondary_index(rocksh(), sindex_block, name, &sindex);
-    if (!success) {
-        return false;
-    }
-
-    // Delete the current entry
-    success = delete_secondary_index(rocksh(), sindex_block, name);
-    guarantee(success);
-
-    // Insert the new entry under a different name
-    const sindex_name_t sindex_del_name = compute_sindex_deletion_name(sindex.id);
-    sindex.being_deleted = true;
-    set_secondary_index(rocksh(), sindex_block, sindex_del_name, sindex);
-
-    // Hide the index from the perfmon collection
-    auto slice_it = secondary_index_slices.find(sindex.id);
-    guarantee(slice_it != secondary_index_slices.end());
-    guarantee(slice_it->second.has());
-    slice_it->second->assert_thread();
-    slice_it->second->stats.hide();
-
-    return true;
 }
 
 MUST_USE bool store_t::acquire_sindex_superblock_for_read(

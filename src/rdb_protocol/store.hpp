@@ -312,10 +312,6 @@ private:
     // deleted indexes.  Also migrates the secondary index block to the current version.
     void help_construct_bring_sindexes_up_to_date();
 
-    MUST_USE bool mark_secondary_index_deleted(
-            real_superblock_lock *sindex_block,
-            const sindex_name_t &name);
-
 public:
     namespace_id_t const &get_table_id() const;
 
