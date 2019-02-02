@@ -37,10 +37,6 @@ std::string key_to_unescaped_str(const store_key_t &key) {
     return std::string(reinterpret_cast<const char *>(key.contents()), key.size());
 }
 
-std::string key_to_unescaped_str(const btree_key_t *key) {
-    return std::string(reinterpret_cast<const char *>(key->contents), key->size);
-}
-
 std::string key_to_debug_str(const store_key_t &key) {
     std::string s;
     s.push_back('"');
@@ -59,22 +55,14 @@ std::string key_to_debug_str(const store_key_t &key) {
     return s;
 }
 
-std::string key_to_debug_str(const btree_key_t *key) {
-    return key_to_debug_str(store_key_t(key));
-}
-
 key_range_t::key_range_t() :
     left(), right(store_key_t()) { }
 
 key_range_t::key_range_t(bound_t lm, const store_key_t& l, bound_t rm, const store_key_t& r) {
-    init(lm, l.btree_key(), rm, r.btree_key());
-}
-
-key_range_t::key_range_t(bound_t lm, const btree_key_t *l, bound_t rm, const btree_key_t *r) {
     init(lm, l, rm, r);
 }
 
-void key_range_t::init(bound_t lm, const btree_key_t *l, bound_t rm, const btree_key_t *r) {
+void key_range_t::init(bound_t lm, const store_key_t &l, bound_t rm, const store_key_t &r) {
     switch (lm) {
         case bound_t::closed:
             left.assign(l);
@@ -148,19 +136,11 @@ key_range_t key_range_t::intersection(const key_range_t &other) const {
     return ixn;
 }
 
-void debug_print(printf_buffer_t *buf, const btree_key_t *k) {
-    if (k != nullptr) {
-        debug_print_quoted_string(buf, k->contents, k->size);
-    } else {
-        buf->appendf("NULL");
-    }
-}
-
 void debug_print(printf_buffer_t *buf, const store_key_t &k) {
     if (k == store_key_max) {
         buf->appendf("MAX_KEY");
     } else {
-        debug_print(buf, k.btree_key());
+        debug_print_quoted_string(buf, k.contents(), k.size());
     }
 }
 

@@ -749,7 +749,7 @@ between the source and destination servers. */
 struct range_key_tester_t : public key_tester_t {
     explicit range_key_tester_t(const region_t *_delete_range) : delete_range(_delete_range) { }
     virtual ~range_key_tester_t() { }
-    bool key_should_be_erased(const btree_key_t *key);
+    bool key_should_be_erased(const store_key_t &key);
 
     const region_t *delete_range;
 };

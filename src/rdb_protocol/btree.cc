@@ -2003,7 +2003,7 @@ void rdb_update_single_sindex(
                         rocksh.table_id,
                         rocksh.shard_no,
                         sindex->sindex.id,
-                        key_to_unescaped_str(it->first.btree_key()));
+                        key_to_unescaped_str(it->first));
 
                 // TODO: We could do a SingleDelete for secondary index removals.
 
@@ -2062,7 +2062,7 @@ void rdb_update_single_sindex(
                         rocksh.table_id,
                         rocksh.shard_no,
                         sindex->sindex.id,
-                        key_to_unescaped_str(it->first.btree_key()));
+                        key_to_unescaped_str(it->first));
 
                 // NOTE: We generally need a copy of the value to be available in the secondary index
                 // because the secondary index key can get truncated.  TODO: Make it not get truncated,

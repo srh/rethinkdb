@@ -10,7 +10,6 @@
 #include "buffer_cache/types.hpp"
 #include "containers/uuid.hpp"
 
-struct btree_key_t;
 class btree_slice_t;
 struct rdb_modification_report_t;
 class real_superblock_lock;
@@ -20,7 +19,7 @@ class signal_t;
 class key_tester_t {
 public:
     key_tester_t() { }
-    virtual bool key_should_be_erased(const btree_key_t *key) = 0;
+    virtual bool key_should_be_erased(const store_key_t &key) = 0;
 
 protected:
     virtual ~key_tester_t() { }
@@ -29,7 +28,7 @@ private:
 };
 
 struct always_true_key_tester_t : public key_tester_t {
-    bool key_should_be_erased(UNUSED const btree_key_t *key) {
+    bool key_should_be_erased(UNUSED const store_key_t &key) {
         return true;
     }
 };

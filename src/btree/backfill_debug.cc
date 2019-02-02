@@ -5,6 +5,7 @@
 
 #include "arch/spinlock.hpp"
 
+// TODO: Delete this, probably.
 #ifdef ENABLE_BACKFILL_DEBUG
 
 class backfill_debug_msg_t {
@@ -26,7 +27,7 @@ void backfill_debug_key(const store_key_t &key, const std::string &msg) {
     spinlock_acq_t acq(&backfill_debug_lock);
     backfill_debug_msgs.push_back(backfill_debug_msg_t {
         false,
-        key_range_t(key.btree_key()),
+        key_range_t(key),
         msg
         });
 }
@@ -59,7 +60,7 @@ void backfill_debug_dump_log(const store_key_t &key) {
         }
         if (msg.general) {
             fprintf(stderr, "<general>: %s\n", msg.msg.c_str());
-        } else if (msg.keys == key_range_t(key.btree_key())) {
+        } else if (msg.keys == key_range_t(key)) {
             fprintf(stderr, "%s: %s\n", key_to_debug_str(key).c_str(), msg.msg.c_str());
         } else {
             fprintf(stderr, "%s: %s\n",

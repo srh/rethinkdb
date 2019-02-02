@@ -34,7 +34,7 @@ public:
         guarantee(!aborted_);
         store_key_t skey(key.second, reinterpret_cast<const uint8_t *>(key.first));
         guarantee(key_range_.contains_key(skey.contents(), skey.size()));
-        if (!tester_->key_should_be_erased(skey.btree_key())) {
+        if (!tester_->key_should_be_erased(skey)) {
             return continue_bool_t::CONTINUE;
         }
         collected_keys_.push_back(skey);

@@ -354,10 +354,10 @@ void post_construct_and_drain_queue(
 }
 
 
-bool range_key_tester_t::key_should_be_erased(const btree_key_t *key) {
+bool range_key_tester_t::key_should_be_erased(const store_key_t &key) {
     uint64_t h = hash_region_hasher(key);
     return delete_range->beg <= h && h < delete_range->end
-        && delete_range->inner.contains_key(key->contents, key->size);
+        && delete_range->inner.contains_key(key.contents(), key.size());
 }
 
 }  // namespace rdb_protocol

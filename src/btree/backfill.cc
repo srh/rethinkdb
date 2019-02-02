@@ -130,7 +130,8 @@ continue_bool_t send_all_in_keyrange(
     iter.reset();  // Might as well destroy asap.
 
     backfill_item_t item;
-    item.range = key_range_t(prev_bound, prev_key.btree_key(), key_range_t::bound_t::none, nullptr);
+    store_key_t bogus;
+    item.range = key_range_t(prev_bound, prev_key, key_range_t::bound_t::none, bogus);
     item.range.right = range.right;
     item.min_deletion_timestamp = max_timestamp;  // TODO: A gross hack, but we can't do better for now.
 

@@ -12,7 +12,7 @@ using geo::S2CellId;
 std::string s2cellid_to_key(S2CellId id);
 S2CellId key_to_s2cellid(const std::string &sid);
 std::pair<S2CellId, bool> order_btree_key_relative_to_s2cellid_keys(
-    const btree_key_t *key_or_null);
+    const store_key_t *key_or_null);
 
 namespace unittest {
 
@@ -38,7 +38,7 @@ void test_btree_key(std::string str_key) {
     // keys to the btree (since 1.16).
     store_key_t key(str_key);
     std::pair<S2CellId, bool> res =
-        order_btree_key_relative_to_s2cellid_keys(key.btree_key());
+        order_btree_key_relative_to_s2cellid_keys(&key);
     if (res.first == S2CellId::Sentinel()) {
         ASSERT_LT(s2cellid_to_key(S2CellId::FromFacePosLevel(5, 0, 0).range_max()),
             str_key);

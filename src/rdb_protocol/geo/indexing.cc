@@ -149,13 +149,13 @@ S2CellId key_to_s2cellid(const std::string &sid) {
 
 /* Returns the S2CellId corresponding to the given key, which must be a correctly
 formatted sindex key. */
-S2CellId btree_key_to_s2cellid(const btree_key_t *key) {
-    rassert(key != NULL);
-    std::string tmp(reinterpret_cast<const char *>(key->contents), key->size);
+S2CellId btree_key_to_s2cellid(const store_key_t &key) {
+    std::string tmp(reinterpret_cast<const char *>(key.contents()), key.size());
     return key_to_s2cellid(
         datum_t::extract_secondary(tmp));
 }
 
+// TODO: Delete this?  Or move to geo_btree.cc.
 /* `key_or_null` represents a point to the left or right of a key in the B-tree
 key-space. If `nullptr`, it means the point left of the leftmost key; otherwise, it means
 the point right of `*key_or_null`. It need not be a valid sindex key.
@@ -171,7 +171,7 @@ relative to geospatial sindex keys. There are four possible outcomes:
   - `key_or_null` lies before all possible sindex keys for `S2CellId`s. It will return
     `(S2CellId::FromFacePosLevel(0, 0, geo::S2::kMaxCellLevel), false)`. */
 std::pair<S2CellId, bool> order_btree_key_relative_to_s2cellid_keys(
-        const btree_key_t *key_or_null) {
+        const store_key_t *key_or_null) {
     static const std::pair<S2CellId, bool> before_all(
         S2CellId::FromFacePosLevel(0, 0, geo::S2::kMaxCellLevel), false);
     static const std::pair<S2CellId, bool> after_all(
@@ -179,12 +179,12 @@ std::pair<S2CellId, bool> order_btree_key_relative_to_s2cellid_keys(
 
     /* A well-formed sindex key will start with the characters 'GC'. */
     uint8_t first_char = 'G';
-    if (key_or_null == nullptr || key_or_null->size == 0) return before_all;
-    if (key_or_null->contents[0] < first_char) return before_all;
-    if (key_or_null->contents[0] > first_char) return after_all;
-    if (key_or_null->size == 1) return before_all;
-    if (key_or_null->contents[1] < 'C') return before_all;
-    if (key_or_null->contents[1] > 'C') return after_all;
+    if (key_or_null == nullptr || key_or_null->size() == 0) return before_all;
+    if (key_or_null->contents()[0] < first_char) return before_all;
+    if (key_or_null->contents()[0] > first_char) return after_all;
+    if (key_or_null->size() == 1) return before_all;
+    if (key_or_null->contents()[1] < 'C') return before_all;
+    if (key_or_null->contents()[1] > 'C') return after_all;
 
     /* A well-formed sindex key will next have 16 hexadecimal digits, using lowercase
     letters. If `key_or_null` starts with such a well-formed string, we'll set
@@ -194,12 +194,12 @@ std::pair<S2CellId, bool> order_btree_key_relative_to_s2cellid_keys(
     uint64_t cell_number = 0;
     bool inside_cell = true;
     for (int i = 0; i < 16; ++i) {
-        if (i + 2 >= key_or_null->size) {
+        if (i + 2 >= key_or_null->size()) {
             /* The string is too short. For example, "123" -> (0x1230..., false). */
             inside_cell = false;
             break;
         }
-        uint8_t hex_digit = key_or_null->contents[i + 2];
+        uint8_t hex_digit = key_or_null->contents()[i + 2];
         if (hex_digit >= '0' && hex_digit <= '9') {
             /* The string is still valid, so keep going. */
             cell_number += static_cast<uint64_t>(hex_digit - '0') << (4 * (15 - i));
@@ -344,7 +344,7 @@ geo_index_traversal_helper_t::handle_pair(
     }
 
     store_key_t skey(key.second, reinterpret_cast<const uint8_t *>(key.first));
-    const S2CellId key_cell = btree_key_to_s2cellid(skey.btree_key());
+    const S2CellId key_cell = btree_key_to_s2cellid(skey);
     if (any_cell_intersects(query_cells_, key_cell.range_min(), key_cell.range_max())) {
         bool definitely_intersects_if_point =
             any_cell_contains(query_interior_cells_, key_cell);
@@ -404,7 +404,7 @@ bool geo_index_traversal_helper_t::skip_forward_to_seek_key(std::string *pos) co
         // The minimal cell id.
         pos_cell = geo::S2CellId(1);
     } else if (*pos < "GD") {
-        pos_cell = btree_key_to_s2cellid(skey.btree_key());
+        pos_cell = btree_key_to_s2cellid(skey);
     } else {
         return false;
     }
@@ -518,7 +518,7 @@ continue_bool_t geo_traversal(
         key_slice.remove_prefix(rocks_kv_prefix.size());
 
         store_key_t skey(key_slice.size(), reinterpret_cast<const uint8_t *>(key_slice.data()));
-        S2CellId cellid = btree_key_to_s2cellid(skey.btree_key());
+        S2CellId cellid = btree_key_to_s2cellid(skey);
 
         bool found_cell = false;
         S2CellId max_cell;

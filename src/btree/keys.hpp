@@ -38,20 +38,6 @@ bool is_better(const T &a, const T &b, sorting_t sorting) {
 // Fast string compare
 int sized_strcmp(const uint8_t *str1, int len1, const uint8_t *str2, int len2);
 
-// Note: Changing this struct changes the format of the data stored on disk.
-// If you change this struct, previous stored data will be misinterpreted.
-ATTR_PACKED(struct btree_key_t {
-    uint8_t size;
-    uint8_t contents[];
-    uint16_t full_size() const {
-        return size + offsetof(btree_key_t, contents);
-    }
-});
-
-inline int btree_key_cmp(const btree_key_t *left, const btree_key_t *right) {
-    return sized_strcmp(left->contents, left->size, right->contents, right->size);
-}
-
 struct store_key_t {
 public:
     store_key_t() {
@@ -66,18 +52,24 @@ public:
         assign(_key.size(), _key.contents());
     }
 
-    explicit store_key_t(const btree_key_t *key) {
-        assign(key->size, key->contents);
-    }
-
     explicit store_key_t(const std::string &s) {
         assign(s.size(), reinterpret_cast<const uint8_t *>(s.data()));
     }
+
+private:
+    ATTR_PACKED(struct btree_key_t {
+        uint8_t size;
+        uint8_t contents[];
+        uint16_t full_size() const {
+            return size + offsetof(btree_key_t, contents);
+        }
+    });
 
     btree_key_t *btree_key() { return reinterpret_cast<btree_key_t *>(buffer); }
     const btree_key_t *btree_key() const {
         return reinterpret_cast<const btree_key_t *>(buffer);
     }
+public:
     void set_size(int s) {
         rassert(s <= MAX_KEY_SIZE);
         btree_key()->size = s;
@@ -91,8 +83,8 @@ public:
         memcpy(contents(), buf, sz);
     }
 
-    void assign(const btree_key_t *key) {
-        assign(key->size, key->contents);
+    void assign(const store_key_t &key) {
+        assign(key.size(), key.contents());
     }
 
     static store_key_t min() {
@@ -212,11 +204,7 @@ inline bool operator>=(const store_key_t &k1, const store_key_t &k2) {
 
 bool unescaped_str_to_key(const char *str, int len, store_key_t *buf);
 std::string key_to_unescaped_str(const store_key_t &key);
-std::string key_to_unescaped_str(const btree_key_t *key);
-
 std::string key_to_debug_str(const store_key_t &key);
-
-std::string key_to_debug_str(const btree_key_t *key);
 
 /* `key_range_t` represents a contiguous set of keys. */
 class key_range_t {
@@ -284,8 +272,6 @@ public:
     key_range_t();   /* creates a range containing no keys */
     key_range_t(bound_t lm, const store_key_t &l,
                 bound_t rm, const store_key_t &r);
-    key_range_t(bound_t lm, const btree_key_t *l,
-                bound_t rm, const btree_key_t *r);
 
     template<class T>
     static key_range_t one_key(const T &key) {
@@ -337,10 +323,6 @@ public:
         return left_ok && right_ok;
     }
 
-    bool contains_key(const btree_key_t *key) const {
-        return contains_key(key->contents, key->size);
-    }
-
     std::string print() const;
     bool is_superset(const key_range_t &other) const;
     bool overlaps(const key_range_t &other) const;
@@ -350,8 +332,8 @@ public:
     right_bound_t right;
 
 private:
-    void init(bound_t lm, const btree_key_t *l,
-              bound_t rm, const btree_key_t *r);
+    void init(bound_t lm, const store_key_t &l,
+              bound_t rm, const store_key_t &r);
 };
 
 RDB_DECLARE_SERIALIZABLE(key_range_t::right_bound_t);
@@ -361,7 +343,6 @@ RDB_DECLARE_SERIALIZABLE(key_range_t);
 void serialize_for_metainfo(write_message_t *wm, const key_range_t &kr);
 MUST_USE archive_result_t deserialize_for_metainfo(read_stream_t *s, key_range_t *out);
 
-void debug_print(printf_buffer_t *buf, const btree_key_t *k);
 void debug_print(printf_buffer_t *buf, const store_key_t &k);
 void debug_print(printf_buffer_t *buf, const store_key_t *k);
 void debug_print(printf_buffer_t *buf, const key_range_t::right_bound_t &rb);
