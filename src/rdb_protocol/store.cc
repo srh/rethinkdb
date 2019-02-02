@@ -43,37 +43,6 @@ void store_t::note_reshard(const region_t &shard_region) {
     // block.
 }
 
-reql_version_t update_sindex_last_compatible_version(
-        rockshard rocksh,
-        secondary_index_t *sindex,
-        real_superblock_lock *sindex_block) {
-    sindex_disk_info_t sindex_info;
-    deserialize_sindex_info_or_crash(sindex->opaque_definition, &sindex_info);
-
-    reql_version_t res = sindex_info.mapping_version_info.original_reql_version;
-
-    if (sindex_info.mapping_version_info.latest_checked_reql_version
-        != reql_version_t::LATEST) {
-
-        sindex_info.mapping_version_info.latest_compatible_reql_version = res;
-        sindex_info.mapping_version_info.latest_checked_reql_version =
-            reql_version_t::LATEST;
-
-        write_message_t wm;
-        serialize_sindex_info(&wm, sindex_info);
-
-        vector_stream_t stream;
-        stream.reserve(wm.size());
-        int write_res = send_write_message(&stream, &wm);
-        guarantee(write_res == 0);
-
-        sindex->opaque_definition = stream.vector();
-
-        ::set_secondary_index(rocksh, sindex_block, sindex->id, *sindex);
-    }
-
-    return res;
-}
 
 void store_t::help_construct_bring_sindexes_up_to_date() {
     // Make sure to continue bringing sindexes up-to-date if it was interrupted earlier
