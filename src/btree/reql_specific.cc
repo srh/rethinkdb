@@ -147,11 +147,11 @@ void set_superblock_metainfo(real_superblock_lock *superblock,
     std::string meta_prefix = rockstore::table_metadata_prefix(rocksh.table_id, rocksh.shard_no);
     // TODO: Don't update version if it's already properly set.  (Performance.)
     // TODO: Just remove the metadata version key...?
-    rocksdb::Status status = superblock->txn()->batch.Put(
+    rocksdb::Status status = superblock->wait_write_batch()->Put(
         meta_prefix + rockstore::TABLE_METADATA_VERSION_KEY(),
         rockstore::VERSION());
     guarantee(status.ok());
-    status = superblock->txn()->batch.Put(
+    status = superblock->wait_write_batch()->Put(
         meta_prefix + rockstore::TABLE_METADATA_METAINFO_KEY(),
         rocksdb::Slice(metainfo.data(), metainfo.size()));
     guarantee(status.ok());

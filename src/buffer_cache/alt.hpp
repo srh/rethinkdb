@@ -58,6 +58,11 @@ public:
     // might consider supporting a mem_cap paremeter.
     cache_account_t create_cache_account(int priority);
 
+    // TODO: Add status checks to every usage.
+    // TODO: It would be nice to just avoid duplicate secondary index writing, so
+    // we can use a plain WriteBatch.
+    scoped_ptr_t<rocksdb::WriteBatchWithIndex> batch;
+
 private:
     friend class txn_t;
     friend class real_superblock_lock;
@@ -92,11 +97,6 @@ public:
 
     void set_account(cache_account_t *cache_account);
     cache_account_t *account() { return cache_account_; }
-
-    // TODO: Add status checks to every usage.
-    // TODO: It would be nice to just avoid duplicate secondary index writing, so
-    // we can use a plain WriteBatch.
-    rocksdb::WriteBatchWithIndex batch;
 
 private:
     void help_construct(int64_t expected_change_count, cache_conn_t *cache_conn);
@@ -153,6 +153,16 @@ public:
         txn_ = nullptr;
         acq_.reset();
         write_semaphore_acq_.reset();
+    }
+
+    rocksdb::WriteBatchWithIndex *wait_read_batch() {
+        read_acq_signal()->wait();
+        return txn_->cache()->batch.get();
+    }
+
+    rocksdb::WriteBatchWithIndex *wait_write_batch() {
+        write_acq_signal()->wait();
+        return txn_->cache()->batch.get();
     }
 
     txn_t *txn_;

@@ -77,9 +77,8 @@ void get_secondary_indexes_internal(
     std::string kv_location = rockstore::table_sindex_map(rocksh.table_id, rocksh.shard_no);
 
     // TODO: Some vestigial code with a guarantee here -- presumably to be cleaned up later.
-    txn_t *txn = superblock->txn();
     std::string rocks_sindex_blob;
-    rocksdb::Status status = txn->batch.GetFromBatch(rocksdb::DBOptions(), kv_location, &rocks_sindex_blob);
+    rocksdb::Status status = superblock->wait_read_batch()->GetFromBatch(rocksdb::DBOptions(), kv_location, &rocks_sindex_blob);
     guarantee(!status.ok(), "Expecting no get-after-set of sindex_map");
 
     rocks_sindex_blob = rocksh.rocks->read(kv_location);
@@ -98,7 +97,7 @@ void set_secondary_indexes_internal(
     // TODO: rocksdb transactionality
     std::string sindex_rocks_blob = serialize_to_string<cluster_version_t::LATEST_DISK>(sindexes);
     std::string sindex_rocks_key = rockstore::table_sindex_map(rocksh.table_id, rocksh.shard_no);
-    superblock->txn()->batch.Put(sindex_rocks_key, sindex_rocks_blob);
+    superblock->wait_write_batch()->Put(sindex_rocks_key, sindex_rocks_blob);
 }
 
 void initialize_secondary_indexes(rockshard rocksh,

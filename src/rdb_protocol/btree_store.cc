@@ -765,7 +765,7 @@ void store_t::clear_sindex_data(
         for (size_t i = 0; i < keys.size(); ++i) {
             std::string rocks_kv_location =
                 rockstore::table_secondary_key(table_id, shard_no, sindex_id, key_to_unescaped_str(keys[i]));
-            superblock->txn()->batch.Delete(rocks_kv_location);
+            superblock->wait_write_batch()->Delete(rocks_kv_location);
         }
 
         txn->commit(rocks, std::move(superblock));

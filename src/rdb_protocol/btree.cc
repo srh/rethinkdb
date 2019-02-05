@@ -54,7 +54,7 @@ void kv_location_delete(rockstore::store *rocks,
     (void)rocks;  // TODO
     (void)timestamp;  // TODO: Use with WAL?
     (void)delete_mode;  // TODO: Use this with WAL?
-    superblock->txn()->batch.Delete(rocks_kv_location);
+    superblock->wait_write_batch()->Delete(rocks_kv_location);
 }
 
 ql::serialization_result_t datum_serialize_to_string(const ql::datum_t &datum, std::string *out) {
@@ -89,7 +89,7 @@ kv_location_set(rockstore::store *rocks,
     if (bad(res)) {
         return res;
     }
-    superblock->txn()->batch.Put(rocks_kv_location, str);
+    superblock->wait_write_batch()->Put(rocks_kv_location, str);
 
     return ql::serialization_result_t::SUCCESS;
 }
@@ -107,7 +107,7 @@ kv_location_set_secondary(
     ql::serialization_result_t res =
         datum_serialize_to_string(value_datum, &str);
     guarantee(!bad(res));
-    superblock->txn()->batch.Put(rocks_kv_location, str);
+    superblock->wait_write_batch()->Put(rocks_kv_location, str);
     // TODO: Useless return value;
     return ql::serialization_result_t::SUCCESS;
 }
@@ -2007,7 +2007,7 @@ void rdb_update_single_sindex(
 
                 // TODO: We could do a SingleDelete for secondary index removals.
 
-                superblock->txn()->batch.Delete(rocks_secondary_kv_location);
+                superblock->wait_write_batch()->Delete(rocks_secondary_kv_location);
             }
         } catch (const ql::base_exc_t &) {
             // Do nothing (it wasn't actually in the index).

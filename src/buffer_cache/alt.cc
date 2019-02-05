@@ -67,7 +67,8 @@ void alt_txn_throttler_t::inform_memory_limit_change(uint64_t memory_limit) {
 }
 
 cache_t::cache_t(perfmon_collection_t *perfmon_collection)
-    : throttler_(MINIMUM_SOFT_UNWRITTEN_CHANGES_LIMIT) {
+    : batch(new rocksdb::WriteBatchWithIndex()),
+      throttler_(MINIMUM_SOFT_UNWRITTEN_CHANGES_LIMIT) {
     (void)perfmon_collection;
     // TODO: Use perfmon_collection for something?
 }
@@ -146,7 +147,8 @@ void txn_t::commit(rockstore::store *rocks, scoped_ptr_t<real_superblock_lock> s
 
     bool sync = durability_ == write_durability_t::SOFT ? false : true;
 
-    rocks->write_batch(batch.GetWriteBatch(), rockstore::write_options(sync));
+    rocks->write_batch(superblock->wait_write_batch()->GetWriteBatch(), rockstore::write_options(sync));
+    cache_->batch = make_scoped<rocksdb::WriteBatchWithIndex>();
     superblock.reset();
 }
 
