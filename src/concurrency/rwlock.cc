@@ -14,18 +14,18 @@ void rwlock_t::add_acq(rwlock_in_line_t *acq) {
     pulse_pulsables(acq);
 }
 
-void rwlock_t::remove_acq(rwlock_in_line_t *acq) {
+bool rwlock_t::remove_acq(rwlock_in_line_t *acq) {
     rwlock_in_line_t *subsequent = acqs_.next(acq);
     acqs_.remove(acq);
-    pulse_pulsables(subsequent);
+    return pulse_pulsables(subsequent);
 }
 
 // p is a node whose situation might have changed -- a node whose previous entry is
 // different.
-void rwlock_t::pulse_pulsables(rwlock_in_line_t *p) {
+bool rwlock_t::pulse_pulsables(rwlock_in_line_t *p) {
     // We might not have to do any pulsing at all.
     if (p == nullptr) {
-        return;
+        return true;
     } else if (p->read_cond_.is_pulsed()) {
         // p is already pulsed for read.  We don't want to re-pulse the same chain of
         // nodes after p.  The only question is whether we should pulse p for write.
@@ -35,7 +35,7 @@ void rwlock_t::pulse_pulsables(rwlock_in_line_t *p) {
         if (p->access_ == access_t::write && acqs_.prev(p) == nullptr) {
             p->write_cond_.pulse_if_not_already_pulsed();
         }
-        return;
+        return false;
     } else {
         rwlock_in_line_t *prev = acqs_.prev(p);
         do {
@@ -44,7 +44,7 @@ void rwlock_t::pulse_pulsables(rwlock_in_line_t *p) {
                 !(prev->access_ == access_t::read && prev->read_cond_.is_pulsed())) {
                 // We're done, because the previous node is present and isn't a
                 // pulsed read-acquirer.
-                return;
+                return false;
             }
             p->read_cond_.pulse();
 
@@ -53,12 +53,12 @@ void rwlock_t::pulse_pulsables(rwlock_in_line_t *p) {
                 if (prev == nullptr) {
                     p->write_cond_.pulse();
                 }
-                return;
+                return false;
             }
             prev = p;
             p = acqs_.next(p);
         } while (p != nullptr);
-        return;
+        return false;
     }
 }
 
@@ -89,6 +89,16 @@ void rwlock_in_line_t::init(rwlock_t *lock, access_t access) {
 
 rwlock_in_line_t::~rwlock_in_line_t() {
     reset();
+}
+
+bool rwlock_in_line_t::release() {
+    ASSERT_NO_CORO_WAITING;
+    rassert(lock_ != nullptr);
+    bool ret = lock_->remove_acq(this);
+    access_ = valgrind_undefined(access_t::read);
+    read_cond_.reset();
+    write_cond_.reset();
+    return ret;
 }
 
 void rwlock_in_line_t::reset() {

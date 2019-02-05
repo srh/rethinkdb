@@ -15,9 +15,9 @@ public:
 private:
     friend class rwlock_in_line_t;
     void add_acq(rwlock_in_line_t *acq);
-    void remove_acq(rwlock_in_line_t *acq);
+    bool remove_acq(rwlock_in_line_t *acq);
 
-    void pulse_pulsables(rwlock_in_line_t *p);
+    bool pulse_pulsables(rwlock_in_line_t *p);
 
     // Acquirers, in order by acquisition, with the head containing one of the
     // current acquirer, the tail possibly containing a node that does not yet hold
@@ -50,6 +50,11 @@ public:
         guarantee(access_ == access_t::write);
         return &write_cond_;
     }
+
+    // Returns true if the lock is NOT held by some reader or writer after we
+    // released it.  That is, returns true if we were the last acquirer for this
+    // lock.
+    bool release();
 
     void reset();
 
