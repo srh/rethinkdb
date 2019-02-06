@@ -9,10 +9,12 @@
 
 #include "rocksdb/utilities/write_batch_with_index.h"
 
+// TODO: Remove unused includes.
 #include "buffer_cache/page_cache.hpp"
 #include "buffer_cache/types.hpp"
 #include "concurrency/rwlock.hpp"
 #include "concurrency/new_semaphore.hpp"
+#include "concurrency/new_mutex.hpp"
 #include "containers/scoped.hpp"
 #include "containers/two_level_array.hpp"
 #include "containers/uuid.hpp"
@@ -44,6 +46,7 @@ private:
 class lock_state {
 public:
     rwlock_t real_superblock_lock;
+    std::unordered_map<std::string, scoped_ptr_t<new_mutex_t>> row_locks;
     uint64_t next_write_acquirer = 1;
     uint64_t high_waterline = 0;
 };
@@ -68,6 +71,7 @@ public:
 private:
     friend class txn_t;
     friend class real_superblock_lock;
+    friend class row_lock;
 
     // throttler_ can cause the txn_t constructor to block
     alt_txn_throttler_t throttler_;
@@ -184,6 +188,49 @@ public:
     new_semaphore_in_line_t write_semaphore_acq_;
     rwlock_in_line_t acq_;
     uint64_t write_acq_sequence_number_;
+};
+
+class row_lock {
+public:
+    row_lock() = delete;
+
+    row_lock(real_superblock_lock *superblock, const std::string &row)
+        : txn_(superblock->txn()), row_(row) {
+        superblock->write_acq_signal()->wait();
+
+        cache_t *cache = txn_->cache();
+        auto it = cache->locks_.row_locks.find(row_);
+        if (it == cache->locks_.row_locks.end()) {
+            it = cache->locks_.row_locks.emplace(row_, make_scoped<new_mutex_t>()).first;
+        }
+        acq_.init(it->second.get());
+    }
+
+    DISABLE_COPYING(row_lock);
+
+    ~row_lock() {
+        if (txn_ != nullptr) {
+            cache_t *cache = txn_->cache();
+            ASSERT_NO_CORO_WAITING;
+            bool last = acq_.release();
+            if (last) {
+                auto it = cache->locks_.row_locks.find(row_);
+                rassert(it != cache->locks_.row_locks.end());
+                cache->locks_.row_locks.erase(it);
+            }
+            txn_ = nullptr;
+            row_ = "";
+        }
+    }
+
+    const signal_t *write_acq_signal() {
+        return acq_.acq_signal();
+    }
+
+    txn_t *txn_;
+    // TODO: Something other than std::string?  An iterator?  Idk.
+    std::string row_;
+    new_mutex_in_line_t acq_;
 };
 
 

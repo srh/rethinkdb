@@ -31,6 +31,10 @@ public:
 
     new_mutex_in_line_t(new_mutex_in_line_t &&) = default;
 
+    void init(new_mutex_t *new_mutex) {
+        rwlock_in_line_.init(&new_mutex->rwlock_, access_t::write);
+    }
+
     const signal_t *acq_signal() const { return rwlock_in_line_.write_signal(); }
     // Returns true if the lock is unowned after we released it.
     bool release() { return rwlock_in_line_.release(); }
