@@ -44,6 +44,8 @@ private:
 class lock_state {
 public:
     rwlock_t real_superblock_lock;
+    uint64_t next_write_acquirer = 1;
+    uint64_t high_waterline = 0;
 };
 
 class cache_t : public home_thread_mixin_t {
@@ -132,7 +134,13 @@ public:
         : txn_(txn),
           access_(access),
           write_semaphore_acq_(std::move(write_semaphore_acq)),
-          acq_(&txn->cache()->locks_.real_superblock_lock, access) {}
+          acq_(&txn->cache()->locks_.real_superblock_lock, access) {
+        if (access == access_t::write) {
+            write_acq_sequence_number_ = txn->cache()->locks_.next_write_acquirer++;
+        } else {
+            write_acq_sequence_number_ = 0;
+        }
+    }
 
     txn_t *txn() { return txn_; }
     access_t access() const { return access_; }
@@ -153,6 +161,7 @@ public:
         txn_ = nullptr;
         acq_.reset();
         write_semaphore_acq_.reset();
+        write_acq_sequence_number_ = 0;
     }
 
     rocksdb::WriteBatchWithIndex *wait_read_batch() {
@@ -174,6 +183,7 @@ public:
     // TODO: We should (with rocks) always let reads jump the line ahead of writes?
     new_semaphore_in_line_t write_semaphore_acq_;
     rwlock_in_line_t acq_;
+    uint64_t write_acq_sequence_number_;
 };
 
 

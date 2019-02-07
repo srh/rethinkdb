@@ -149,6 +149,8 @@ void txn_t::commit(rockstore::store *rocks, scoped_ptr_t<real_superblock_lock> s
 
     rocks->write_batch(superblock->wait_write_batch()->GetWriteBatch(), rockstore::write_options(sync));
     cache_->batch = make_scoped<rocksdb::WriteBatchWithIndex>();
+    guarantee(cache_->locks_.high_waterline == superblock->write_acq_sequence_number_ - 1);
+    cache_->locks_.high_waterline = superblock->write_acq_sequence_number_;
     superblock.reset();
 }
 
