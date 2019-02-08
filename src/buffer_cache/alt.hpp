@@ -43,6 +43,17 @@ private:
     DISABLE_COPYING(alt_txn_throttler_t);
 };
 
+class store_state {
+public:
+    store_state() : batch(new rocksdb::WriteBatchWithIndex()) {}
+    // TODO: Add status checks to every usage.
+    // TODO: It would be nice to just avoid duplicate secondary index writing, so
+    // we can use a plain WriteBatch.
+    scoped_ptr_t<rocksdb::WriteBatchWithIndex> batch;
+    uint64_t next_write_acquirer = 1;
+    uint64_t high_waterline = 0;
+};
+
 class lock_state {
 public:
     rwlock_t real_superblock_lock;
@@ -63,10 +74,7 @@ public:
     // might consider supporting a mem_cap paremeter.
     cache_account_t create_cache_account(int priority);
 
-    // TODO: Add status checks to every usage.
-    // TODO: It would be nice to just avoid duplicate secondary index writing, so
-    // we can use a plain WriteBatch.
-    scoped_ptr_t<rocksdb::WriteBatchWithIndex> batch;
+    store_state store;
 
 private:
     friend class txn_t;
@@ -170,12 +178,12 @@ public:
 
     rocksdb::WriteBatchWithIndex *wait_read_batch() {
         read_acq_signal()->wait();
-        return txn_->cache()->batch.get();
+        return txn_->cache()->store.batch.get();
     }
 
     rocksdb::WriteBatchWithIndex *wait_write_batch() {
         write_acq_signal()->wait();
-        return txn_->cache()->batch.get();
+        return txn_->cache()->store.batch.get();
     }
 
     txn_t *txn_;
