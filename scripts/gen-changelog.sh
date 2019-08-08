@@ -11,8 +11,8 @@
 TIMESTAMP_TIME="`date "+%a, %d %b %Y %H:%M:%S"`" ;
 TIMESTAMP_OFFSET="-0800" ;
 TIMESTAMP_FULL="$TIMESTAMP_TIME"" ""$TIMESTAMP_OFFSET" ;
-AGENT_NAME="RethinkDB Packaging"
-AGENT_MAIL="packaging@rethinkdb.com"
+AGENT_NAME="SRH Packaging"
+AGENT_MAIL="packaging@samuelhughes.com"
 
 echo "$PRODUCT_NAME ($PRODUCT_VERSION) $OS_RELEASE; urgency=low"
 echo

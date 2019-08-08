@@ -1,7 +1,7 @@
 Source: VERSIONED_QUALIFIED_PACKAGE_NAME
 Section: database
 Priority: optional
-Maintainer: RethinkDB <packaging@rethinkdb.com>
+Maintainer: SRH Packaging <packaging@samuelhughes.com>
 Build-Depends: DEB_BUILD_DEPENDS
 Homepage: http://www.rethinkdb.com
 
