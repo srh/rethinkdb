@@ -107,7 +107,6 @@ void store_t::help_construct_bring_sindexes_up_to_date() {
 void acquire_sindex_for_read(
     store_t *store,
     real_superblock_lock *superblock,
-    release_superblock_t release_superblock,
     const std::string &table_name,
     const std::string &sindex_id,
     sindex_disk_info_t *sindex_info_out,
@@ -181,7 +180,6 @@ void do_snap_read(
             acquire_sindex_for_read(
                     store,
                     superblock.get(),
-                    release_superblock_t::KEEP,  // TODO: This is unused.
                     rget.table_name,
                     rget.sindex->id,
                     &sindex_info,
@@ -278,7 +276,6 @@ void do_read(rockshard rocksh,
             acquire_sindex_for_read(
                     store,
                     superblock,
-                    release_superblock_t::KEEP,
                     rget.table_name,
                     rget.sindex->id,
                     &sindex_info,
@@ -544,7 +541,6 @@ struct rdb_read_visitor_t : public boost::static_visitor<void> {
             acquire_sindex_for_read(
                     store,
                     superblock.get(),
-                    release_superblock_t::RELEASE,
                     geo_read.table_name,
                     geo_read.sindex.id,
                     &sindex_info, &sindex_uuid);
@@ -608,7 +604,6 @@ struct rdb_read_visitor_t : public boost::static_visitor<void> {
             acquire_sindex_for_read(
                     store,
                     superblock.get(),
-                    release_superblock_t::RELEASE,
                     geo_read.table_name,
                     geo_read.sindex_id,
                     &sindex_info, &sindex_uuid);
