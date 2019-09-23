@@ -167,13 +167,14 @@ protected:
         grouped_acc_t::finish_impl(last_cb, out);
     }
 
-    void stop_at_boundary(store_key_t &&key) final {
+    void stop_at_boundary(store_key_t &&key_param) final {
+        store_key_t key = std::move(key_param);
         for (auto &&pair : *get_acc()) {
             for (auto &&stream_pair : pair.second.substreams) {
                 // We have to do it this way rather than using the end of
                 // the range in `stream_pair.first` because we might be
                 // sorting by an sindex.
-                stream_pair.second.last_key = std::move(key);
+                stream_pair.second.last_key = key;
             }
         }
     }
