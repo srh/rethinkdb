@@ -59,10 +59,30 @@ static store_key_t interpolate_key(store_key_t in1, store_key_t in2, double frac
     return out;
 }
 
+// The use of decrement_key here is called on keys that are within O(n)
+// decrements of the maximum key value.  Thus, the keys are already MAX_KEY_SIZE
+// bytes long, and we aren't inflating key lengths.  This is all a hypothetical,
+// anyway.
+bool decrement_key(store_key_t *key) {
+    std::string &str = key->str();
+    if (str.empty()) {
+        return false;
+    } else if (str.back() != 0) {
+        str.back() = static_cast<uint8_t>(str.back()) - 1;
+        for (int i = str.size(); i < MAX_KEY_SIZE; i++) {
+            str.push_back(static_cast<char>(255));
+        }
+        return true;
+    } else {
+        str.pop_back();
+        return true;
+    }
+}
+
 /* `ensure_distinct()` ensures that all of the `store_key_t`s in the given vector are
 distinct from eachother. Initially, they should be non-strictly monotonically increasing;
 upon return, they will be strictly monotonically increasing. */
-static void ensure_distinct(std::vector<store_key_t> *split_points) {
+void ensure_distinct(std::vector<store_key_t> *split_points) {
     for (size_t i = 1; i < split_points->size(); ++i) {
         /* Make sure the initial condition is met */
         guarantee(split_points->at(i) >= split_points->at(i-1));
@@ -76,7 +96,7 @@ static void ensure_distinct(std::vector<store_key_t> *split_points) {
                 unlikely in practice, but we handle it anyway. */
                 size_t j = i;
                 while (j > 1 && split_points->at(j) == split_points->at(j-1)) {
-                    bool ok2 = split_points->at(j-1).decrement();
+                    bool ok2 = decrement_key(&split_points->at(j-1));
                     guarantee(ok2);
                     --j;
                 }
