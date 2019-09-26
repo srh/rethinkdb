@@ -8,6 +8,7 @@
 #include <utility>
 #include <vector>
 
+#include "btree/virtual_key.hpp"
 #include "buffer_cache/types.hpp"   // for `write_durability_t`
 #include "clustering/administration/servers/server_metadata.hpp"
 #include "clustering/generic/nonoverlapping_regions.hpp"
@@ -84,7 +85,7 @@ public:
     }
 
     key_range_t get_shard_range(size_t i) const;
-    size_t find_shard_for_key(const store_key_t &key) const;
+    size_t find_shard_for_key(const virtual_key &key) const;
 };
 
 RDB_DECLARE_SERIALIZABLE(table_shard_scheme_t);
