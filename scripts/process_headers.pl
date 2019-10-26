@@ -46,8 +46,6 @@
 use strict;
 use File::Find;
 
-chdir 'src';  # (Does nothing if we're already in the src directory.)
-
 my @paths;
 
 my %edges;
@@ -63,9 +61,13 @@ sub callback {
     push @paths, $path;
 }
 
+chdir 'src';  # (Does nothing if we're already in the src directory.)
 find(\&callback, ".");
 
 for my $path (@paths) {
+    if ($path =~ m!^\./rocksdb/!) {
+        continue;
+    }
 
     open(my $FH, '<', $path) or die "could not open $path\n";
 
@@ -75,6 +77,10 @@ for my $path (@paths) {
     while (<$FH>) {
         if (/^#include\s+"(.*)"/ && !/NOPROCESS/) {
             my $header = $1;
+            if ($header =~ /^rocksdb\//) {
+                $boosts{$path}->{$header} = 1;
+                next;
+            }
             $header =~ s!^!./!;
             $header =~ s!^\./\./!./!;
             if ($header =~ /\.\./) {
