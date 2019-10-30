@@ -132,6 +132,10 @@ class Connection extends events.EventEmitter
     # results.
     DEFAULT_TIMEOUT: 20 # In seconds
 
+    # The class we use to construct a connection by r.connect.  This holds
+    # TcpConnection, unless it gets assigned by the admin UI.
+    _connectionClass: null
+
     # #### Connection constructor
     constructor: (host, callback) ->
         # We need to set the defaults if the user hasn't supplied anything.
@@ -920,25 +924,12 @@ pbkdf2_cache = {}
 # connection to the server.
 class TcpConnection extends Connection
 
-    # #### TcpConnection isAvailable method
-    #
-    # The TcpConnection should never be used by the webui, so we have
-    # an extra method here that decides whether it's available. This
-    # is called by the constructor, but also by the `.connect`
-    # function which uses it to decide what kind of connection to
-    # create.
-    @isAvailable: () -> !(process.browser)
-
     # #### TcpConnection constructor method
     #
     # This sets up all aspects of the connection that relate to
     # TCP. Everything else is done in the Connection superclass
     # constructor.
     constructor: (host, callback) ->
-        # Bail out early if we happen to be in the browser
-        unless TcpConnection.isAvailable()
-            throw new err.ReqlDriverError "TCP sockets are not available in this environment"
-
         # Invoke the superclass's constructor. This initializes the
         # attributes `@host`, `@port`, `@db`, `@authKey` and
         # `@timeout`, `@outstandingCallbacks`, `@nextToken`, `@open`,
@@ -1389,12 +1380,6 @@ class HttpConnection extends Connection
     # one.
     DEFAULT_PROTOCOL: 'http'
 
-    # A static method used by `r.connect` to decide which kind of
-    # connection to create in a given environment. Here we check if
-    # XHRs are defined. If not, we aren't in the browser and shouldn't
-    # be using `HttpConnection`
-    @isAvailable: -> typeof XMLHttpRequest isnt "undefined"
-
     # #### HttpConnection constructor method
     #
     # This method sets up the XMLHttpRequest object that all
@@ -1415,7 +1400,7 @@ class HttpConnection extends Connection
     # cursors and feeds.
     constructor: (host, callback) ->
         # A quick check to ensure we can create an `HttpConnection`
-        unless HttpConnection.isAvailable()
+        if typeof XMLHttpRequest is "undefined"
             throw new err.ReqlDriverError "XMLHttpRequest is not available in this environment"
         # Call the superclass constructor. This initializes the
         # attributes `@host`, `@port`, `@db`, `@authKey`, `@timeout`,
@@ -1614,6 +1599,8 @@ class HttpConnection extends Connection
 module.exports.isConnection = (connection) ->
     return connection instanceof Connection
 
+Connection._connectionClass = TcpConnection
+
 # ## connect
 #
 # The main function of this module, which is exposed to end users as
@@ -1651,20 +1638,15 @@ module.exports.connect = varar 0, 2, (hostOrCallback, callback) ->
             # Fixing mismatch between drivers
             if host.username?
                 host.user = host.username
-        create_connection = (host, callback) =>
-            if TcpConnection.isAvailable()
-                new TcpConnection host, callback
-            else if HttpConnection.isAvailable()
-                new HttpConnection host, callback
-            else
-                throw new err.ReqlDriverError "Neither TCP nor HTTP avaiable in this environment"
 
         wrappedCb = (err, result) ->
             if (err)
                 reject(err)
             else
                 resolve(result)
-        create_connection(host, wrappedCb)
+        # connectionClass is TcpConnection or HttpConnection
+        connectionClass = Connection._connectionClass
+        new connectionClass(host, wrappedCb)
     ).nodeify callback
 
 # Exposing the connection classes

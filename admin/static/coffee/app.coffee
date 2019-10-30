@@ -31,6 +31,9 @@ class Driver
     # We want run() to throw an error, in case a user write .run() in a query.
     # We'll internally run a query with the method `private_run`
     hack_driver: =>
+        # While we're at it, hack the driver to use HttpConnection.
+        r.net.Connection._connectionClass = r.net.HttpConnection
+
         TermBase = r.expr(1).constructor.__super__.constructor.__super__
         if not TermBase.private_run?
             that = @
