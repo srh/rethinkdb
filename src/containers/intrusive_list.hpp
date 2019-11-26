@@ -58,7 +58,7 @@ public:
         this->next_ = this;
     }
 
-    intrusive_list_t(intrusive_list_t &&movee) : size_(0) {
+    intrusive_list_t(intrusive_list_t &&movee) noexcept : size_(0) {
         // We just initialize ourselves to empty and then use append_and_clear.
         this->prev_ = this;
         this->next_ = this;
