@@ -1,6 +1,8 @@
 #ifndef RDB_PROTOCOL_DATUM_STREAM_ORDERED_UNION_HPP_
 #define RDB_PROTOCOL_DATUM_STREAM_ORDERED_UNION_HPP_
 
+#include <queue>
+
 #include "rdb_protocol/datum_stream.hpp"
 #include "rdb_protocol/order_util.hpp"
 

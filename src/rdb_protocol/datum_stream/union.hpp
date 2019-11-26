@@ -1,6 +1,8 @@
 #ifndef RDB_PROTOCOL_DATUM_STREAM_UNION_HPP_
 #define RDB_PROTOCOL_DATUM_STREAM_UNION_HPP_
 
+#include <deque>
+
 #include "rdb_protocol/datum_stream.hpp"
 #include "concurrency/coro_pool.hpp"
 #include "concurrency/queue/unlimited_fifo.hpp"
@@ -70,7 +72,7 @@ private:
     promise_t<std::exception_ptr> abort_exc;
     scoped_ptr_t<cond_t> data_available;
 
-    std::queue<std::vector<datum_t> > queue; // FIFO
+    std::deque<std::vector<datum_t> > queue; // FIFO
 
     auto_drainer_t drainer;
 };

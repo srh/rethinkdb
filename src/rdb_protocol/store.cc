@@ -1,8 +1,6 @@
 // Copyright 2010-2014 RethinkDB, all rights reserved.
 #include "rdb_protocol/store.hpp"
 
-#include <list>
-
 #include "btree/backfill_debug.hpp"
 #include "btree/reql_specific.hpp"
 #include "btree/superblock.hpp"

@@ -4,10 +4,7 @@
 
 #include <algorithm>
 #include <deque>
-#include <list>
 #include <map>
-#include <queue>
-#include <set>
 #include <string>
 #include <utility>
 #include <vector>

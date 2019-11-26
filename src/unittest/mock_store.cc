@@ -1,5 +1,7 @@
 #include "unittest/mock_store.hpp"
 
+#include <deque>
+
 #include "arch/timing.hpp"
 #include "btree/backfill.hpp"
 #include "random.hpp"
@@ -324,7 +326,7 @@ continue_bool_t mock_store_t::send_backfill(
     key_range_t::right_bound_t table_cursor(start_point.get_domain().inner.left);
     key_range_t::right_bound_t right_bound = start_point.get_domain().inner.right;
 
-    std::list<backfill_pre_item_t> pre_items;
+    std::deque<backfill_pre_item_t> pre_items;
     key_range_t::right_bound_t pre_items_limit = table_cursor;
     auto more_pre_items = [&]() -> continue_bool_t {
         return pre_item_producer->consume_range(

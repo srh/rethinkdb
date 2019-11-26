@@ -3,9 +3,6 @@
 
 #include <stdint.h>
 
-#include <map>
-#include <list>
-
 #include "arch/runtime/system_event.hpp"
 #include "arch/runtime/event_queue_types.hpp"
 #include "arch/runtime/runtime_utils.hpp"

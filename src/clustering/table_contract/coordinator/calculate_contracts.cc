@@ -195,7 +195,8 @@ contract_t calculate_contract(
         /* Step 2: Remove voters */
         /* We try to remove non-streaming replicas first before we start removing
         streaming ones to maximize availability in case a replica fails. */
-        std::list<server_id_t> to_remove;
+        std::vector<server_id_t> to_remove_last;
+        std::vector<server_id_t> to_remove;
         for (const server_id_t &server : new_voters) {
             if (config_voting_replicas.count(server) > 0) {
                 /* The replica should remain a voter */
@@ -204,13 +205,14 @@ contract_t calculate_contract(
             if (is_streaming(old_c, acks, server)) {
                 /* The replica is streaming. Put it at the end of the `to_remove`
                 list. */
-                to_remove.push_back(server);
+                to_remove_last.push_back(server);
             } else {
                 /* The replica is not streaming. Removing it doesn't hurt
                 availability, so we put it at the front of the `to_remove` list. */
-                to_remove.push_front(server);
+                to_remove.push_back(server);
             }
         }
+        to_remove.insert(to_remove.end(), to_remove_last.begin(), to_remove_last.end());
 
         size_t num_streaming = 0;
         for (const server_id_t &server : new_voters) {

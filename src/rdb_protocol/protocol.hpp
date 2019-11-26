@@ -3,7 +3,6 @@
 #define RDB_PROTOCOL_PROTOCOL_HPP_
 
 #include <algorithm>
-#include <list>
 #include <map>
 #include <set>
 #include <string>

@@ -2,7 +2,7 @@
 #ifndef CONCURRENCY_QUEUE_DISK_BACKED_QUEUE_WRAPPER_HPP_
 #define CONCURRENCY_QUEUE_DISK_BACKED_QUEUE_WRAPPER_HPP_
 
-#include <list>
+#include <deque>
 #include <string>
 
 #include "assignment_sentry.hpp"
@@ -144,7 +144,7 @@ private:
     availability_control_t available_control;
     mutex_t push_mutex;
     scoped_ptr_t<internal_disk_backed_queue_t> disk_queue;
-    std::list<write_message_t> memory_queue;
+    std::deque<write_message_t> memory_queue;
     // Note that `memory_queue_free_space` can sometimes be negative
     int64_t memory_queue_free_space;
     cond_t *notify_when_room_in_memory_queue;

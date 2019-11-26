@@ -2,7 +2,6 @@
 #ifndef RDB_PROTOCOL_ERROR_HPP_
 #define RDB_PROTOCOL_ERROR_HPP_
 
-#include <list>
 #include <string>
 
 #include "errors.hpp"
