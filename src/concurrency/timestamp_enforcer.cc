@@ -25,7 +25,7 @@ void timestamp_enforcer_t::complete(state_timestamp_t completed) {
             timestamp = timestamp.next();
             future_completed.erase(future_completed.begin());
         }
-        for (auto it = waiters.begin(); it != waiters.upper_bound(timestamp); ++it) {
+        for (auto it = waiters.begin(), e = waiters.upper_bound(timestamp); it != e; ++it) {
             it->second->pulse_if_not_already_pulsed();
         }
     } else {
