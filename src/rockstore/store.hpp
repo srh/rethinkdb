@@ -100,9 +100,8 @@ std::string table_primary_key(namespace_id_t id, int shard_no, const std::string
 
 std::string prefix_end(const std::string &prefix);
 
-// TODO: Don't have a table metadata version key?  Just have a single global version?
+// TODO: Make sure we have a single global file format version in the file somewhere.
 inline const char * VERSION() { return "v2_4"; }
-inline const char * TABLE_METADATA_VERSION_KEY() { return "version"; }
 inline const char * TABLE_METADATA_METAINFO_KEY() { return "metainfo"; }
 
 }  // namespace rockstore

@@ -82,16 +82,9 @@ void get_superblock_metainfo(
         std::vector<std::pair<std::vector<char>, std::vector<char> > > *kv_pairs_out) {
     superblock->read_acq_signal()->wait_lazily_ordered();
 
-    std::string meta_prefix = rockstore::table_metadata_prefix(rocksh.table_id, rocksh.shard_no);
-    std::string version
-        = rocksh.rocks->read(meta_prefix + rockstore::TABLE_METADATA_VERSION_KEY());
-    std::string metainfo
-        = rocksh.rocks->read(meta_prefix + rockstore::TABLE_METADATA_METAINFO_KEY());
-
-    // TODO: Do we even need this field?
-    if (version != rockstore::VERSION()) {
-        crash("Unrecognized metainfo version found.");
-    }
+    std::string metainfo_key = rockstore::table_metadata_prefix(rocksh.table_id, rocksh.shard_no)
+        + rockstore::TABLE_METADATA_METAINFO_KEY();
+    std::string metainfo = rocksh.rocks->read(metainfo_key);
 
     for (superblock_metainfo_iterator_t kv_iter(metainfo.data(), metainfo.data() + metainfo.size()); !kv_iter.is_end(); ++kv_iter) {
         superblock_metainfo_iterator_t::key_t key = kv_iter.key();
@@ -145,13 +138,7 @@ void set_superblock_metainfo(real_superblock_lock *superblock,
     // Rocksdb metadata.
     rocksdb::WriteBatch batch;
     std::string meta_prefix = rockstore::table_metadata_prefix(rocksh.table_id, rocksh.shard_no);
-    // TODO: Don't update version if it's already properly set.  (Performance.)
-    // TODO: Just remove the metadata version key...?
     rocksdb::Status status = superblock->wait_write_batch()->Put(
-        meta_prefix + rockstore::TABLE_METADATA_VERSION_KEY(),
-        rockstore::VERSION());
-    guarantee(status.ok());
-    status = superblock->wait_write_batch()->Put(
         meta_prefix + rockstore::TABLE_METADATA_METAINFO_KEY(),
         rocksdb::Slice(metainfo.data(), metainfo.size()));
     guarantee(status.ok());
