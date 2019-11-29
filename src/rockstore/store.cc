@@ -184,7 +184,7 @@ void store::sync() {
     });
     if (!status.ok()) {
         // TODO
-        throw std::runtime_error("store::write_batch failed");
+        throw std::runtime_error("store::sync failed");
     }
     return;
 }
