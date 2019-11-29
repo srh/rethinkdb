@@ -133,8 +133,6 @@ void set_superblock_metainfo(real_superblock_lock *superblock,
             static_cast<const uint8_t *>(value_it->data()) + value_it->size());
     }
 
-    // TODO: buffer_group_copy_data -- does anybody use it?
-
     // Rocksdb metadata.
     rocksdb::WriteBatch batch;
     std::string meta_prefix = rockstore::table_metadata_prefix(rocksh.table_id, rocksh.shard_no);
