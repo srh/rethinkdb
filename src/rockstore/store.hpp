@@ -63,11 +63,6 @@ public:
     // TODO: This isn't an atomic op, is it?  Rename this?  Suitable for metadata?
     void deprecated_insert(const std::string &key, const std::string &value, const write_options &opts);
 
-private:
-    // TODO: Remove, unused.
-    // Throws std::runtime_error.
-    void deprecated_remove(const std::string &key, const write_options &opts);
-
 public:
 
     // Throws std::runtime_error.

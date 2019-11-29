@@ -189,18 +189,6 @@ void store::sync() {
     return;
 }
 
-void store::deprecated_remove(const std::string &key, const write_options &opts) {
-    rocksdb::Status status;
-    linux_thread_pool_t::run_in_blocker_pool([&]() {
-        status = db_->Delete(to_rocks(opts), key);
-    });
-    if (!status.ok()) {
-        // TODO
-        throw std::runtime_error("store::remove failed");
-    }
-    return;
-}
-
 std::string table_overall_prefix(namespace_id_t id) {
     std::string ret = "tables/";
     ret += uuid_to_str(id);
