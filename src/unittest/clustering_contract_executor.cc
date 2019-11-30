@@ -97,7 +97,7 @@ public:
             server_id(_server_id) {
         int next_thread = 0;
         for (size_t i = 0; i < CPU_SHARDING_FACTOR; ++i) {
-            stores[i].init(new mock_store_t(binary_blob_t(version_t::zero())));
+            stores[i].init(new mock_store_t(version_t::zero()));
             stores[i]->rethread(threadnum_t(next_thread));
             next_thread = (next_thread + 1) % get_num_threads();
         }

@@ -45,7 +45,7 @@ void replica_t::do_read(
 
 #ifndef NDEBUG
     metainfo_checker_t metainfo_checker(store->get_region(),
-        [](const region_t &, const binary_blob_t &) { });
+        [](const region_t &, const version_t &) { });
 #endif
 
     // Perform the operation
@@ -84,17 +84,17 @@ void replica_t::do_write(
 
 #ifndef NDEBUG
     metainfo_checker_t metainfo_checker(store->get_region(),
-        [&](const region_t &, const binary_blob_t &bb) {
-            rassert(binary_blob_t::get<version_t>(bb).timestamp <= timestamp.pred());
+        [&](const region_t &, const version_t &bb) {
+            rassert(bb.timestamp <= timestamp.pred());
         });
 #endif
 
     // Perform the operation
     store->write(
         DEBUG_ONLY(metainfo_checker, )
-        region_map_t<binary_blob_t>(
+        region_map_t<version_t>(
             store->get_region(),
-            binary_blob_t(version_t(branch_id, timestamp))),
+            version_t(branch_id, timestamp)),
         write,
         response_out,
         durability,

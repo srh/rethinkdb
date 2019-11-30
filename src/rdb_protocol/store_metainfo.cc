@@ -2,6 +2,7 @@
 #include "rdb_protocol/store_metainfo.hpp"
 
 #include "btree/reql_specific.hpp"
+#include "clustering/immediate_consistency/history.hpp"
 #include "containers/archive/buffer_stream.hpp"
 #include "containers/archive/vector_stream.hpp"
 #include "rockstore/rockshard.hpp"
@@ -11,7 +12,7 @@ store_metainfo_manager_t::store_metainfo_manager_t(rockshard rocksh, real_superb
     // TODO: this is inefficient, cut out the middleman (vector)
     get_superblock_metainfo(rocksh, superblock, &kv_pairs);
     std::vector<region_t> regions;
-    std::vector<binary_blob_t> values;
+    std::vector<version_t> values;
     for (auto &pair : kv_pairs) {
         region_t region;
         {
@@ -20,14 +21,16 @@ store_metainfo_manager_t::store_metainfo_manager_t(rockshard rocksh, real_superb
             guarantee_deserialization(res, "region");
         }
         regions.push_back(region);
-        values.push_back(binary_blob_t(pair.second.begin(), pair.second.end()));
+        guarantee(pair.second.size() == sizeof(version_t));
+        version_t value = *reinterpret_cast<const version_t *>(pair.second.data());
+        values.push_back(value);
     }
-    cache = region_map_t<binary_blob_t>::from_unordered_fragments(
-        std::move(regions), std::move(values));;
+    cache = region_map_t<version_t>::from_unordered_fragments(
+        std::move(regions), std::move(values));
     rassert(cache.get_domain() == region_t::universe());
 }
 
-region_map_t<binary_blob_t> store_metainfo_manager_t::get(
+region_map_t<version_t> store_metainfo_manager_t::get(
         real_superblock_lock *superblock,
         const region_t &region) const {
     guarantee(superblock != nullptr);
@@ -38,7 +41,7 @@ region_map_t<binary_blob_t> store_metainfo_manager_t::get(
 void store_metainfo_manager_t::visit(
         real_superblock_lock *superblock,
         const region_t &region,
-        const std::function<void(const region_t &, const binary_blob_t &)> &cb) const {
+        const std::function<void(const region_t &, const version_t &)> &cb) const {
     guarantee(superblock != nullptr);
     superblock->read_acq_signal()->wait_lazily_ordered();
     cache.visit(region, cb);
@@ -47,7 +50,7 @@ void store_metainfo_manager_t::visit(
 void store_metainfo_manager_t::update(
         real_superblock_lock *superblock,
         rockshard rocksh,
-        const region_map_t<binary_blob_t> &new_values) {
+        const region_map_t<version_t> &new_values) {
     // TODO: Strip out non-rocks writing (but keep superblock write acquisition waiting).
     guarantee(superblock != nullptr);
     superblock->write_acq_signal()->wait_lazily_ordered();
@@ -55,9 +58,9 @@ void store_metainfo_manager_t::update(
     cache.update(new_values);
 
     std::vector<std::vector<char> > keys;
-    std::vector<binary_blob_t> values;
+    std::vector<version_t> values;
     cache.visit(region_t::universe(),
-        [&](const region_t &region, const binary_blob_t &value) {
+        [&](const region_t &region, const version_t &value) {
             vector_stream_t key;
             write_message_t wm;
             serialize_for_metainfo(&wm, region);

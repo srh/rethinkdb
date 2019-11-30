@@ -6,6 +6,7 @@
 #include "arch/timing.hpp"
 #include "btree/operations.hpp"
 #include "btree/reql_specific.hpp"
+#include "clustering/immediate_consistency/history.hpp"
 #include "containers/archive/boost_types.hpp"
 #include "containers/archive/vector_stream.hpp"
 #include "containers/uuid.hpp"
@@ -251,6 +252,7 @@ TPTEST(RDBBtree, SindexPostConstruct) {
             io_backender.rocks(),
             "unit_test_store",
             true,
+            version_t::zero(),
             &get_global_perfmon_collection(),
             nullptr,
             &io_backender,
@@ -282,6 +284,7 @@ TPTEST(RDBBtree, SindexEraseRange) {
             io_backender.rocks(),
             "unit_test_store",
             true,
+            version_t::zero(),
             &get_global_perfmon_collection(),
             nullptr,
             &io_backender,
@@ -352,6 +355,7 @@ TPTEST(RDBBtree, SindexInterruptionViaDrop) {
             io_backender.rocks(),
             "unit_test_store",
             true,
+            version_t::zero(),
             &get_global_perfmon_collection(),
             nullptr,
             &io_backender,
@@ -383,6 +387,7 @@ TPTEST(RDBBtree, SindexInterruptionViaStoreDelete) {
             io_backender.rocks(),
             "unit_test_store",
             true,
+            version_t::zero(),
             &get_global_perfmon_collection(),
             nullptr,
             &io_backender,

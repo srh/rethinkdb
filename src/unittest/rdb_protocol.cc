@@ -72,6 +72,7 @@ void run_with_namespace_interface(
             underlying_stores.push_back(
                     make_scoped<store_t>(region_t::universe(), i, io_backender.rocks(),
                         temp_files[i]->name().permanent_path().c_str(), do_create,
+                        version_t::zero(),
                         &get_global_perfmon_collection(), &ctx, &io_backender,
                         base_path_t("."), table_id, update_sindexes_t::UPDATE));
         }

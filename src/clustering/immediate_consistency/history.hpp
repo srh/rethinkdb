@@ -13,8 +13,6 @@
 #include "timestamps.hpp"
 #include "utils.hpp"
 
-class binary_blob_t;
-
 /* The type `version_t` uniquely identifies the state of some region of a RethinkDB table
 at some point in time. Every read operation that passes through a `broadcaster_t` will
 get all its data from the version that the broadcaster is at at the time that the read
@@ -29,7 +27,9 @@ when the `broadcaster_t` was created, and the timestamp will be a number that th
 `broadcaster_t` increments every time a write operation passes through it. (Warning: The
 timestamp is usually not zero for a new `broadcaster_t`.) */
 
-class version_t {
+// We need ATTR_PACKED for some reinterpret_cast<const version_t *> operations.
+// (Previously, we _should_ have had ATTR_PACKED for use with binary_blob_t.)
+ATTR_PACKED(class version_t {
 public:
     version_t() { }
     version_t(branch_id_t bid, state_timestamp_t ts) :
@@ -47,7 +47,7 @@ public:
 
     branch_id_t branch;
     state_timestamp_t timestamp;
-};
+});
 
 RDB_DECLARE_SERIALIZABLE(version_t);
 
@@ -58,9 +58,6 @@ inline void debug_print(printf_buffer_t *buf, const version_t& v) {
     debug_print(buf, v.timestamp);
     buf->appendf("}");
 }
-
-region_map_t<version_t> to_version_map(const region_map_t<binary_blob_t> &blob_map);
-region_map_t<binary_blob_t> from_version_map(const region_map_t<version_t> &version_map);
 
 /* The state of the database at the time that the `broadcaster_t` was created and the
 sequence of writes that pass through a `broadcaster_t` are collectively referred to as a

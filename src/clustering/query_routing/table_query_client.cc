@@ -462,7 +462,7 @@ void table_query_client_t::dispatch_debug_direct_read(
                     on_thread_t thread_switcher_2(store->home_thread());
 #ifndef NDEBUG
                     metainfo_checker_t checker(
-                        region, [](const region_t &, const binary_blob_t &) {});
+                        region, [](const region_t &, const version_t &) {});
 #endif /* NDEBUG */
                     read_token_t token;
                     store->new_read_token(&token);

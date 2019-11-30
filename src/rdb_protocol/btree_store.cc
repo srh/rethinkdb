@@ -85,6 +85,7 @@ store_t::store_t(const region_t &_region,
                  rockstore::store *_rocks,
                  const char *perfmon_prefix,
                  bool create,
+                 version_t zero_version,
                  perfmon_collection_t *parent_perfmon_collection,
                  rdb_context_t *_ctx,
                  io_backender_t *io_backender,
@@ -125,7 +126,7 @@ store_t::store_t(const region_t &_region,
         // lock ordering logic, when we go rocks-only.
         // TODO: Not to mention... file existence logic.
         btree_slice_t::init_real_superblock(
-            superblock.get(), rocksh(), key.vector(), binary_blob_t());
+            superblock.get(), rocksh(), key.vector(), zero_version);
         txn.commit(rocks, std::move(superblock));
     }
 
@@ -208,7 +209,7 @@ void store_t::read(
 
 void store_t::write(
         DEBUG_ONLY(const metainfo_checker_t& metainfo_checker, )
-        const region_map_t<binary_blob_t>& new_metainfo,
+        const region_map_t<version_t>& new_metainfo,
         const write_t &_write,
         write_response_t *response,
         const write_durability_t durability,
@@ -233,7 +234,7 @@ void store_t::write(
 }
 
 void store_t::reset_data(
-        const binary_blob_t &zero_metainfo,
+        const version_t &zero_metainfo,
         const region_t &subregion,
         const write_durability_t durability,
         signal_t *interruptor)
@@ -281,7 +282,7 @@ void store_t::reset_data(
         region_t deleted_region(subregion.beg, subregion.end, deleted_range);
         metainfo->update(superblock.get(),
                          rocksh(),
-                         region_map_t<binary_blob_t>(deleted_region, zero_metainfo));
+                         region_map_t<version_t>(deleted_region, zero_metainfo));
 
         if (!mod_reports.empty()) {
             // TODO: Pass along the transactionality from rdb_erase_small_range for rocksdb.
@@ -988,7 +989,7 @@ bool store_t::acquire_sindex_superblocks_for_write(
     return !sindexes_to_acquire || sindex_sbs_out->size() == sindexes_to_acquire->size();
 }
 
-region_map_t<binary_blob_t> store_t::get_metainfo(
+region_map_t<version_t> store_t::get_metainfo(
         UNUSED order_token_t order_token,  // TODO
         read_token_t *token,
         const region_t &_region,
@@ -1003,7 +1004,7 @@ region_map_t<binary_blob_t> store_t::get_metainfo(
     return metainfo->get(superblock.get(), _region);
 }
 
-void store_t::set_metainfo(const region_map_t<binary_blob_t> &new_metainfo,
+void store_t::set_metainfo(const region_map_t<version_t> &new_metainfo,
                            UNUSED order_token_t order_token,  // TODO
                            write_token_t *token,
                            write_durability_t durability,

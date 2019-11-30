@@ -25,9 +25,9 @@ local_replicator_t::local_replicator_t(
     certificate (just as a sanity check) */
     read_token_t read_token;
     store->new_read_token(&read_token);
-    region_map_t<version_t> origin = to_version_map(store->get_metainfo(
+    region_map_t<version_t> origin = store->get_metainfo(
         order_source.check_in("local_replica_t(read)").with_read_mode(),
-        &read_token, store->get_region(), interruptor));
+        &read_token, store->get_region(), interruptor);
     guarantee(origin == primary->get_branch_birth_certificate().origin);
     guarantee(store->get_region() ==
         primary->get_branch_birth_certificate().get_region());
@@ -48,11 +48,11 @@ local_replicator_t::local_replicator_t(
     write_token_t write_token;
     store->new_write_token(&write_token);
     store->set_metainfo(
-        region_map_t<binary_blob_t>(
+        region_map_t<version_t>(
             store->get_region(),
-            binary_blob_t(version_t(
+            version_t(
                 primary->get_branch_id(),
-                primary->get_branch_birth_certificate().initial_timestamp))),
+                primary->get_branch_birth_certificate().initial_timestamp)),
         order_source.check_in("local_replica_t(write)"),
         &write_token,
         write_durability_t::HARD,

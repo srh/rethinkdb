@@ -30,7 +30,7 @@ void erase_execution_t::run(auto_drainer_t::lock_t keepalive) {
         on_thread_t thread_switcher(store->home_thread());
         try {
             store->reset_data(
-                binary_blob_t(version_t::zero()),
+                version_t::zero(),
                 region,
                 write_durability_t::HARD,
                 &interruptor_store_thread);

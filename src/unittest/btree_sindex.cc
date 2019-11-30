@@ -5,6 +5,7 @@
 #include "btree/operations.hpp"
 #include "btree/reql_specific.hpp"
 #include "buffer_cache/alt.hpp"
+#include "clustering/immediate_consistency/history.hpp"
 #include "containers/uuid.hpp"
 #include "unittest/unittest_utils.hpp"
 #include "random.hpp"
@@ -31,7 +32,8 @@ TPTEST(BTreeSindex, LowLevelOps) {
 
         auto sb_lock = make_scoped<real_superblock_lock>(&txn, access_t::write, new_semaphore_in_line_t());
         btree_slice_t::init_real_superblock(
-            sb_lock.get(), rockshard(io_backender.rocks(), table_id, 0), std::vector<char>(), binary_blob_t());
+            sb_lock.get(), rockshard(io_backender.rocks(), table_id, 0),
+            std::vector<char>(), version_t::zero());
 
         txn.commit(rocksh.rocks, std::move(sb_lock));
     }

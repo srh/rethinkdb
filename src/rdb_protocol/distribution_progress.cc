@@ -13,7 +13,7 @@ distribution_progress_estimator_t::distribution_progress_estimator_t(
 #ifndef NDEBUG
     metainfo_checker_t metainfo_checker(
         store->get_region(),
-        [](const region_t &, const binary_blob_t &) { });
+        [](const region_t &, const version_t &) { });
 #endif
 
     distribution_read_t distribution_read(max_depth, result_limit);

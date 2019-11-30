@@ -7,6 +7,7 @@
 
 class backfill_item_t;
 class backfill_pre_item_t;
+class version_t;
 
 #ifndef NDEBUG
 // Checks that the metainfo has a certain value, or certain kind of value.
@@ -14,10 +15,10 @@ class metainfo_checker_t {
 public:
     metainfo_checker_t(
             const region_t &r,
-            const std::function<void(const region_t &, const binary_blob_t &)> &cb) :
+            const std::function<void(const region_t &, const version_t &)> &cb) :
         region(r), callback(cb) { }
     region_t region;
-    std::function<void(const region_t &, const binary_blob_t &)> callback;
+    std::function<void(const region_t &, const version_t &)> callback;
 };
 
 #endif  // NDEBUG
@@ -37,7 +38,7 @@ for some protocol.  It covers some `region_t`, which is returned by `get_region(
 
 In addition to the actual data, `store_view_t` is responsible for keeping track of
 metadata which is keyed by region. The metadata is currently implemented as opaque
-binary blob (`binary_blob_t`).
+binary blob (`version_t`).
 */
 
 class store_view_t : public home_thread_mixin_t {
@@ -57,7 +58,7 @@ public:
     virtual void new_write_token(write_token_t *token_out) = 0;
 
     /* Gets the metainfo. */
-    virtual region_map_t<binary_blob_t> get_metainfo(
+    virtual region_map_t<version_t> get_metainfo(
             order_token_t order_token,
             read_token_t *token,
             const region_t &region,
@@ -66,7 +67,7 @@ public:
 
     /* Replaces the metainfo in `new_metainfo`'s domain with `new_metainfo`. */
     virtual void set_metainfo(
-            const region_map_t<binary_blob_t> &new_metainfo,
+            const region_map_t<version_t> &new_metainfo,
             order_token_t order_token,
             write_token_t *token,
             write_durability_t durability,
@@ -85,7 +86,7 @@ public:
     and the write's region must be a subset of `new_metainfo`'s region. */
     virtual void write(
             DEBUG_ONLY(const metainfo_checker_t& metainfo_expecter, )
-            const region_map_t<binary_blob_t> &new_metainfo,
+            const region_map_t<version_t> &new_metainfo,
             const write_t &write,
             write_response_t *response,
             write_durability_t durability,
@@ -150,10 +151,10 @@ public:
         block for very long, because the caller may hold B-tree locks while calling them.
         */
         virtual void on_item(
-            const region_map_t<binary_blob_t> &metainfo,
+            const region_map_t<version_t> &metainfo,
             backfill_item_t &&item) THROWS_NOTHING = 0;
         virtual void on_empty_range(
-            const region_map_t<binary_blob_t> &metainfo,
+            const region_map_t<version_t> &metainfo,
             const key_range_t::right_bound_t &threshold) THROWS_NOTHING = 0;
     protected:
         virtual ~backfill_item_consumer_t() { }
@@ -220,7 +221,7 @@ public:
         may be invalidated if the calling coroutine yields, calls `next_item()`, or calls
         `on_commit()`. The metainfo is only guaranteed to be complete up to the
         right-hand side of the last item (or empty range) returned by `next_item()`. */
-        virtual const region_map_t<binary_blob_t> *get_metainfo() THROWS_NOTHING = 0;
+        virtual const region_map_t<version_t> *get_metainfo() THROWS_NOTHING = 0;
 
         virtual void on_commit(
             const key_range_t::right_bound_t &threshold) THROWS_NOTHING = 0;
@@ -244,7 +245,7 @@ public:
     /* Deletes every key in the region, and sets the metainfo for that region to
     `zero_version`. */
     virtual void reset_data(
-            const binary_blob_t &zero_version,
+            const version_t &zero_version,
             const region_t &subregion,
             write_durability_t durability,
             signal_t *interruptor)

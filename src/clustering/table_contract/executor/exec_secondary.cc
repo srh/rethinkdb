@@ -77,10 +77,10 @@ void secondary_execution_t::run(auto_drainer_t::lock_t keepalive) {
             contract_ack_t initial_ack(contract_ack_t::state_t::secondary_need_primary);
             read_token_t token;
             store->new_read_token(&token);
-            initial_ack.version.set(to_version_map(
+            initial_ack.version.set(
                 store->get_metainfo(
                     order_source.check_in("secondary_execution_t").with_read_mode(),
-                    &token, region, &interruptor_on_store_thread)));
+                    &token, region, &interruptor_on_store_thread));
 
             direct_query_server_t direct_query_server(context->mailbox_manager, store);
 

@@ -57,28 +57,13 @@ public:
                 rocks,
                 "shard",
                 create,
+                version_t::zero(),
                 perfmon_collection_serializers,
                 rdb_context,
                 io_backender,
                 base_path,
                 table_id,
                 update_sindexes_t::UPDATE));
-
-            /* Initialize the metainfo if necessary */
-            if (create) {
-                order_source_t order_source;
-                cond_t non_interruptor;
-                write_token_t write_token;
-                stores[ix]->new_write_token(&write_token);
-                stores[ix]->set_metainfo(
-                    region_map_t<binary_blob_t>(
-                        region_t::universe(),
-                        binary_blob_t(version_t::zero())),
-                    order_source.check_in("real_multistore_ptr_t"),
-                    &write_token,
-                    write_durability_t::HARD,
-                    &non_interruptor);
-            }
         });
 
         // We create existence key after we've actually created and initialized

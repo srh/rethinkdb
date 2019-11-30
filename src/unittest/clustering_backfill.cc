@@ -40,9 +40,9 @@ TPTEST(ClusteringBackfill, BackfillTest) {
         write_token_t token;
         stores[i]->new_write_token(&token);
         stores[i]->set_metainfo(
-            region_map_t<binary_blob_t>(
+            region_map_t<version_t>(
                 region,
-                binary_blob_t(version_t(dummy_branch_id, timestamp))),
+                version_t(dummy_branch_id, timestamp)),
             order_source.check_in(strprintf("set_metainfo(i=%zu)", i)),
             &token,
             write_durability_t::HARD,
@@ -63,17 +63,17 @@ TPTEST(ClusteringBackfill, BackfillTest) {
 
 #ifndef NDEBUG
             metainfo_checker_t metainfo_checker(region,
-                [&](const region_t &, const binary_blob_t &bb) {
-                    rassert(bb == binary_blob_t(version_t(
-                        dummy_branch_id, timestamp.pred())));
+                [&](const region_t &, const version_t &bb) {
+                    rassert(bb == version_t(
+                        dummy_branch_id, timestamp.pred()));
                 });
 #endif
 
             backfiller_store.write(
                 DEBUG_ONLY(metainfo_checker, )
-                region_map_t<binary_blob_t>(
+                region_map_t<version_t>(
                     region,
-                    binary_blob_t(version_t(dummy_branch_id, timestamp))
+                    version_t(dummy_branch_id, timestamp)
                 ),
                 w,
                 &response, write_durability_t::SOFT,
@@ -135,17 +135,17 @@ TPTEST(ClusteringBackfill, BackfillTest) {
     backfillee_store.new_read_token(&token1);
 
     region_map_t<version_t> backfillee_metadata =
-        to_version_map(backfillee_store.get_metainfo(
+        backfillee_store.get_metainfo(
             order_source.check_in("backfillee_store.get_metainfo").with_read_mode(),
-            &token1, backfillee_store.get_region(), &non_interruptor));
+            &token1, backfillee_store.get_region(), &non_interruptor);
 
     read_token_t token2;
     backfiller_store.new_read_token(&token2);
 
     region_map_t<version_t> backfiller_metadata =
-        to_version_map(backfiller_store.get_metainfo(
+        backfiller_store.get_metainfo(
             order_source.check_in("backfiller_store.get_metainfo").with_read_mode(),
-            &token2, backfiller_store.get_region(), &non_interruptor));
+            &token2, backfiller_store.get_region(), &non_interruptor);
 
     EXPECT_TRUE(backfillee_metadata == backfiller_metadata);
 

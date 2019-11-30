@@ -33,7 +33,7 @@ void run_with_primary(
         &get_global_perfmon_collection(),
         region_map_t<version_t>(region_t::universe(), version_t::zero()));
 
-    mock_store_t initial_store((binary_blob_t(version_t::zero())));
+    mock_store_t initial_store(version_t::zero());
     in_memory_branch_history_manager_t branch_history_manager;
     local_replicator_t local_replicator(
         cluster.get_mailbox_manager(),
@@ -154,7 +154,7 @@ void run_backfill_test(
     peer_id_t nil_peer;
 
     /* Set up a second mirror */
-    mock_store_t store2((binary_blob_t(version_t::zero())));
+    mock_store_t store2(version_t::zero());
     in_memory_branch_history_manager_t bhm2;
     cond_t interruptor;
     remote_replicator_client_t remote_replicator_client(

@@ -9,9 +9,9 @@
 #include "concurrency/new_semaphore.hpp"
 #include "concurrency/promise.hpp"
 
-class binary_blob_t;
 class cache_t;
 class rockshard;
+class version_t;
 
 class superblock_passback_guard {
 public:
@@ -39,6 +39,7 @@ index B-trees. */
 
 class btree_slice_t : public home_thread_mixin_debug_only_t {
 public:
+    // TODO: Does anybody call this?
     // Initializes a superblock (presumably, constructed with
     // alt_create_t::create) for use with btrees, setting the initial value of
     // the metainfo (with a single key/value pair). Not for use with sindex
@@ -47,7 +48,7 @@ public:
             real_superblock_lock *superblock,
             rockshard rocksh,
             const std::vector<char> &metainfo_key,
-            const binary_blob_t &metainfo_value);
+            const version_t &metainfo_value);
 
     btree_slice_t(cache_t *cache,
                   perfmon_collection_t *parent,
@@ -122,12 +123,12 @@ void get_superblock_metainfo(
 void set_superblock_metainfo(real_superblock_lock *superblock,
                              rockshard rocksh,
                              const std::vector<char> &key,
-                             const binary_blob_t &value);
+                             const version_t &value);
 
 void set_superblock_metainfo(real_superblock_lock *superblock,
                              rockshard rocksh,
                              const std::vector<std::vector<char> > &keys,
-                             const std::vector<binary_blob_t> &values);
+                             const std::vector<version_t> &values);
 
 // Convenience functions for accessing the superblock
 void get_btree_superblock(

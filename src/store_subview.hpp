@@ -71,7 +71,7 @@ public:
         store_view->new_write_token(token_out);
     }
 
-    region_map_t<binary_blob_t> get_metainfo(
+    region_map_t<version_t> get_metainfo(
             order_token_t order_token,
             read_token_t *token,
             const region_t &_region,
@@ -82,7 +82,7 @@ public:
         return store_view->get_metainfo(order_token, token, _region, interruptor);
     }
 
-    void set_metainfo(const region_map_t<binary_blob_t> &new_metainfo,
+    void set_metainfo(const region_map_t<version_t> &new_metainfo,
                       order_token_t order_token,
                       write_token_t *token,
                       write_durability_t durability,
@@ -109,7 +109,7 @@ public:
 
     void write(
             DEBUG_ONLY(const metainfo_checker_t& metainfo_checker, )
-            const region_map_t<binary_blob_t>& new_metainfo,
+            const region_map_t<version_t>& new_metainfo,
             const write_t &_write,
             write_response_t *response,
             write_durability_t durability,
@@ -174,7 +174,7 @@ public:
     }
 
     void reset_data(
-            const binary_blob_t &zero_version,
+            const version_t &zero_version,
             const region_t &subregion,
             write_durability_t durability,
             signal_t *interruptor)

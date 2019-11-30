@@ -4,7 +4,7 @@
 #include "arch/io/disk.hpp"
 #include "btree/operations.hpp"
 #include "btree/reql_specific.hpp"
-#include "containers/binary_blob.hpp"
+#include "clustering/immediate_consistency/history.hpp"
 #include "unittest/unittest_utils.hpp"
 
 namespace unittest {
@@ -25,10 +25,6 @@ std::string random_string() {
     }
     char c = 'a' + random() % ('z' - 'a' + 1);
     return std::string(length, c);
-}
-
-binary_blob_t string_to_blob(const std::string &s) {
-    return binary_blob_t(s.data(), s.data() + s.size());
 }
 
 std::vector<char> string_to_vector(const std::string &s) {
@@ -56,15 +52,15 @@ TPTEST(BtreeMetainfo, MetainfoTest) {
             sb_lock.get(),
             rocksh,
             std::vector<char>(),
-            binary_blob_t());
+            version_t::zero());
 
         txn.commit(rocksh.rocks, std::move(sb_lock));
     }
 
     for (int i = 0; i < 3; ++i) {
-        std::map<std::string, std::string> metainfo;
+        std::map<std::string, version_t> metainfo;
         for (int j = 0; j < 100; ++j) {
-            metainfo[random_string()] = random_string();
+            metainfo[random_string()] = version_t(generate_uuid(), state_timestamp_t::zero());
         }
         {
             scoped_ptr_t<txn_t> txn;
@@ -74,10 +70,10 @@ TPTEST(BtreeMetainfo, MetainfoTest) {
                 &cache_conn, nullptr, write_access_t::write, 1,
                 write_durability_t::SOFT, &superblock, &txn);
             std::vector<std::vector<char> > keys;
-            std::vector<binary_blob_t> values;
+            std::vector<version_t> values;
             for (const auto &pair : metainfo) {
                 keys.push_back(string_to_vector(pair.first));
-                values.push_back(string_to_blob(pair.second));
+                values.push_back(pair.second);
             }
             set_superblock_metainfo(superblock.get(), rocksh, keys, values);
 
@@ -93,7 +89,8 @@ TPTEST(BtreeMetainfo, MetainfoTest) {
             std::set<std::string> seen;
             for (const auto &pair : read_back) {
                 std::string key = vector_to_string(pair.first);
-                std::string value = vector_to_string(pair.second);
+                ASSERT_EQ(sizeof(version_t), pair.second.size());
+                version_t value = *reinterpret_cast<const version_t *>(pair.second.data());
                 ASSERT_EQ(0, seen.count(key));
                 seen.insert(key);
                 ASSERT_EQ(metainfo[key], value);

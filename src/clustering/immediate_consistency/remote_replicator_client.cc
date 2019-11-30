@@ -329,9 +329,9 @@ remote_replicator_client_t::remote_replicator_client_t(
         all at the correct timestamp */
         read_token_t read_token;
         store->new_read_token(&read_token);
-        region_map_t<version_t> version = to_version_map(store->get_metainfo(
+        region_map_t<version_t> version = store->get_metainfo(
             order_token_t::ignore.with_read_mode(), &read_token, region_,
-            interruptor));
+            interruptor);
         version_t expect(branch_id,
             timestamp_enforcer_->get_latest_all_before_completed());
         version.visit(region_,
@@ -419,15 +419,15 @@ void remote_replicator_client_t::on_write_async(
         cleanup_rwlock_acq.reset();
 
         if (!region_is_empty(clip_region)) {
-            region_map_t<binary_blob_t> new_metainfo(
-                clip_region, binary_blob_t(version_t(branch_id_, timestamp)));
+            region_map_t<version_t> new_metainfo(
+                clip_region, version_t(branch_id_, timestamp));
             write_t subwrite;
             if (write.shard(clip_region, &subwrite)) {
 #ifndef NDEBUG
                 metainfo_checker_t checker(clip_region,
-                    [&](const region_t &, const binary_blob_t &bb) {
-                        rassert(bb == binary_blob_t(
-                            version_t(branch_id_, timestamp.pred())));
+                    [&](const region_t &, const version_t &bb) {
+                        rassert(bb ==
+                            version_t(branch_id_, timestamp.pred()));
                     });
 #endif
                 write_response_t dummy_response;

@@ -14,8 +14,8 @@ void dummy_performer_t::read(const read_t &_read,
 
 #ifndef NDEBUG
     metainfo_checker_t metainfo_checker(store->get_region(),
-        [&](const region_t &, const binary_blob_t &bb) {
-            rassert(bb == binary_blob_t(expected_timestamp));
+        [&](const region_t &, const version_t &bb) {
+            rassert(bb == version_t(nil_uuid(), expected_timestamp));
         });
 #endif
 
@@ -30,7 +30,7 @@ void dummy_performer_t::read_outdated(const read_t &_read,
 
 #ifndef NDEBUG
     metainfo_checker_t metainfo_checker(store->get_region(),
-        [](const region_t &, const binary_blob_t &) { });
+        [](const region_t &, const version_t &) { });
 #endif
 
     return store->read(DEBUG_ONLY(metainfo_checker, ) _read, response,
@@ -46,7 +46,7 @@ void dummy_performer_t::write(const write_t &_write,
 
 #ifndef NDEBUG
     metainfo_checker_t metainfo_checker(store->get_region(),
-        [](const region_t &, const binary_blob_t &) { });
+        [](const region_t &, const version_t &) { });
 #endif
 
     write_token_t token;
@@ -54,7 +54,7 @@ void dummy_performer_t::write(const write_t &_write,
 
     store->write(
             DEBUG_ONLY(metainfo_checker, )
-            region_map_t<binary_blob_t>(store->get_region(), binary_blob_t(timestamp)),
+            region_map_t<version_t>(store->get_region(), version_t(uuid_u(), timestamp)),
             _write, response, write_durability_t::SOFT, timestamp, order_token, &token, &non_interruptor);
 }
 
@@ -67,7 +67,7 @@ dummy_timestamper_t::dummy_timestamper_t(dummy_performer_t *n,
     read_token_t read_token;
     next->store->new_read_token(&read_token);
 
-    region_map_t<binary_blob_t> metainfo = next->store->get_metainfo(
+    region_map_t<version_t> metainfo = next->store->get_metainfo(
         order_source->check_in("dummy_timestamper_t").with_read_mode(),
         &read_token,
         next->store->get_region(),
@@ -75,8 +75,8 @@ dummy_timestamper_t::dummy_timestamper_t(dummy_performer_t *n,
 
     current_timestamp = state_timestamp_t::zero();
     metainfo.visit(metainfo.get_domain(),
-        [&](const region_t &, const binary_blob_t &b) {
-            state_timestamp_t region_ts = binary_blob_t::get<state_timestamp_t>(b);
+        [&](const region_t &, const version_t &b) {
+            state_timestamp_t region_ts = b.timestamp;
             current_timestamp = std::max(current_timestamp, region_ts);
         });
 }
@@ -173,7 +173,7 @@ dummy_namespace_interface_t(std::vector<region_t> shards,
             read_token_t read_token;
             stores[i]->new_read_token(&read_token);
 
-            region_map_t<binary_blob_t> metainfo = stores[i]->get_metainfo(
+            region_map_t<version_t> metainfo = stores[i]->get_metainfo(
                 order_source->check_in("dummy_namespace_interface_t::"
                     "dummy_namespace_interface_t (get_metainfo)").with_read_mode(),
                 &read_token,
@@ -181,16 +181,16 @@ dummy_namespace_interface_t(std::vector<region_t> shards,
                 &interruptor);
 
             rassert(metainfo.get_domain() == shards[i]);
-            metainfo.visit(shards[i], [&](const region_t &, const binary_blob_t &b) {
-                guarantee(b.size() == 0);
+            metainfo.visit(shards[i], [&](const region_t &, const version_t &b) {
+                guarantee(b == version_t::zero());
             });
 
             write_token_t write_token;
             stores[i]->new_write_token(&write_token);
 
             stores[i]->set_metainfo(
-                    region_map_t<binary_blob_t>(
-                        shards[i], binary_blob_t(state_timestamp_t::zero())),
+                    region_map_t<version_t>(
+                        shards[i], version_t::zero()),
                     order_source->check_in("dummy_namespace_interface_t::"
                         "dummy_namespace_interface_t (set_metainfo)"),
                     &write_token,

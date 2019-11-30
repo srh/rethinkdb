@@ -123,9 +123,9 @@ backfiller_t::client_t::client_t(
     {
         read_token_t read_token;
         parent->store->new_read_token(&read_token);
-        our_version = to_version_map(parent->store->get_metainfo(
+        our_version = parent->store->get_metainfo(
             order_token_t::ignore.with_read_mode(), &read_token,
-            parent->store->get_region(), interruptor));
+            parent->store->get_region(), interruptor);
     }
 
     /* Compute the common ancestor of `intro.initial_version` and `our_version`, storing
@@ -383,7 +383,7 @@ private:
                                 guarantee(chunk->get_mem_size() == 0);
                             }
                         void on_item(
-                                const region_map_t<binary_blob_t> &item_metainfo,
+                                const region_map_t<version_t> &item_metainfo,
                                 backfill_item_t &&item) THROWS_NOTHING {
                             rassert(key_range_t::right_bound_t(item.range.left) >=
                                 chunk->get_right_key());
@@ -392,7 +392,7 @@ private:
                             chunk->push_back(std::move(item));
                         }
                         void on_empty_range(
-                                const region_map_t<binary_blob_t> &range_metainfo,
+                                const region_map_t<version_t> &range_metainfo,
                                 const key_range_t::right_bound_t &new_threshold)
                                 THROWS_NOTHING {
                             rassert(new_threshold >= chunk->get_right_key());
@@ -401,7 +401,7 @@ private:
                         }
                     private:
                         void on_metainfo(
-                                const region_map_t<binary_blob_t> &new_metainfo,
+                                const region_map_t<version_t> &new_metainfo,
                                 const key_range_t::right_bound_t &new_threshold) {
                             if (new_threshold == chunk->get_right_key()) {
                                 /* This is a no-op. But if `chunk->get_right_key()` is
@@ -416,7 +416,7 @@ private:
                             mask.inner.left = chunk->get_right_key().key();
                             mask.inner.right = new_threshold;
                             metainfo->extend_keys_right(
-                                to_version_map(new_metainfo.mask(mask)));
+                                new_metainfo.mask(mask));
                         }
                         backfill_item_seq_t<backfill_item_t> *const chunk;
                         region_map_t<version_t> *const metainfo;

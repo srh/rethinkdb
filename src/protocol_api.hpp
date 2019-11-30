@@ -14,7 +14,6 @@
 #include "concurrency/interruptor.hpp"
 #include "concurrency/signal.hpp"
 #include "containers/archive/stl_types.hpp"
-#include "containers/binary_blob.hpp"
 #include "containers/object_buffer.hpp"
 #include "containers/scoped.hpp"
 #include "region/region.hpp"

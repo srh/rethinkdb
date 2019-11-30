@@ -40,7 +40,6 @@ public:
         items_mem_size_unacked(0),
         sent_end_session(false),
         metainfo(region_map_t<version_t>::empty()),
-        metainfo_binary(region_map_t<binary_blob_t>::empty()),
         pulse_when_items_arrive(nullptr)
     {
         coro_t::spawn_sometime(std::bind(
@@ -63,7 +62,6 @@ public:
         items_mem_size_unacked += chunk.get_mem_size();
         items.concat(std::move(chunk));
         metainfo.extend_keys_right(std::move(metainfo_chunk));
-        metainfo_binary = from_version_map(metainfo);
         if (pulse_when_items_arrive != nullptr) {
             pulse_when_items_arrive->pulse_if_not_already_pulsed();
         }
@@ -166,8 +164,8 @@ private:
                             return continue_bool_t::ABORT;
                         }
                     }
-                    const region_map_t<binary_blob_t> *get_metainfo() THROWS_NOTHING {
-                        return &parent->metainfo_binary;
+                    const region_map_t<version_t> *get_metainfo() THROWS_NOTHING {
+                        return &parent->metainfo;
                     }
                     void on_commit(const key_range_t::right_bound_t &new_threshold)
                             THROWS_NOTHING {
@@ -300,9 +298,6 @@ private:
     extends from wherever we started the backfill to the right-hand side of `items`. */
     region_map_t<version_t> metainfo;
 
-    /* `metainfo_binary` is just `metainfo` in `binary_blob_t` form. */
-    region_map_t<binary_blob_t> metainfo_binary;
-
     /* `run()` puts a `cond_t` here when it needs to wait for more backfill items to be
     appended to `items`. `on_items()` pulses it when it appends more backfill items to
     `items`. */
@@ -354,9 +349,9 @@ backfillee_t::backfillee_t(
     {
         read_token_t read_token;
         store->new_read_token(&read_token);
-        our_intro.initial_version = to_version_map(store->get_metainfo(
+        our_intro.initial_version = store->get_metainfo(
             order_token_t::ignore.with_read_mode(), &read_token, store->get_region(),
-            interruptor));
+            interruptor);
     }
     {
         on_thread_t thread_switcher(branch_history_manager->home_thread());

@@ -4,14 +4,14 @@
 #include "rocksdb/write_batch.h"
 
 #include "btree/secondary_operations.hpp"
-#include "containers/binary_blob.hpp"
+#include "clustering/immediate_consistency/history.hpp"
 #include "rockstore/store.hpp"
 
 
 void btree_slice_t::init_real_superblock(real_superblock_lock *superblock,
                                          rockshard rocksh,
                                          const std::vector<char> &metainfo_key,
-                                         const binary_blob_t &metainfo_value) {
+                                         const version_t &metainfo_value) {
     superblock->write_acq_signal()->wait_lazily_ordered();
     set_superblock_metainfo(superblock, rocksh, metainfo_key, metainfo_value);
     initialize_secondary_indexes(rocksh, superblock);
@@ -96,16 +96,16 @@ void get_superblock_metainfo(
 void set_superblock_metainfo(real_superblock_lock *superblock,
                              rockshard rocksh,
                              const std::vector<char> &key,
-                             const binary_blob_t &value) {
+                             const version_t &value) {
     std::vector<std::vector<char> > keys = {key};
-    std::vector<binary_blob_t> values = {value};
+    std::vector<version_t> values = {value};
     set_superblock_metainfo(superblock, rocksh, keys, values);
 }
 
 void set_superblock_metainfo(real_superblock_lock *superblock,
                              rockshard rocksh,
                              const std::vector<std::vector<char> > &keys,
-                             const std::vector<binary_blob_t> &values) {
+                             const std::vector<version_t> &values) {
     // Acquire lock explicitly for rocksdb writing.
     superblock->write_acq_signal()->wait_lazily_ordered();
 
@@ -119,18 +119,18 @@ void set_superblock_metainfo(real_superblock_lock *superblock,
             uint32_t y;
         } u;
         rassert(key_it->size() < UINT32_MAX);
-        rassert(value_it->size() < UINT32_MAX);
 
         u.y = key_it->size();
         metainfo.insert(metainfo.end(), u.x, u.x + sizeof(uint32_t));
         metainfo.insert(metainfo.end(), key_it->begin(), key_it->end());
 
-        u.y = value_it->size();
+        version_t value = *value_it;
+        u.y = sizeof(value);
         metainfo.insert(metainfo.end(), u.x, u.x + sizeof(uint32_t));
         metainfo.insert(
             metainfo.end(),
-            static_cast<const uint8_t *>(value_it->data()),
-            static_cast<const uint8_t *>(value_it->data()) + value_it->size());
+            reinterpret_cast<const uint8_t *>(&value),
+            reinterpret_cast<const uint8_t *>(&value) + sizeof(value));
     }
 
     // Rocksdb metadata.

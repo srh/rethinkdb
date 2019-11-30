@@ -4,6 +4,7 @@
 
 #include "arch/timing.hpp"
 #include "btree/backfill.hpp"
+#include "clustering/immediate_consistency/history.hpp"
 #include "random.hpp"
 #include "rdb_protocol/serialize_datum.hpp"
 #include "rdb_protocol/store.hpp"
@@ -42,7 +43,7 @@ std::string mock_parse_read_response(const read_response_t &rr) {
 std::string mock_lookup(store_view_t *store, std::string key) {
 #ifndef NDEBUG
     metainfo_checker_t checker(store->get_region(),
-        [](const region_t &, const binary_blob_t &) { });
+        [](const region_t &, const version_t &) { });
 #endif
     read_token_t token;
     store->new_read_token(&token);
@@ -59,7 +60,7 @@ std::string mock_lookup(store_view_t *store, std::string key) {
 }
 
 
-mock_store_t::mock_store_t(binary_blob_t universe_metainfo)
+mock_store_t::mock_store_t(version_t universe_metainfo)
     : store_view_t(region_t::universe()),
       metainfo_(get_region(), universe_metainfo) { }
 mock_store_t::~mock_store_t() { }
@@ -76,7 +77,7 @@ void mock_store_t::new_write_token(write_token_t *token_out) {
     token_out->main_write_token.create(&token_sink_, token);
 }
 
-region_map_t<binary_blob_t> mock_store_t::get_metainfo(
+region_map_t<version_t> mock_store_t::get_metainfo(
         order_token_t order_token,
         read_token_t *token,
         const region_t &_region,
@@ -95,7 +96,7 @@ region_map_t<binary_blob_t> mock_store_t::get_metainfo(
     return metainfo_.mask(_region);
 }
 
-void mock_store_t::set_metainfo(const region_map_t<binary_blob_t> &new_metainfo,
+void mock_store_t::set_metainfo(const region_map_t<version_t> &new_metainfo,
                                 order_token_t order_token,
                                 write_token_t *token,
                                 UNUSED write_durability_t durability,
@@ -180,7 +181,7 @@ void mock_store_t::read(
 
 void mock_store_t::write(
         DEBUG_ONLY(const metainfo_checker_t &metainfo_checker, )
-        const region_map_t<binary_blob_t> &new_metainfo,
+        const region_map_t<version_t> &new_metainfo,
         const write_t &_write,
         write_response_t *response,
         UNUSED write_durability_t durability,
@@ -527,7 +528,7 @@ bool mock_store_t::check_ok_to_receive_backfill() THROWS_NOTHING {
 }
 
 void mock_store_t::reset_data(
-        const binary_blob_t &zero_version,
+        const version_t &zero_version,
         const region_t &subregion,
         UNUSED write_durability_t durability,
         signal_t *interruptor) THROWS_ONLY(interrupted_exc_t) {

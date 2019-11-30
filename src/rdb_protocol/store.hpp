@@ -66,6 +66,7 @@ public:
             rockstore::store *rocks,
             const char *perfmon_prefix,
             bool create,
+            version_t zero_version,  // If create is true, used to initialize metainfo.
             perfmon_collection_t *parent_perfmon_collection,
             rdb_context_t *_ctx,
             io_backender_t *io_backender,
@@ -81,7 +82,7 @@ public:
     void new_read_token(read_token_t *token_out);
     void new_write_token(write_token_t *token_out);
 
-    region_map_t<binary_blob_t> get_metainfo(
+    region_map_t<version_t> get_metainfo(
             order_token_t order_token,
             read_token_t *token,
             const region_t &region,
@@ -89,7 +90,7 @@ public:
         THROWS_ONLY(interrupted_exc_t);
 
     void set_metainfo(
-            const region_map_t<binary_blob_t> &new_metainfo,
+            const region_map_t<version_t> &new_metainfo,
             order_token_t order_token,
             write_token_t *token,
             write_durability_t durability,
@@ -107,7 +108,7 @@ public:
 
     void write(
             DEBUG_ONLY(const metainfo_checker_t& metainfo_checker, )
-            const region_map_t<binary_blob_t>& new_metainfo,
+            const region_map_t<version_t>& new_metainfo,
             const write_t &write,
             write_response_t *response,
             write_durability_t durability,
@@ -140,7 +141,7 @@ public:
     bool check_ok_to_receive_backfill() THROWS_NOTHING;
 
     void reset_data(
-            const binary_blob_t &zero_version,
+            const version_t &zero_version,
             const region_t &subregion,
             write_durability_t durability,
             signal_t *interruptor)

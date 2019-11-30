@@ -48,15 +48,16 @@ public:
             store(region_t::universe(), 0 /* the only shard */,
                 io_backender->rocks(),
                 temp_file.name().permanent_path().c_str(), true,
+                version_t::zero(),
                 &get_global_perfmon_collection(), ctx, io_backender, base_path_t("."),
                 generate_uuid(), update_sindexes_t::UPDATE) {
         /* Initialize store metadata */
         cond_t non_interruptor;
         write_token_t token;
         store.new_write_token(&token);
-        region_map_t<binary_blob_t> new_metainfo(
+        region_map_t<version_t> new_metainfo(
                 store.get_region(),
-                binary_blob_t(version_t::zero()));
+                version_t::zero());
         store.set_metainfo(new_metainfo, order_source->check_in("test_store_t"), &token,
             write_durability_t::SOFT, &non_interruptor);
     }

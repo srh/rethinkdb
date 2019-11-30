@@ -149,7 +149,7 @@ public:
     limiting_btree_backfill_item_consumer_t(
             store_view_t::backfill_item_consumer_t *_inner,
             key_range_t::right_bound_t *_threshold_ptr,
-            const region_map_t<binary_blob_t> *_metainfo_ptr) :
+            const region_map_t<version_t> *_metainfo_ptr) :
         remaining(MAX_BACKFILL_ITEMS_PER_TXN), inner(_inner),
         threshold_ptr(_threshold_ptr), metainfo_ptr(_metainfo_ptr) { }
     continue_bool_t on_item(backfill_item_t &&item) override {
@@ -183,7 +183,7 @@ private:
     /* `metainfo_ptr` points to the metainfo that applies to the items we're handling.
     Note that it can't be changed. This is OK because `limiting_..._consumer_t` never
     exists across multiple B-tree transactions, so the metainfo is constant. */
-    const region_map_t<binary_blob_t> *const metainfo_ptr;
+    const region_map_t<version_t> *const metainfo_ptr;
 };
 
 continue_bool_t store_t::send_backfill(
@@ -225,7 +225,7 @@ continue_bool_t store_t::send_backfill(
             pre_item_producer->rewind(threshold);
             pre_item_adapter_t pre_item_adapter(pre_item_producer);
 
-            region_map_t<binary_blob_t> metainfo_copy =
+            region_map_t<version_t> metainfo_copy =
                 metainfo->get(sb.get(), region_t(pair.first));
 
             key_range_t to_do = pair.first;
@@ -236,8 +236,7 @@ continue_bool_t store_t::send_backfill(
             repli_timestamp_t max_timestamp = repli_timestamp_t::distant_past;
 
             region_t to_do_region(to_do);
-            metainfo_copy.visit(to_do_region, [&](const region_t &, const binary_blob_t vers) {
-                version_t version = binary_blob_t::get<version_t>(vers);
+            metainfo_copy.visit(to_do_region, [&](const region_t &, const version_t version) {
                 max_timestamp = std::max<repli_timestamp_t>(max_timestamp, version.timestamp.to_repli_timestamp());
             });
 

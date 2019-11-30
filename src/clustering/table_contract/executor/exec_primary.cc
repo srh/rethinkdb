@@ -161,9 +161,9 @@ void primary_execution_t::run(auto_drainer_t::lock_t keepalive) {
 
         read_token_t token;
         store->new_read_token(&token);
-        region_map_t<version_t> initial_version = to_version_map(store->get_metainfo(
+        region_map_t<version_t> initial_version = store->get_metainfo(
             order_source.check_in("primary_t").with_read_mode(),
-            &token, region, &interruptor_store_thread));
+            &token, region, &interruptor_store_thread);
 
         perfmon_collection_t perfmon_collection;
         perfmon_membership_t perfmon_membership(params->get_parent_perfmon_collection(),

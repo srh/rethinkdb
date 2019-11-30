@@ -38,7 +38,7 @@ void direct_query_server_t::on_read(
 
 #ifndef NDEBUG
         metainfo_checker_t metainfo_checker(svs->get_region(),
-            [](const region_t &, const binary_blob_t &) { });
+            [](const region_t &, const version_t &) { });
 #endif
 
         read_response_t response;

@@ -5,6 +5,7 @@
 #include <utility>
 #include <string>
 
+#include "clustering/immediate_consistency/history.hpp"
 #include "rdb_protocol/protocol.hpp"
 #include "store_view.hpp"
 
@@ -20,7 +21,7 @@ std::string mock_lookup(store_view_t *store, std::string key);
 
 class mock_store_t : public store_view_t {
 public:
-    explicit mock_store_t(binary_blob_t universe_metainfo = binary_blob_t());
+    explicit mock_store_t(version_t universe_metainfo = version_t::zero());
     ~mock_store_t();
     void rethread(threadnum_t new_thread) {
         home_thread_mixin_t::real_home_thread = new_thread;
@@ -34,14 +35,14 @@ public:
     void new_read_token(read_token_t *token_out);
     void new_write_token(write_token_t *token_out);
 
-    region_map_t<binary_blob_t> get_metainfo(
+    region_map_t<version_t> get_metainfo(
             order_token_t order_token,
             read_token_t *token,
             const region_t &region,
             signal_t *interruptor)
             THROWS_ONLY(interrupted_exc_t);
 
-    void set_metainfo(const region_map_t<binary_blob_t> &new_metainfo,
+    void set_metainfo(const region_map_t<version_t> &new_metainfo,
                       order_token_t order_token,
                       write_token_t *token,
                       write_durability_t durability,
@@ -57,7 +58,7 @@ public:
 
     void write(
             DEBUG_ONLY(const metainfo_checker_t &metainfo_checker, )
-            const region_map_t<binary_blob_t> &new_metainfo,
+            const region_map_t<version_t> &new_metainfo,
             const write_t &write,
             write_response_t *response,
             write_durability_t durability,
@@ -90,7 +91,7 @@ public:
     bool check_ok_to_receive_backfill() THROWS_NOTHING;
 
     void reset_data(
-            const binary_blob_t &zero_version,
+            const version_t &zero_version,
             const region_t &subregion,
             write_durability_t durability,
             signal_t *interruptor)
@@ -106,7 +107,7 @@ private:
 
     order_sink_t order_sink_;
 
-    region_map_t<binary_blob_t> metainfo_;
+    region_map_t<version_t> metainfo_;
     std::map<store_key_t, std::pair<repli_timestamp_t, ql::datum_t> > table_;
 
     DISABLE_COPYING(mock_store_t);

@@ -3,20 +3,7 @@
 
 #include <stack>
 
-#include "containers/binary_blob.hpp"
-
 RDB_IMPL_SERIALIZABLE_2_SINCE_v1_13(version_t, branch, timestamp);
-
-region_map_t<version_t> to_version_map(const region_map_t<binary_blob_t> &blob_map) {
-    return blob_map.map(blob_map.get_domain(),
-        [&](const binary_blob_t &b) -> version_t {
-            return binary_blob_t::get<version_t>(b);
-        });
-}
-
-region_map_t<binary_blob_t> from_version_map(const region_map_t<version_t> &vers_map) {
-    return vers_map.map(vers_map.get_domain(), &binary_blob_t::make<version_t>);
-}
 
 RDB_IMPL_SERIALIZABLE_2_SINCE_v2_1(branch_birth_certificate_t,
     initial_timestamp, origin);
