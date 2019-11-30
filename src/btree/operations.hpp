@@ -2,29 +2,6 @@
 #ifndef BTREE_OPERATIONS_HPP_
 #define BTREE_OPERATIONS_HPP_
 
-#include <algorithm>
-#include <utility>
-#include <vector>
-
-#include "btree/stats.hpp"
-#include "buffer_cache/alt.hpp"
-#include "concurrency/fifo_enforcer.hpp"
-#include "concurrency/new_semaphore.hpp"
-#include "concurrency/promise.hpp"
-#include "containers/archive/stl_types.hpp"
-#include "containers/scoped.hpp"
-#include "perfmon/perfmon.hpp"
-#include "repli_timestamp.hpp"
-#include "utils.hpp"
-
-/* This is the main entry point for performing B-tree operations. */
-
-namespace profile {
-class trace_t;
-}
-
-enum cache_snapshotted_t { CACHE_SNAPSHOTTED_NO, CACHE_SNAPSHOTTED_YES };
-
 // TODO: Remove or make use of.
 /* `delete_mode_t` controls how `apply_keyvalue_change()` acts when `kv_loc->value` is
 empty. */

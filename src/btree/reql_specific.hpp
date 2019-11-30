@@ -3,6 +3,7 @@
 #define BTREE_REQL_SPECIFIC_HPP_
 
 #include "btree/operations.hpp"
+#include "btree/stats.hpp"
 #include "buffer_cache/alt.hpp"
 #include "containers/uuid.hpp"
 #include "concurrency/new_semaphore.hpp"

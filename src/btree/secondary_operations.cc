@@ -5,11 +5,13 @@
 
 #include "btree/operations.hpp"
 #include "buffer_cache/alt.hpp"
+#include "containers/archive/stl_types.hpp"
 #include "containers/archive/string_stream.hpp"
 #include "containers/archive/vector_stream.hpp"
 #include "containers/archive/versioned.hpp"
 #include "debug.hpp"
 #include "rockstore/store.hpp"
+#include "utils.hpp"
 
 // TODO: Remove old serialization versions, or maybe even serialization versioning.
 RDB_IMPL_SERIALIZABLE_4_SINCE_v2_4(
