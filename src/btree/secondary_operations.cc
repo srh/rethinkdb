@@ -13,7 +13,6 @@
 #include "rockstore/store.hpp"
 #include "utils.hpp"
 
-// TODO: Remove old serialization versions, or maybe even serialization versioning.
 RDB_IMPL_SERIALIZABLE_4_SINCE_v2_4(
         secondary_index_t, opaque_definition,
         needs_post_construction_range, being_deleted, id);
