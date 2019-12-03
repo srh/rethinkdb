@@ -142,7 +142,6 @@ void acquire_sindex_for_read(
     *sindex_uuid_out = sindex_uuid;
 }
 
-// TODO: Is sindex_id_out always nullptr?
 void do_snap_read(
         rockshard rocksh,
         ql::env_t *env,
@@ -238,7 +237,7 @@ void do_snap_read(
 }
 
 // TODO: Remove this?
-void do_read(rockshard rocksh,
+void do_read_for_changefeed(rockshard rocksh,
              ql::env_t *env,
              store_t *store,
              btree_slice_t *btree,
@@ -249,9 +248,7 @@ void do_read(rockshard rocksh,
     guarantee(rget.current_shard.has_value());
     if (!rget.sindex.has_value()) {
         // rget using a primary index
-        if (sindex_id_out != nullptr) {
-            *sindex_id_out = r_nullopt;
-        }
+        *sindex_id_out = r_nullopt;
         rdb_rget_slice(
             rocksh,
             btree,
@@ -279,9 +276,7 @@ void do_read(rockshard rocksh,
                     rget.sindex->id,
                     &sindex_info,
                     &sindex_uuid);
-            if (sindex_id_out != nullptr) {
-                *sindex_id_out = make_optional(sindex_uuid);
-            }
+            *sindex_id_out = make_optional(sindex_uuid);
             reql_version_t reql_version =
                 sindex_info.mapping_version_info.latest_compatible_reql_version;
             res->reql_version = reql_version;
@@ -395,7 +390,7 @@ struct rdb_read_visitor_t : public boost::static_visitor<void> {
             // The superblock will instead be released in `store_t::read`
             // shortly after this function returns.
             rget_read_response_t resp;
-            do_read(store->rocksh(), &env, store, btree, superblock.get(), rget, &resp,
+            do_read_for_changefeed(store->rocksh(), &env, store, btree, superblock.get(), rget, &resp,
                     &sindex_id);
             auto *gs = boost::get<ql::grouped_t<ql::stream_t> >(&resp.result);
             if (gs == NULL) {
