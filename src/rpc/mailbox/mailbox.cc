@@ -36,7 +36,7 @@ public:
         serialize_universal(&wm, dest_mailbox_id);
         uint64_t prefix_length = static_cast<uint64_t>(wm.size());
 
-        subwriter->write(cluster_version_t::CLUSTER, &wm);
+        subwriter->write(&wm);
 
         // Prepend the message length.
         // TODO: It would be more efficient if we could make this part of `msg`.

@@ -826,15 +826,13 @@ bool secondary_indexes_are_equivalent(const std::vector<char> &left,
         bool res;
         write_message_t wm_left;
         vector_stream_t stream_left;
-        serialize_for_version(cluster_version_t::CLUSTER, &wm_left,
-                              sindex_info_left.mapping);
+        serialize_for_cluster(&wm_left, sindex_info_left.mapping);
         res = send_write_message(&stream_left, &wm_left);
         guarantee(res == 0);
 
         write_message_t wm_right;
         vector_stream_t stream_right;
-        serialize_for_version(cluster_version_t::CLUSTER, &wm_right,
-                              sindex_info_right.mapping);
+        serialize_for_cluster(&wm_right, sindex_info_right.mapping);
         res = send_write_message(&stream_right, &wm_right);
         guarantee(res == 0);
 

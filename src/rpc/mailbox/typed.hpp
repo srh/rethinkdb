@@ -16,8 +16,7 @@ template <class...> class mailbox_t;
 class mailbox_write_callback_t {
 public:
     virtual ~mailbox_write_callback_t() { }
-    virtual void write(cluster_version_t cluster_version,
-                       write_message_t *wm) = 0;
+    virtual void write(write_message_t *wm) = 0;
 #ifdef ENABLE_MESSAGE_PROFILER
     virtual const char *message_profiler_tag() const = 0;
 #endif
@@ -112,8 +111,7 @@ private:
     const std::tuple<Args...> args;
 public:
     explicit mailbox_write_impl(const Args &... _args) : args(_args...) { }
-    void write(DEBUG_VAR cluster_version_t cluster_version, write_message_t *wm) {
-        rassert(cluster_version == cluster_version_t::CLUSTER);
+    void write(write_message_t *wm) {
         serialize<cluster_version_t::CLUSTER>(wm, args);
     }
 #ifdef ENABLE_MESSAGE_PROFILER

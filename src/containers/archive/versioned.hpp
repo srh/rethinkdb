@@ -75,20 +75,9 @@ inline MUST_USE archive_result_t deserialize_reql_version(
     return res;
 }
 
-
-// Serializes a value for a given version.  DOES NOT SERIALIZE THE VERSION NUMBER!
 template <class T>
-void serialize_for_version(cluster_version_t version, write_message_t *wm,
-                           const T &value) {
-    // We currently only support serializing either the current disk or current
-    // cluster version, no previous versions.
-    if (version == cluster_version_t::CLUSTER) {
-        serialize<cluster_version_t::CLUSTER>(wm, value);
-    } else if (version == cluster_version_t::LATEST_DISK) {
-        serialize<cluster_version_t::LATEST_DISK>(wm, value);
-    } else {
-        crash("Attempted to serialize for a non-current version");
-    }
+void serialize_for_cluster(write_message_t *wm, const T &value) {
+    serialize<cluster_version_t::CLUSTER>(wm, value);
 }
 
 // Deserializes a value, assuming it's serialized for a given version.  (This doesn't

@@ -25,8 +25,8 @@ private:
     class write_impl_t : public mailbox_write_callback_t {
     public:
         explicit write_impl_t(int _arg) : arg(_arg) { }
-        void write(cluster_version_t cluster_version, write_message_t *wm) {
-            serialize_for_version(cluster_version, wm, arg);
+        void write(write_message_t *wm) {
+            serialize_for_cluster(wm, arg);
         }
 #ifdef ENABLE_MESSAGE_PROFILER
         const char *message_profiler_tag() const {

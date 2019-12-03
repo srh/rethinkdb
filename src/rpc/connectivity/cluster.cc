@@ -946,8 +946,8 @@ join_result_t connectivity_cluster_t::run_t::handle(
     }
 
     // Check version number (e.g. 1.9.0-466-gadea67)
-    cluster_version_t resolved_version;
     {
+        cluster_version_t resolved_version;
         std::string remote_version_string;
 
         if (!deserialize_compatible_string(conn, &remote_version_string, peername)) {
@@ -973,7 +973,6 @@ join_result_t connectivity_cluster_t::run_t::handle(
             return join_result_t::PERMANENT_ERROR;
         }
 
-        // In the future we'll need to support multiple cluster versions.
         guarantee(resolved_version == cluster_version_t::CLUSTER);
     }
 
@@ -1187,14 +1186,14 @@ join_result_t connectivity_cluster_t::run_t::handle(
         knows we're in. */
         {
             write_message_t wm;
-            serialize_for_version(resolved_version, &wm, routing_table_to_send);
+            serialize_for_cluster(&wm, routing_table_to_send);
             if (send_write_message(conn, &wm)) {
                 return join_result_t::TEMPORARY_ERROR;         // network error
             }
         }
 
         /* Receive the follower's routing table */
-        if (deserialize_and_check(resolved_version, conn,
+        if (deserialize_and_check(cluster_version_t::CLUSTER, conn,
                                   &other_routing_table, peername)) {
             return join_result_t::TEMPORARY_ERROR;
         }
@@ -1203,7 +1202,7 @@ join_result_t connectivity_cluster_t::run_t::handle(
         /* Receive the leader's routing table. (If our connection has lost a
         conflict, then the leader will close the connection instead of sending
         the routing table. */
-        if (deserialize_and_check(resolved_version, conn,
+        if (deserialize_and_check(cluster_version_t::CLUSTER, conn,
                                   &other_routing_table, peername)) {
             return join_result_t::TEMPORARY_ERROR;
         }
@@ -1219,7 +1218,7 @@ join_result_t connectivity_cluster_t::run_t::handle(
         /* Send our routing table to the leader */
         {
             write_message_t wm;
-            serialize_for_version(resolved_version, &wm, routing_table_to_send);
+            serialize_for_cluster(&wm, routing_table_to_send);
             if (send_write_message(conn, &wm)) {
                 return join_result_t::TEMPORARY_ERROR;         // network error
             }
@@ -1347,9 +1346,6 @@ join_result_t connectivity_cluster_t::run_t::handle(
                         "Apparently we aren't compatible with the cluster on the other "
                         "end.");
 
-                    /* If you really want to support old cluster versions, the
-                    resolved_version should be passed into the on_message() handler. */
-                    guarantee(resolved_version == cluster_version_t::CLUSTER);
                     handler->on_message(
                         &conn_structure,
                         auto_drainer_t::lock_t(conn_structure.drainers.get()),
