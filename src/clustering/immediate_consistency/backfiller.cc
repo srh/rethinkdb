@@ -2,7 +2,7 @@
 #include "clustering/immediate_consistency/backfiller.hpp"
 
 #include "assignment_sentry.hpp"
-#include "clustering/immediate_consistency/history.hpp"
+#include "clustering/immediate_consistency/version.hpp"
 #include "concurrency/new_semaphore.hpp"
 #include "rdb_protocol/distribution_progress.hpp"
 #include "rdb_protocol/protocol.hpp"

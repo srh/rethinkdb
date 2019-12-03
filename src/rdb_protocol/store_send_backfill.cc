@@ -3,7 +3,7 @@
 #include "btree/backfill.hpp"
 #include "btree/reql_specific.hpp"
 #include "btree/operations.hpp"
-#include "clustering/immediate_consistency/history.hpp"  // For to_version_map.
+#include "clustering/immediate_consistency/version.hpp"  // For to_version_map.
 #include "rdb_protocol/btree.hpp"
 #include "rdb_protocol/store_metainfo.hpp"
 

@@ -3,7 +3,7 @@
 #define CLUSTERING_TABLE_CONTRACT_EXECUTOR_EXECUTOR_HPP_
 
 #include "clustering/generic/raft_core.hpp"
-#include "clustering/immediate_consistency/history.hpp"
+#include "clustering/immediate_consistency/version.hpp"
 #include "clustering/table_contract/cpu_sharding.hpp"
 #include "clustering/table_contract/executor/exec.hpp"
 #include "concurrency/pump_coro.hpp"

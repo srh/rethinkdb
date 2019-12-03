@@ -3,7 +3,7 @@
 
 #include "arch/timing.hpp"
 #include "assignment_sentry.hpp"
-#include "clustering/immediate_consistency/history.hpp"
+#include "clustering/immediate_consistency/version.hpp"
 #include "concurrency/cross_thread_signal.hpp"
 #include "concurrency/wait_any.hpp"
 

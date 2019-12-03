@@ -3,7 +3,7 @@
 #define CLUSTERING_IMMEDIATE_CONSISTENCY_REMOTE_REPLICATOR_METADATA_HPP_
 
 #include "clustering/generic/registration_metadata.hpp"
-#include "clustering/immediate_consistency/history.hpp"
+#include "clustering/immediate_consistency/version.hpp"
 #include "rdb_protocol/protocol.hpp"
 #include "rpc/connectivity/server_id.hpp"
 

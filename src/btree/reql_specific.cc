@@ -4,7 +4,7 @@
 #include "rocksdb/write_batch.h"
 
 #include "btree/secondary_operations.hpp"
-#include "clustering/immediate_consistency/history.hpp"
+#include "clustering/immediate_consistency/version.hpp"
 #include "rockstore/store.hpp"
 
 

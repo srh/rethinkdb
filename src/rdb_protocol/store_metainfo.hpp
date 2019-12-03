@@ -4,7 +4,7 @@
 
 #include <functional>
 
-#include "clustering/immediate_consistency/history.hpp"
+#include "clustering/immediate_consistency/version.hpp"
 #include "containers/uuid.hpp"
 #include "region/region_map.hpp"
 

@@ -6,7 +6,7 @@
 #include "arch/timing.hpp"
 #include "btree/operations.hpp"
 #include "btree/reql_specific.hpp"
-#include "clustering/immediate_consistency/history.hpp"
+#include "clustering/immediate_consistency/version.hpp"
 #include "containers/archive/boost_types.hpp"
 #include "containers/archive/vector_stream.hpp"
 #include "containers/uuid.hpp"

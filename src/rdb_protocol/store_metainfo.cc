@@ -2,7 +2,7 @@
 #include "rdb_protocol/store_metainfo.hpp"
 
 #include "btree/reql_specific.hpp"
-#include "clustering/immediate_consistency/history.hpp"
+#include "clustering/immediate_consistency/version.hpp"
 #include "containers/archive/buffer_stream.hpp"
 #include "containers/archive/vector_stream.hpp"
 #include "rockstore/rockshard.hpp"

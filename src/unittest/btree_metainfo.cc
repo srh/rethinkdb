@@ -4,7 +4,7 @@
 #include "arch/io/disk.hpp"
 #include "btree/operations.hpp"
 #include "btree/reql_specific.hpp"
-#include "clustering/immediate_consistency/history.hpp"
+#include "clustering/immediate_consistency/version.hpp"
 #include "unittest/unittest_utils.hpp"
 
 namespace unittest {

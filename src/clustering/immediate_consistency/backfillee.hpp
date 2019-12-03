@@ -3,7 +3,7 @@
 #define CLUSTERING_IMMEDIATE_CONSISTENCY_BACKFILLEE_HPP_
 
 #include "clustering/generic/registrant.hpp"
-#include "clustering/immediate_consistency/history.hpp"
+#include "clustering/immediate_consistency/version.hpp"
 #include "clustering/immediate_consistency/backfill_metadata.hpp"
 #include "clustering/table_manager/backfill_progress_tracker.hpp"
 #include "concurrency/new_mutex.hpp"

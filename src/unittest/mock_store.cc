@@ -4,7 +4,7 @@
 
 #include "arch/timing.hpp"
 #include "btree/backfill.hpp"
-#include "clustering/immediate_consistency/history.hpp"
+#include "clustering/immediate_consistency/version.hpp"
 #include "random.hpp"
 #include "rdb_protocol/serialize_datum.hpp"
 #include "rdb_protocol/store.hpp"

@@ -2,7 +2,7 @@
 #ifndef CLUSTERING_IMMEDIATE_CONSISTENCY_LOCAL_REPLICATOR_HPP_
 #define CLUSTERING_IMMEDIATE_CONSISTENCY_LOCAL_REPLICATOR_HPP_
 
-#include "clustering/immediate_consistency/history.hpp"
+#include "clustering/immediate_consistency/version.hpp"
 #include "clustering/immediate_consistency/primary_dispatcher.hpp"
 #include "clustering/immediate_consistency/replica.hpp"
 #include "store_view.hpp"

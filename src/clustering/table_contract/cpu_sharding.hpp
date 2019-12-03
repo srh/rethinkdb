@@ -2,10 +2,10 @@
 #ifndef CLUSTERING_TABLE_CONTRACT_CPU_SHARDING_HPP_
 #define CLUSTERING_TABLE_CONTRACT_CPU_SHARDING_HPP_
 
-#include "clustering/immediate_consistency/history.hpp"
 #include "protocol_api.hpp"
 #include "region/region.hpp"
 
+class branch_history_manager_t;
 class store_t;
 
 /* `cpu_sharding_subspace()` returns a `region_t` that contains the full key-range space

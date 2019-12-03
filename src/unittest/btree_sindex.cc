@@ -5,7 +5,7 @@
 #include "btree/operations.hpp"
 #include "btree/reql_specific.hpp"
 #include "buffer_cache/alt.hpp"
-#include "clustering/immediate_consistency/history.hpp"
+#include "clustering/immediate_consistency/version.hpp"
 #include "containers/uuid.hpp"
 #include "unittest/unittest_utils.hpp"
 #include "random.hpp"
