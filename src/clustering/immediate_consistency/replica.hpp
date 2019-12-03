@@ -2,9 +2,16 @@
 #ifndef CLUSTERING_IMMEDIATE_CONSISTENCY_REPLICA_HPP_
 #define CLUSTERING_IMMEDIATE_CONSISTENCY_REPLICA_HPP_
 
+#include "buffer_cache/types.hpp"
 #include "clustering/immediate_consistency/backfill_metadata.hpp"
 #include "clustering/immediate_consistency/backfiller.hpp"
 #include "concurrency/timestamp_enforcer.hpp"
+
+class order_token_t;
+struct read_t;
+struct read_response_t;
+struct write_t;
+struct write_response_t;
 
 /* `replica_t` represents a replica of a shard which is currently tracking changes to a
 given branch. `local_replicator_t` and `remote_replicator_client_t` construct a

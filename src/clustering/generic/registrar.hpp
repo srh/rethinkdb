@@ -32,7 +32,7 @@ public:
                                                   this, ph::_1, ph::_2))
     { }
 
-    registrar_business_card_t<business_card_t> get_business_card() {
+    registrar_business_card_t<business_card_t> get_business_card() const {
         return registrar_business_card_t<business_card_t>(
             create_mailbox.get_address(),
             delete_mailbox.get_address());

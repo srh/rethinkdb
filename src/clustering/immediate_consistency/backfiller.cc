@@ -3,9 +3,82 @@
 
 #include "assignment_sentry.hpp"
 #include "clustering/immediate_consistency/history.hpp"
+#include "concurrency/new_semaphore.hpp"
 #include "rdb_protocol/distribution_progress.hpp"
 #include "rdb_protocol/protocol.hpp"
 #include "store_view.hpp"
+
+class backfiller_t::client_t {
+public:
+    client_t(backfiller_t *, const backfiller_bcard_t::intro_1_t &intro, signal_t *);
+
+private:
+    /* `session_t` represents a session within this backfill; the definition is
+    hidden to keep this header file simple. */
+    class session_t;
+
+    void on_begin_session(
+        signal_t *interruptor,
+        const fifo_enforcer_write_token_t &write_token,
+        const key_range_t::right_bound_t &threshold);
+    void on_end_session(
+        signal_t *interruptor,
+        const fifo_enforcer_write_token_t &write_token);
+    void on_ack_items(
+        signal_t *interruptor,
+        const fifo_enforcer_write_token_t &write_token,
+        size_t mem_size);
+    void on_pre_items(
+        signal_t *interruptor,
+        const fifo_enforcer_write_token_t &write_token,
+        backfill_item_seq_t<backfill_pre_item_t> &&chunk);
+
+    backfiller_t *const parent;
+
+    /* `intro` is what we received from the backfillee in the initial handshake. */
+    backfiller_bcard_t::intro_1_t const intro;
+
+    /* `full_region` is the entire region that this backfill applies to. It's the
+    same as `intro.initial_version.get_domain()`. */
+    region_t const full_region;
+
+    /* `fifo_source` is used to attach order tokens to the messages we send to the
+    backfillee. `fifo_sink` is used to interpret the order tokens on messages we
+    receive from the backfillee. */
+    fifo_enforcer_source_t fifo_source;
+    fifo_enforcer_sink_t fifo_sink;
+
+    /* `common_version` and `pre_items` together describe the state of the
+    backfillee's B-tree relative to ours. Initially, `common_version` is set to the
+    timestamp of the common ancestor of our B-tree's version and the backfillee's
+    B-tree's version, and `pre_items` contains backfill pre items describing which
+    keys on the backfillee have changed since the common ancestor (*see note). When a
+    backfill session covers a certain region for the first time, it consumes the
+    corresponding part of `pre_items` and updates `common_version` to be whatever
+    version it sends to the backfillee. So if a subsequent backfill session backfills
+    the same region, then it only backfills things that have changed since the first
+    backfill session.
+
+    * Note: Actually, `pre_items` is initially empty. As we stream pre-items from
+    the backfillee, they are appended to the right-hand side. So it conceptually
+    contains all the pre items, but in reality it's filled in incrementally. */
+    region_map_t<state_timestamp_t> common_version;
+    backfill_item_seq_t<backfill_pre_item_t> pre_items;
+
+    /* `item_throttler` limits the total mem size of the backfill items that are
+    allowed to queue up on the backfillee. `item_throttler_acq` always holds
+    `item_throttler`, but its `count` changes to reflect the total mem size that's
+    currently in the queue. */
+    new_semaphore_t item_throttler;
+    new_semaphore_in_line_t item_throttler_acq;
+
+    scoped_ptr_t<session_t> current_session;
+
+    backfiller_bcard_t::pre_items_mailbox_t pre_items_mailbox;
+    backfiller_bcard_t::begin_session_mailbox_t begin_session_mailbox;
+    backfiller_bcard_t::end_session_mailbox_t end_session_mailbox;
+    backfiller_bcard_t::ack_items_mailbox_t ack_items_mailbox;
+};
 
 backfiller_t::backfiller_t(
         mailbox_manager_t *_mailbox_manager,
@@ -16,6 +89,14 @@ backfiller_t::backfiller_t(
     store(_store),
     registrar(mailbox_manager, this)
     { }
+
+backfiller_t::~backfiller_t() { }
+
+backfiller_bcard_t backfiller_t::get_business_card() const {
+    return backfiller_bcard_t {
+        store->get_region(),
+        registrar.get_business_card() };
+}
 
 backfiller_t::client_t::client_t(
         backfiller_t *_parent,
