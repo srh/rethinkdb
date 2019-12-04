@@ -146,7 +146,7 @@ public:
     class intro_2_t {
     public:
         /* The backfillee uses this to determine where to send pre-items from. */
-        region_map_t<state_timestamp_t> common_version;
+        region_map_t<version_t> common_version;
 
         /* This is the branch history corresponding to the `version_t`s that will be sent
         later. */

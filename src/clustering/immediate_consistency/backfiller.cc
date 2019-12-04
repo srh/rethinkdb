@@ -49,20 +49,28 @@ private:
     fifo_enforcer_sink_t fifo_sink;
 
     /* `common_version` and `pre_items` together describe the state of the
-    backfillee's B-tree relative to ours. Initially, `common_version` is set to the
-    timestamp of the common ancestor of our B-tree's version and the backfillee's
-    B-tree's version, and `pre_items` contains backfill pre items describing which
-    keys on the backfillee have changed since the common ancestor (*see note). When a
-    backfill session covers a certain region for the first time, it consumes the
-    corresponding part of `pre_items` and updates `common_version` to be whatever
-    version it sends to the backfillee. So if a subsequent backfill session backfills
-    the same region, then it only backfills things that have changed since the first
+    backfillee's B-tree relative to ours. Initially, `common_version` is set
+    to the version_t (a (branch id, timestamp) pair) of the common ancestor
+    of our B-tree's version and the backfillee's B-tree's version, which
+    might be version_t::zero(), and `pre_items` contains backfill pre items
+    describing which keys on the backfillee have changed since the common
+    ancestor (*see note).  When a backfill session covers a certain region
+    for the first time, it consumes the corresponding part of `pre_items`
+    and updates `common_version` to be whatever version it sends to the
+    backfillee. So if a subsequent backfill session backfills the same
+    region, then it only backfills things that have changed since the first
     backfill session.
 
-    * Note: Actually, `pre_items` is initially empty. As we stream pre-items from
-    the backfillee, they are appended to the right-hand side. So it conceptually
-    contains all the pre items, but in reality it's filled in incrementally. */
-    region_map_t<state_timestamp_t> common_version;
+    * Note: The branch id's are redundant information -- they could be
+      computed from the backfiller's branch history and the
+      state_timestamp_t field in the version_t.  In fact, the backfillee, which
+      uses the branch id's it receives, could compute that information.
+
+    * Note: Actually, `pre_items` is initially empty. As we stream pre-items
+      from the backfillee, they are appended to the right-hand side. So it
+      conceptually contains all the pre items, but in reality it's filled in
+      incrementally. */
+    region_map_t<version_t> common_version;
     backfill_item_seq_t<backfill_pre_item_t> pre_items;
 
     /* `item_throttler` limits the total mem size of the backfill items that are
@@ -146,16 +154,14 @@ backfiller_t::client_t::client_t(
                     [&](const region_t &region2, const version_t &version2) {
                         try {
                             return version_find_common(
-                                    &combined_history, version1, version2, region2)
-                                .map(region2,
-                                    [](const version_t &v) { return v.timestamp; });
+                                    &combined_history, version1, version2, region2);
                         } catch (const missing_branch_exc_t &) {
                             /* If we don't have enough information to determine the
                             common ancestor of the two versions, act as if it's zero.
                             This will always produce correct results but it might make us
                             do more backfilling than necessary. */
-                            return region_map_t<state_timestamp_t>(
-                                region2, state_timestamp_t::zero());
+                            return region_map_t<version_t>(
+                                region2, version_t::zero());
                         }
                     });
             });
@@ -180,11 +186,11 @@ backfiller_t::client_t::client_t(
     uint64_t num_changes_estimate = 0;
     our_version.visit(full_region, [&](const region_t &r1, const version_t &v1) {
         intro.initial_version.visit(r1, [&](const region_t &r2, const version_t &v2) {
-            common_version.visit(r2, [&](const region_t &, const state_timestamp_t &b) {
-                guarantee(v1.timestamp >= b);
-                guarantee(v2.timestamp >= b);
-                uint64_t backfiller_changes = v1.timestamp.count_changes(b);
-                uint64_t backfillee_changes = v2.timestamp.count_changes(b);
+            common_version.visit(r2, [&](const region_t &, const version_t &b) {
+                guarantee(v1.timestamp >= b.timestamp);
+                guarantee(v2.timestamp >= b.timestamp);
+                uint64_t backfiller_changes = v1.timestamp.count_changes(b.timestamp);
+                uint64_t backfillee_changes = v2.timestamp.count_changes(b.timestamp);
                 uint64_t total_changes = backfiller_changes + backfillee_changes;
                 num_changes_estimate = std::max(num_changes_estimate, total_changes);
             });
@@ -426,7 +432,7 @@ private:
                         parent->intro.config.item_chunk_mem_size);
 
                     parent->parent->store->send_backfill(
-                        parent->common_version.mask(subregion),
+                        parent->common_version.map(subregion, [](const version_t &v) { return v.timestamp; }),
                         &producer, &consumer, &memory_tracker,
                         keepalive.get_drain_signal());
 
@@ -464,9 +470,7 @@ private:
 
                         /* Update `common_version` to reflect the changes that will
                         happen on the backfillee in response to the chunk */
-                        parent->common_version.update(
-                            metainfo.map(metainfo.get_domain(),
-                                [](const version_t &v) { return v.timestamp; }));
+                        parent->common_version.update(metainfo);
 
                         /* Discard pre-items we don't need anymore. This has two
                         purposes: it saves memory, and it keeps `pre_items` consistent

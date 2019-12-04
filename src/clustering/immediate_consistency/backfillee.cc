@@ -488,7 +488,9 @@ void backfillee_t::send_pre_items(auto_drainer_t::lock_t keepalive) {
                 backfill_config_t const *const config;
             } callback(&chunk, &backfill_config);
 
-            store->send_backfill_pre(intro.common_version.mask(subregion), &callback,
+            store->send_backfill_pre(
+                intro.common_version.map(subregion, [](const version_t &v) { return v.timestamp; }),
+                &callback,
                 keepalive.get_drain_signal());
 
             /* Adjust for the fact that `chunk.get_mem_size()` isn't precisely equal to
