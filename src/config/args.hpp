@@ -26,7 +26,7 @@
 // The number of hash-based CPU shards per table.
 // This "must" be hard-coded because a cluster cannot run with
 // differing cpu sharding factors.
-#define CPU_SHARDING_FACTOR                       8
+#define CPU_SHARDING_FACTOR                       1
 
 // Defines the maximum size of the batch of IO events to process on
 // each loop iteration. A larger number will increase throughput but
@@ -49,6 +49,8 @@
 // I/O priority of index writes in the log serializer
 #define INDEX_WRITE_IO_PRIORITY                   128
 
+// TODO: Remove/replace this and any other unused config/args.hpp defines.
+
 // Each cache uses its own I/O account for reads.
 // Writes use the default I/O account, which in practice is going to be overridden
 // by a common account in the merger_serializer_t.
@@ -61,7 +63,7 @@
 // flushes.  The rationale behind this is that reads are almost always blocking
 // operations.  Writes, on the other hand, can be non-blocking (from the user's
 // perspective) if they are soft-durability or noreply writes.
-#define CACHE_READS_IO_PRIORITY                   (512 / CPU_SHARDING_FACTOR)
+#define CACHE_READS_IO_PRIORITY                   512
 
 // The cache priority to use for secondary index post construction
 // 100 = same priority as all other read operations in the cache together.
