@@ -445,15 +445,7 @@ void table_query_client_t::dispatch_debug_direct_read(
                 "This server does not have any data available for the given table.",
                 query_state_t::FAILED);
         }
-        read_response_t responses;
 
-        // TODO: Check that op.shard is a no-op and remove.  (It might return false if an
-        // empty read region already got here; check that.)
-        region_t region = region_t::universe();
-        read_t subread;
-        if (!op.shard(region, &subread)) {
-            return;
-        }
         {
             // TODO: With rocksdb this might be an unnecessary thread switch.
             store_view_t *store =
@@ -463,22 +455,19 @@ void table_query_client_t::dispatch_debug_direct_read(
             on_thread_t thread_switcher_2(store->home_thread());
 #ifndef NDEBUG
             metainfo_checker_t checker(
-                region, [](const region_t &, const version_t &) {});
+                region_t::universe(), [](const region_t &, const version_t &) {});
 #endif /* NDEBUG */
             read_token_t token;
             store->new_read_token(&token);
             store->read(
                 DEBUG_ONLY(checker, )
-                subread, &responses, &token,
+                op, response, &token,
                 &interruptor_on_store);
         }
         // Maybe we missed the interruption on the other thread.
         if (interruptor_on_mtm.is_pulsed()) {
             throw interrupted_exc_t();
         }
-        // TODO: Check that op.unshard is a no-op and remove.  (Fixup profiling etc.)
-        op.unshard(&responses, 1 /* {responses} array length */, response, ctx,
-            &interruptor_on_mtm);
     });
 }
 
