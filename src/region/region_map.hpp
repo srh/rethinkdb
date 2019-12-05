@@ -278,41 +278,14 @@ template<cluster_version_t W, class V>
 MUST_USE archive_result_t deserialize(read_stream_t *s, region_map_t<V> *map) {
     static_assert(W == cluster_version_t::v2_5_is_latest,
         "deserialize() is only supported for the latest version");
-    switch (W) {
-        case cluster_version_t::v2_5_is_latest:
-        case cluster_version_t::v2_4:
-        case cluster_version_t::v2_3:
-        case cluster_version_t::v2_2:
-        case cluster_version_t::v2_1: {
-            archive_result_t res;
-            res = deserialize<W>(s, &map->inner);
-            if (bad(res)) { return res; }
-            res = deserialize<W>(s, &map->hash_beg);
-            if (bad(res)) { return res; }
-            res = deserialize<W>(s, &map->hash_end);
-            if (bad(res)) { return res; }
-            return archive_result_t::SUCCESS;
-        }
-        case cluster_version_t::v2_0:
-        case cluster_version_t::v1_16:
-        case cluster_version_t::v1_15:
-        case cluster_version_t::v1_14: {
-            std::vector<std::pair<region_t, V> > pairs;
-            archive_result_t res = deserialize<W>(s, &pairs);
-            if (bad(res)) { return res; }
-            std::vector<region_t> regions;
-            std::vector<V> values;
-            for (auto &&pair : pairs) {
-                regions.push_back(pair.first);
-                values.push_back(std::move(pair.second));
-            }
-            *map = region_map_t<V>::from_unordered_fragments(
-                std::move(regions), std::move(values));
-            return archive_result_t::SUCCESS;
-        }
-    default:
-        unreachable();
-    }
+    archive_result_t res;
+    res = deserialize<W>(s, &map->inner);
+    if (bad(res)) { return res; }
+    res = deserialize<W>(s, &map->hash_beg);
+    if (bad(res)) { return res; }
+    res = deserialize<W>(s, &map->hash_end);
+    if (bad(res)) { return res; }
+    return archive_result_t::SUCCESS;
 }
 
 #endif  // REGION_REGION_MAP_HPP_
