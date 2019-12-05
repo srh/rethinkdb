@@ -45,15 +45,16 @@ public:
         // or wipe out just the metainfo and assert there is nothing else in the
         // actual table shards.
 
-        pmap(CPU_SHARDING_FACTOR, [&](int ix) {
+        {
             // TODO: Exceptions? If exceptions are being thrown in here, nothing is
             // handling them.
 
-            on_thread_t thread_switcher_2(store_thread_allocations[ix]->get_thread());
+            // TODO: Remove store_thread_allocations?  Or make it a single value.
+            on_thread_t thread_switcher_2(store_thread_allocations[THE_CPU_SHARD]->get_thread());
 
-            stores[ix].init(new store_t(
-                cpu_sharding_subspace(ix),
-                ix,
+            store.init(new store_t(
+                cpu_sharding_subspace(THE_CPU_SHARD),
+                THE_CPU_SHARD,
                 rocks,
                 "shard",
                 create,
@@ -64,7 +65,7 @@ public:
                 base_path,
                 table_id,
                 update_sindexes_t::UPDATE));
-        });
+        };
 
         // We create existence key after we've actually created and initialized
         // the stores (and before any data writes could happen).
@@ -80,29 +81,38 @@ public:
         store_thread_allocations.clear();
         map_insertion_sentry.reset();
         drainer.drain();
-        pmap(CPU_SHARDING_FACTOR, [this](int ix) {
-            if (stores[ix].has()) {
-                on_thread_t thread_switcher(stores[ix]->home_thread());
-                stores[ix].reset();
-            }
-        });
+
+        if (store.has()) {
+            on_thread_t thread_switcher(store->home_thread());
+            store.reset();
+        }
     }
 
     branch_history_manager_t *get_branch_history_manager() {
         return branch_history_manager.get();
     }
 
-    store_view_t *get_cpu_sharded_store(size_t i) {
-        return stores[i].get();
+    // TODO: Remove
+    store_view_t *get_cpu_sharded_store(UNUSED size_t i) {
+        return store.get();
     }
 
-    store_t *get_underlying_store(size_t i) {
-        return stores[i].get();
+    store_view_t *get_store() {
+        return store.get();
+    }
+
+    // TODO: Remove
+    store_t *get_underlying_store(UNUSED size_t i) {
+        return store.get();
+    }
+
+    store_t *get_underlying_store() {
+        return store.get();
     }
 
 private:
     scoped_ptr_t<real_branch_history_manager_t> branch_history_manager;
-    scoped_ptr_t<store_t> stores[CPU_SHARDING_FACTOR];
+    scoped_ptr_t<store_t> store;
 
     std::vector<scoped_ptr_t<thread_allocation_t> > store_thread_allocations;
 

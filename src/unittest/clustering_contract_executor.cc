@@ -96,24 +96,26 @@ public:
     explicit executor_tester_files_t(const server_id_t &_server_id) :
             server_id(_server_id) {
         int next_thread = 0;
-        for (size_t i = 0; i < CPU_SHARDING_FACTOR; ++i) {
-            stores[i].init(new mock_store_t(version_t::zero()));
-            stores[i]->rethread(threadnum_t(next_thread));
-            next_thread = (next_thread + 1) % get_num_threads();
-        }
+        stores[THE_CPU_SHARD].init(new mock_store_t(version_t::zero()));
+        stores[THE_CPU_SHARD]->rethread(threadnum_t(next_thread));
+        next_thread = (next_thread + 1) % get_num_threads();
     }
     ~executor_tester_files_t() {
-        for (size_t i = 0; i < CPU_SHARDING_FACTOR; ++i) {
-            stores[i]->rethread(home_thread());
-        }
+        stores[THE_CPU_SHARD]->rethread(home_thread());
     }
     branch_history_manager_t *get_branch_history_manager() {
         return &branch_history_manager;
     }
-    store_view_t *get_cpu_sharded_store(size_t i) {
-        return stores[i].get();
+    store_view_t *get_cpu_sharded_store(UNUSED size_t i) {
+        return stores[THE_CPU_SHARD].get();
+    }
+    store_view_t *get_store() {
+        return stores[THE_CPU_SHARD].get();
     }
     store_t *get_underlying_store(UNUSED size_t i) {
+        crash("not implemented for this unit test");
+    }
+    store_t *get_underlying_store() {
         crash("not implemented for this unit test");
     }
 private:

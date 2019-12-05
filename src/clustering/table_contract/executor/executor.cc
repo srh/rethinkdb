@@ -17,8 +17,7 @@ public:
             const table_raft_state_t &state) :
         parent(_parent), contract_id(_contract_id),
         store_subview(
-            parent->multistore->get_cpu_sharded_store(
-                get_cpu_shard_number(key.region)),
+            parent->multistore->get_store(),
             key.region),
         perfmon_name(strprintf("%s-%d", key.role_name().c_str(), ++parent->perfmon_counter))
     {

@@ -23,6 +23,9 @@
  * Basic configuration parameters.
  */
 
+// TODO: Remove these two
+#define THE_CPU_SHARD                             0
+
 // The number of hash-based CPU shards per table.
 // This "must" be hard-coded because a cluster cannot run with
 // differing cpu sharding factors.

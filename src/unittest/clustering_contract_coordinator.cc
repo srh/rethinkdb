@@ -210,15 +210,12 @@ public:
         SCOPED_TRACE("checking contract: " + context);
         key_range_t range = quick_range(quick_range_spec);
         cpu_contract_ids_t res;
-        bool found[CPU_SHARDING_FACTOR];
-        for (size_t i = 0; i < CPU_SHARDING_FACTOR; ++i) {
-            found[i] = false;
-        }
+        bool found = false;
         for (const auto &pair : state.contracts) {
             if (pair.second.first.inner == range) {
-                size_t i = get_cpu_shard_number(pair.second.first);
-                EXPECT_FALSE(found[i]);
-                found[i] = true;
+                const size_t i = THE_CPU_SHARD;
+                EXPECT_FALSE(found);
+                found = true;
                 res.contract_ids[i] = pair.first;
                 const contract_t &expect = contracts.contracts[i];
                 const contract_t &actual = pair.second.second;
@@ -246,9 +243,7 @@ public:
                 }
             }
         }
-        for (size_t i = 0; i < CPU_SHARDING_FACTOR; ++i) {
-            EXPECT_TRUE(found[i]);
-        }
+        EXPECT_TRUE(found);
         return res;
     }
 
@@ -258,9 +253,7 @@ public:
         SCOPED_TRACE("checking branches");
 
         bool mismatched[CPU_SHARDING_FACTOR];
-        for (size_t i = 0; i < CPU_SHARDING_FACTOR; ++i) {
-            mismatched[i] = false;
-        }
+        mismatched[THE_CPU_SHARD] = false;
         state.current_branches.visit(
             region_t(branches.range),
             [&](const region_t &reg, const branch_id_t &branch) {
