@@ -730,8 +730,8 @@ void calculate_all_contracts(
     /* Slice the new contracts by CPU shard and by user shard, so that no contract spans
     more than one CPU shard or user shard. */
     std::map<region_t, contract_t> new_contract_map;
-    for (size_t cpu = 0; cpu < CPU_SHARDING_FACTOR; ++cpu) {
-        region_t region = cpu_sharding_subspace(cpu);
+    {
+        region_t region = cpu_sharding_subspace(THE_CPU_SHARD);
         for (size_t shard = 0; shard < old_state.config.config.shards.size(); ++shard) {
             region.inner = old_state.config.shard_scheme.get_shard_range(shard);
             new_contract_region_map.visit(region,

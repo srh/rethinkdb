@@ -51,25 +51,21 @@ public:
             const cpu_contracts_t &contracts) {
         cpu_contract_ids_t res;
         res.range = quick_range(quick_range_spec);
-        for (size_t i = 0; i < CPU_SHARDING_FACTOR; ++i) {
-            res.contract_ids[i] = generate_uuid();
-            state.contracts[res.contract_ids[i]] = std::make_pair(
-                region_intersection(region_t(res.range), cpu_sharding_subspace(i)),
-                contracts.contracts[i]);
-        }
+
+        res.contract_ids[THE_CPU_SHARD] = generate_uuid();
+        state.contracts[res.contract_ids[THE_CPU_SHARD]] = std::make_pair(
+            region_t(res.range),
+            contracts.contracts[THE_CPU_SHARD]);
+
         return res;
     }
     void remove_contract(const cpu_contract_ids_t &ids) {
-        for (size_t i = 0; i < CPU_SHARDING_FACTOR; ++i) {
-            state.contracts.erase(ids.contract_ids[i]);
-        }
+        state.contracts.erase(ids.contract_ids[THE_CPU_SHARD]);
     }
     void set_current_branches(const cpu_branch_ids_t &branches) {
-        for (size_t i = 0; i < CPU_SHARDING_FACTOR; ++i) {
-            region_t reg = cpu_sharding_subspace(i);
-            reg.inner = branches.range;
-            state.current_branches.update(reg, branches.branch_ids[i]);
-        }
+        region_t reg = cpu_sharding_subspace(THE_CPU_SHARD);
+        reg.inner = branches.range;
+        state.current_branches.update(reg, branches.branch_ids[THE_CPU_SHARD]);
     }
     void publish() {
         published_state.set_value_no_equals(state);

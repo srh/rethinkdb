@@ -79,12 +79,10 @@ public:
             const cpu_contracts_t &contracts) {
         cpu_contract_ids_t res;
         res.range = quick_range(quick_range_spec);
-        for (size_t i = 0; i < CPU_SHARDING_FACTOR; ++i) {
-            res.contract_ids[i] = generate_uuid();
-            state.contracts[res.contract_ids[i]] = std::make_pair(
-                region_intersection(region_t(res.range), cpu_sharding_subspace(i)),
-                contracts.contracts[i]);
-        }
+        res.contract_ids[THE_CPU_SHARD] = generate_uuid();
+        state.contracts[res.contract_ids[THE_CPU_SHARD]] = std::make_pair(
+            region_t(res.range),
+            contracts.contracts[THE_CPU_SHARD]);
         return res;
     }
 
@@ -92,11 +90,9 @@ public:
     the coordinator receives an ack with that branch in it from the primary for a given
     range during the initial branch registration of a new primary. */
     void set_current_branches(const cpu_branch_ids_t &branches) {
-        for (size_t i = 0; i < CPU_SHARDING_FACTOR; ++i) {
-            region_t reg = cpu_sharding_subspace(i);
-            reg.inner = branches.range;
-            state.current_branches.update(reg, branches.branch_ids[i]);
-        }
+        region_t reg = cpu_sharding_subspace(THE_CPU_SHARD);
+        reg.inner = branches.range;
+        state.current_branches.update(reg, branches.branch_ids[THE_CPU_SHARD]);
     }
 
     /* `add_ack()` creates one ack for each contract in the CPU-sharded contract set.
@@ -118,12 +114,10 @@ public:
             const branch_history_t &branch_history,
             std::initializer_list<quick_cpu_version_map_args_t> version) {
         guarantee(st == contract_ack_t::state_t::secondary_need_primary);
-        for (size_t i = 0; i < CPU_SHARDING_FACTOR; ++i) {
-            contract_ack_t ack(st);
-            ack.version.set(quick_cpu_version_map(i, version));
-            ack.branch_history = branch_history;
-            acks[contracts.contract_ids[i]][server] = ack;
-        }
+        contract_ack_t ack(st);
+        ack.version.set(quick_cpu_version_map(/* THE_CPU_SHARD, */ version));
+        ack.branch_history = branch_history;
+        acks[contracts.contract_ids[THE_CPU_SHARD]][server] = ack;
     }
     void add_ack(
             const server_id_t &server,

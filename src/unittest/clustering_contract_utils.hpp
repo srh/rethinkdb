@@ -31,14 +31,14 @@ public:
 /* `quick_cpu_version_map()` is a minimum-verbosity way to construct a
 `region_map_t<version_t>`. Use it something like this:
 
-    region_map_t<version_t> vers_map_for_cpu_shard_N = quick_cpu_version_map(N, {
+    region_map_t<version_t> vers_map_for_cpu_shard_THE_CPU_SHARD = quick_cpu_version_map({
         {"ABC", &my_first_branch, 25},
         {"DE", &my_second_branch, 28}
         });
 
 This creates a `region_map_t` on the branch `my_first_branch` at timestamp 25 in the
 first key-range, and on the branch `my_second_branch` at timestamp 28 in the second
-key-range. Note that it only operates on one CPU shard at a time. */
+key-range. Note that it only operates on one CPU shard (THE_CPU_SHARD) at a time. */
 struct quick_cpu_version_map_args_t {
 public:
     const char *quick_range_spec;
@@ -46,7 +46,6 @@ public:
     int timestamp;
 };
 region_map_t<version_t> quick_cpu_version_map(
-        size_t which_cpu_subspace,
         std::initializer_list<quick_cpu_version_map_args_t> qvms);
 
 /* `quick_cpu_branch()` is a convenience function to construct a collection of CPU-sharded
