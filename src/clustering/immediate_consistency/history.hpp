@@ -47,7 +47,7 @@ public:
     region_map_t<version_t> origin;
 };
 
-RDB_DECLARE_SERIALIZABLE(branch_birth_certificate_t);
+RDB_DECLARE_SERIALIZABLE_FOR_CLUSTER(branch_birth_certificate_t);
 RDB_DECLARE_EQUALITY_COMPARABLE(branch_birth_certificate_t);
 
 /* `missing_branch_exc_t` is thrown if we try to fetch a birth certificate for a branch
@@ -104,7 +104,7 @@ public:
 
     std::map<branch_id_t, branch_birth_certificate_t> branches;
 };
-RDB_DECLARE_SERIALIZABLE(branch_history_t);
+RDB_DECLARE_SERIALIZABLE_FOR_CLUSTER(branch_history_t);
 RDB_DECLARE_EQUALITY_COMPARABLE(branch_history_t);
 
 /* These are the key functions that we use to do lookups in the branch history. */

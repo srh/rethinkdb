@@ -3,9 +3,9 @@
 
 #include "clustering/administration/persist/file_keys.hpp"
 
-RDB_IMPL_SERIALIZABLE_3_SINCE_v2_1(table_raft_stored_header_t,
+RDB_IMPL_SERIALIZABLE_3_FOR_CLUSTER(table_raft_stored_header_t,
     current_term, voted_for, commit_index);
-RDB_IMPL_SERIALIZABLE_4_SINCE_v2_1(table_raft_stored_snapshot_t,
+RDB_IMPL_SERIALIZABLE_4_FOR_CLUSTER(table_raft_stored_snapshot_t,
     snapshot_state, snapshot_config, log_prev_index, log_prev_term);
 
 raft_log_index_t str_to_log_index(const std::string &str) {

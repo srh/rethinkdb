@@ -185,7 +185,7 @@ RDB_IMPL_EQUALITY_COMPARABLE_6(
 
 RDB_IMPL_SERIALIZABLE_1_SINCE_v2_1(
     table_raft_state_t::change_t::set_table_config_t, new_config);
-RDB_IMPL_SERIALIZABLE_7_SINCE_v2_1(
+RDB_IMPL_SERIALIZABLE_7_FOR_CLUSTER(
     table_raft_state_t::change_t::new_contracts_t,
     remove_contracts, add_contracts, remove_branches, add_branches,
     register_current_branches, remove_server_names, add_server_names);
@@ -194,9 +194,9 @@ RDB_IMPL_SERIALIZABLE_2_SINCE_v2_1(
     remove_member_ids, add_member_ids);
 RDB_IMPL_SERIALIZABLE_2_SINCE_v2_1(
     table_raft_state_t::change_t::new_server_names_t, raft_state, config_and_shards);
-RDB_IMPL_SERIALIZABLE_1_SINCE_v2_1(
+RDB_IMPL_SERIALIZABLE_1_FOR_CLUSTER(
     table_raft_state_t::change_t, v);
-RDB_IMPL_SERIALIZABLE_6_SINCE_v2_1(
+RDB_IMPL_SERIALIZABLE_6_FOR_CLUSTER(
     table_raft_state_t, config, contracts, branch_history, current_branches,
     member_ids, server_names);
 

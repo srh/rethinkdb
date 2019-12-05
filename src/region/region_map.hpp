@@ -276,6 +276,8 @@ void serialize(write_message_t *wm, const region_map_t<V> &map) {
 
 template<cluster_version_t W, class V>
 MUST_USE archive_result_t deserialize(read_stream_t *s, region_map_t<V> *map) {
+    static_assert(W == cluster_version_t::v2_4_is_latest,
+        "deserialize() is only supported for the latest version");
     switch (W) {
         case cluster_version_t::v2_4_is_latest:
         case cluster_version_t::v2_3:

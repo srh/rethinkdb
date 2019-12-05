@@ -5,7 +5,7 @@
 
 RDB_IMPL_SERIALIZABLE_2_SINCE_v1_13(version_t, branch, timestamp);
 
-RDB_IMPL_SERIALIZABLE_2_SINCE_v2_1(branch_birth_certificate_t,
+RDB_IMPL_SERIALIZABLE_2_FOR_CLUSTER(branch_birth_certificate_t,
     initial_timestamp, origin);
 RDB_IMPL_EQUALITY_COMPARABLE_2(branch_birth_certificate_t,
     initial_timestamp, origin);
@@ -64,7 +64,7 @@ bool branch_history_t::is_branch_known(const branch_id_t &branch) const THROWS_N
     return branches.count(branch) != 0;
 }
 
-RDB_IMPL_SERIALIZABLE_1_SINCE_v2_1(branch_history_t, branches);
+RDB_IMPL_SERIALIZABLE_1_FOR_CLUSTER(branch_history_t, branches);
 RDB_IMPL_EQUALITY_COMPARABLE_1(branch_history_t, branches);
 
 bool version_is_ancestor(
