@@ -166,64 +166,6 @@ hash_region_t<inner_region_t> drop_cpu_sharding(const hash_region_t<inner_region
     return hash_region_t<inner_region_t>(0, HASH_REGION_HASH_SIZE, r.inner);
 }
 
-template <class inner_region_t>
-std::vector< hash_region_t<inner_region_t> > region_subtract_many(const hash_region_t<inner_region_t> &minuend,
-                                                                  const std::vector< hash_region_t<inner_region_t> > &subtrahends) {
-    std::vector< hash_region_t<inner_region_t> > buf;
-    std::vector< hash_region_t<inner_region_t> > temp_result_buf;
-
-    buf.push_back(minuend);
-
-    for (typename std::vector<hash_region_t<inner_region_t> >::const_iterator s = subtrahends.begin(); s != subtrahends.end(); ++s) {
-        for (typename std::vector<hash_region_t<inner_region_t> >::const_iterator m = buf.begin(); m != buf.end(); ++m) {
-            // Subtract s from m, push back onto temp_result_buf.
-            // (See the "subtraction drawing" after this function.)
-            // We first subtract the hash range of s from the one from m,
-            // creating areas x and/or z if necessary.
-            // The remaining intersection of m's and s's hash ranges is
-            // then divided into sections l, r by subtracting s->inner from
-            // m->inner.
-
-            uint64_t isect_beg = std::max(m->beg, s->beg);
-            uint64_t isect_end = std::min(m->end, s->end);
-            // This outer conditional check is unnecessary, but it
-            // might improve performance because we avoid trying an
-            // unnecessary region intersection.
-            if (m->beg < s->beg || s->end < m->end) {
-                // Add x, if it exists.
-                if (m->beg < s->beg) {
-                    isect_beg = std::min(s->beg, m->end);
-                    temp_result_buf.push_back(
-                        hash_region_t<inner_region_t>(m->beg, isect_beg, m->inner));
-                }
-
-                // Add z, if it exists.
-                if (s->end < m->end) {
-                    isect_end = std::max(m->beg, s->end);
-                    temp_result_buf.push_back(
-                        hash_region_t<inner_region_t>(isect_end, m->end, m->inner));
-                }
-            }
-
-            if (isect_beg < isect_end) {
-                // The hash intersection is non-empty. Add l and r if necessary.
-                const std::vector<inner_region_t> s_vec = {s->inner};
-                const std::vector<inner_region_t> lr_inner =
-                    region_subtract_many(m->inner, s_vec);
-
-                for (auto it = lr_inner.begin(); it != lr_inner.end(); ++it) {
-                    temp_result_buf.push_back(
-                        hash_region_t<inner_region_t>(isect_beg, isect_end, *it));
-                }
-            }
-        }
-
-        buf.swap(temp_result_buf);
-        temp_result_buf.clear();
-    }
-
-    return buf;
-}
 
 // The "subtraction drawing":
 /*

@@ -37,31 +37,3 @@ region_join_result_t region_join(const std::vector<key_range_t> &vec, key_range_
     }
 }
 
-std::vector<key_range_t> region_subtract_many(key_range_t minuend, const std::vector<key_range_t>& subtrahends) {
-    std::vector<key_range_t> buf, temp_result_buf;
-    buf.push_back(minuend);
-    for (std::vector<key_range_t>::const_iterator s = subtrahends.begin(); s != subtrahends.end(); ++s) {
-        for (std::vector<key_range_t>::const_iterator m = buf.begin(); m != buf.end(); ++m) {
-            // We are computing m-s here for each m in buf and s in subtrahends:
-            // m-s = m & not(s) = m & ([-inf, s.left) | [s.right, +inf))
-            //                  = (m & [-inf, s.left)) | (m & [s.right, +inf))
-            key_range_t left = region_intersection(*m, key_range_t(key_range_t::none, store_key_t(), key_range_t::open, (*s).left));
-            if (!left.is_empty()) {
-                temp_result_buf.push_back(left);
-            }
-            if (!s->right.unbounded) {
-                key_range_t right = region_intersection(*m, key_range_t(
-                        key_range_t::closed, s->right.key(),
-                        key_range_t::none, store_key_t()));
-
-                if (!right.is_empty()) {
-                    temp_result_buf.push_back(right);
-                }
-            }
-        }
-        buf.swap(temp_result_buf);
-        temp_result_buf.clear();
-    }
-    return buf;
-}
-

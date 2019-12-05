@@ -27,6 +27,4 @@ inline bool region_overlaps(const key_range_t &r1, const key_range_t &r2) THROWS
 
 MUST_USE region_join_result_t region_join(const std::vector<key_range_t> &vec, key_range_t *out) THROWS_NOTHING;
 
-std::vector<key_range_t> region_subtract_many(key_range_t a, const std::vector<key_range_t>& b);
-
 #endif  // REGION_REGION_HPP_
