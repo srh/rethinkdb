@@ -21,23 +21,24 @@ enum class cluster_version_t {
     v2_2 = 7,
     v2_3 = 8,
     v2_4 = 9,
+    v2_5 = 10,
 
     // This is used in places where _something_ needs to change when a new cluster
     // version is created.  (Template instantiations, switches on version number,
     // etc.)
-    v2_4_is_latest = v2_4,
+    v2_5_is_latest = v2_5,
 
     // Like the *_is_latest version, but for code that's only concerned with disk
     // serialization. Must be changed whenever LATEST_DISK gets changed.
-    v2_4_is_latest_disk = v2_4,
+    v2_5_is_latest_disk = v2_5,
 
     // The latest version, max of CLUSTER and LATEST_DISK
-    LATEST_OVERALL = v2_4_is_latest,
+    LATEST_OVERALL = v2_5_is_latest,
 
     // The latest version for disk serialization can sometimes be different from the
     // version we use for cluster serialization.  This is also the latest version of
     // ReQL deterministic function behavior.
-    LATEST_DISK = v2_4,
+    LATEST_DISK = v2_5,
 
     // This exists as long as the clustering code only supports the use of one
     // version.  It uses cluster_version_t::CLUSTER wherever it uses this.

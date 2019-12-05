@@ -85,7 +85,7 @@ void get_secondary_indexes_internal(
     rocks_sindex_blob = rocksh.rocks->read(kv_location);
 
     string_read_stream_t stream(std::move(rocks_sindex_blob), 0);
-    archive_result_t res = deserialize<cluster_version_t::v2_4_is_latest_disk>(&stream, sindexes_out);
+    archive_result_t res = deserialize<cluster_version_t::v2_5_is_latest_disk>(&stream, sindexes_out);
     guarantee_deserialization(res, "sindex_map");
 }
 
