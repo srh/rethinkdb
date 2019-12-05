@@ -25,12 +25,12 @@ public:
             io_backender_t *io_backender,
             rdb_context_t *rdb_context,
             perfmon_collection_t *perfmon_collection_serializers,
-            std::vector<scoped_ptr_t<thread_allocation_t> > &&store_threads,
+            scoped_ptr_t<thread_allocation_t> &&store_thread,
             std::map<
                 namespace_id_t, std::pair<real_multistore_ptr_t *, auto_drainer_t::lock_t>
             > *real_multistores) :
         branch_history_manager(std::move(bhm)),
-        store_thread_allocations(std::move(store_threads)),
+        store_thread_allocation(std::move(store_thread)),
         map_insertion_sentry(
             real_multistores, table_id, std::make_pair(this, drainer.lock()))
     {
@@ -49,8 +49,7 @@ public:
             // TODO: Exceptions? If exceptions are being thrown in here, nothing is
             // handling them.
 
-            // TODO: Remove store_thread_allocations?  Or make it a single value.
-            on_thread_t thread_switcher_2(store_thread_allocations[THE_CPU_SHARD]->get_thread());
+            on_thread_t thread_switcher_2(store_thread_allocation->get_thread());
 
             store.init(new store_t(
                 cpu_sharding_subspace(THE_CPU_SHARD),
@@ -78,7 +77,7 @@ public:
     }
 
     ~real_multistore_ptr_t() {
-        store_thread_allocations.clear();
+        store_thread_allocation.reset();
         map_insertion_sentry.reset();
         drainer.drain();
 
@@ -92,17 +91,7 @@ public:
         return branch_history_manager.get();
     }
 
-    // TODO: Remove
-    store_view_t *get_cpu_sharded_store(UNUSED size_t i) {
-        return store.get();
-    }
-
     store_view_t *get_store() {
-        return store.get();
-    }
-
-    // TODO: Remove
-    store_t *get_underlying_store(UNUSED size_t i) {
         return store.get();
     }
 
@@ -114,7 +103,7 @@ private:
     scoped_ptr_t<real_branch_history_manager_t> branch_history_manager;
     scoped_ptr_t<store_t> store;
 
-    std::vector<scoped_ptr_t<thread_allocation_t> > store_thread_allocations;
+    scoped_ptr_t<thread_allocation_t> store_thread_allocation;
 
     auto_drainer_t drainer;
     map_insertion_sentry_t<
@@ -226,10 +215,7 @@ void real_table_persistence_interface_t::load_multistore(
         new real_branch_history_manager_t(
             table_id, metadata_file, metadata_read_txn, interruptor));
 
-    std::vector<scoped_ptr_t<thread_allocation_t> > store_threads;
-    for (size_t i = 0; i < CPU_SHARDING_FACTOR; ++i) {
-        store_threads.emplace_back(new thread_allocation_t(&thread_allocator));
-    }
+    auto store_thread = make_scoped<thread_allocation_t>(&thread_allocator);
 
     multistore_ptr_out->init(new real_multistore_ptr_t(
         io_backender->rocks(),
@@ -239,7 +225,7 @@ void real_table_persistence_interface_t::load_multistore(
         io_backender,
         rdb_context,
         perfmon_collection_serializers,
-        std::move(store_threads),
+        std::move(store_thread),
         &real_multistores));
 }
 

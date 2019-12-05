@@ -214,10 +214,8 @@ table_raft_state_t make_new_table_raft_state(
                 contract_t::primary_t { shard_conf.primary_replica, r_nullopt });
         }
         contract.after_emergency_repair = false;
-        for (size_t j = 0; j < CPU_SHARDING_FACTOR; ++j) {
-            region_t region = region_intersection(
-                region_t(config.shard_scheme.get_shard_range(i)),
-                cpu_sharding_subspace(j));
+        {
+            region_t region(config.shard_scheme.get_shard_range(i));
             state.contracts.insert(std::make_pair(generate_uuid(),
                 std::make_pair(region, contract)));
         }

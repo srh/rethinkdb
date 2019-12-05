@@ -213,11 +213,10 @@ public:
         bool found = false;
         for (const auto &pair : state.contracts) {
             if (pair.second.first.inner == range) {
-                const size_t i = THE_CPU_SHARD;
                 EXPECT_FALSE(found);
                 found = true;
-                res.contract_ids[i] = pair.first;
-                const contract_t &expect = contracts.contracts[i];
+                res.contract_ids[THE_CPU_SHARD] = pair.first;
+                const contract_t &expect = contracts.contracts[THE_CPU_SHARD];
                 const contract_t &actual = pair.second.second;
                 EXPECT_EQ(expect.replicas, actual.replicas);
                 EXPECT_EQ(expect.voters, actual.voters);
@@ -252,31 +251,25 @@ public:
     void check_current_branches(const cpu_branch_ids_t &branches) {
         SCOPED_TRACE("checking branches");
 
-        bool mismatched[CPU_SHARDING_FACTOR];
-        mismatched[THE_CPU_SHARD] = false;
+        bool mismatched = false;
         state.current_branches.visit(
             region_t(branches.range),
             [&](const region_t &reg, const branch_id_t &branch) {
-                int cs = get_cpu_shard_approx_number(reg);
                 /* Make sure the CPU shard matches exactly and fail otherwise. */
-                EXPECT_TRUE(cpu_sharding_subspace(cs).beg == reg.beg &&
-                    cpu_sharding_subspace(cs).end == reg.end);
-                if (branch != branches.branch_ids[cs]) {
-                    mismatched[cs] = true;
+                EXPECT_TRUE(cpu_sharding_subspace(THE_CPU_SHARD).beg == reg.beg &&
+                    cpu_sharding_subspace(THE_CPU_SHARD).end == reg.end);
+                if (branch != branches.branch_ids[THE_CPU_SHARD]) {
+                    mismatched = true;
                 }
             });
 
-        for (size_t i = 0; i < CPU_SHARDING_FACTOR; ++i) {
-            EXPECT_FALSE(mismatched[i]);
-        }
+        EXPECT_FALSE(mismatched);
     }
 
     /* `check_same_contract()` checks that the same contract is still present, with the
     exact same ID. */
     void check_same_contract(const cpu_contract_ids_t &contract_ids) {
-        for (size_t i = 0; i < CPU_SHARDING_FACTOR; ++i) {
-            EXPECT_EQ(1, state.contracts.count(contract_ids.contract_ids[i]));
-        }
+        EXPECT_EQ(1, state.contracts.count(contract_ids.contract_ids[THE_CPU_SHARD]));
     }
 
     table_raft_state_t state;

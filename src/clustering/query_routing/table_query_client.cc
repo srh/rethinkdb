@@ -456,7 +456,7 @@ void table_query_client_t::dispatch_debug_direct_read(
                 read_response_t subresponse;
                 {
                     store_view_t *store =
-                        multistore->get_cpu_sharded_store(shard_number);
+                        multistore->get_store();
                     cross_thread_signal_t interruptor_on_store(
                         &interruptor_on_mtm, store->home_thread());
                     on_thread_t thread_switcher_2(store->home_thread());

@@ -38,10 +38,9 @@ sindex_manager_t::get_status(signal_t *interruptor) const {
         }
     });
 
-    pmap(static_cast<int64_t>(0), static_cast<int64_t>(CPU_SHARDING_FACTOR),
-    [&](int64_t i) {
+    {
         std::map<std::string, std::pair<sindex_config_t, sindex_status_t> > store_state;
-        store_t *store = multistore->get_underlying_store(i);
+        store_t *store = multistore->get_underlying_store();
         cross_thread_signal_t ct_interruptor(interruptor, store->home_thread());
         {
             on_thread_t thread_switcher(store->home_thread());
@@ -58,7 +57,7 @@ sindex_manager_t::get_status(signal_t *interruptor) const {
                 pair.second.second.ready = false;
             }
         }
-    });
+    }
 
     return res;
 }
@@ -69,8 +68,9 @@ void sindex_manager_t::update_blocking(signal_t *interruptor) {
         goal = config->sindexes;
     });
 
-    for (size_t i = 0; i < CPU_SHARDING_FACTOR; ++i) {
-        store_t *store = multistore->get_underlying_store(i);
+    // TODO: THE_CPU_SHARD second look
+    {
+        store_t *store = multistore->get_underlying_store();
         cross_thread_signal_t ct_interruptor(interruptor, store->home_thread());
         on_thread_t thread_switcher(store->home_thread());
 

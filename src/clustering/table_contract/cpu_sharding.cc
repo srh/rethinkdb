@@ -7,9 +7,3 @@ region_t cpu_sharding_subspace(int subregion_number) {
 
     return region_t(key_range_t::universe());
 }
-
-// TODO: Remove
-int get_cpu_shard_approx_number(const region_t &region) {
-    return THE_CPU_SHARD;
-}
-

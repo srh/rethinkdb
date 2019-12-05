@@ -106,14 +106,8 @@ public:
     branch_history_manager_t *get_branch_history_manager() {
         return &branch_history_manager;
     }
-    store_view_t *get_cpu_sharded_store(UNUSED size_t i) {
-        return stores[THE_CPU_SHARD].get();
-    }
     store_view_t *get_store() {
         return stores[THE_CPU_SHARD].get();
-    }
-    store_t *get_underlying_store(UNUSED size_t i) {
-        crash("not implemented for this unit test");
     }
     store_t *get_underlying_store() {
         crash("not implemented for this unit test");
