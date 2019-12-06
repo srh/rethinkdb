@@ -79,10 +79,7 @@ const char* sindex_not_ready_exc_t::what() const throw() {
 
 sindex_not_ready_exc_t::~sindex_not_ready_exc_t() throw() { }
 
-// TODO: Remove region parameter (if we drop hash sharding).  It's always some cpu sharding subspace or universe.
-store_t::store_t(const region_t &_region,
-                 int _shard_no,
-                 rockstore::store *_rocks,
+store_t::store_t(rockstore::store *_rocks,
                  const char *perfmon_prefix,
                  bool create,
                  version_t zero_version,
@@ -92,16 +89,15 @@ store_t::store_t(const region_t &_region,
                  const base_path_t &base_path,
                  namespace_id_t _table_id,
                  update_sindexes_t _update_sindexes)
-    : store_view_t(_region),
+    : store_view_t(region_t::universe()),
       perfmon_collection(),
       rocks(_rocks),
       io_backender_(io_backender), base_path_(base_path),
       perfmon_collection_membership(
           parent_perfmon_collection, &perfmon_collection,
-          strprintf("%s_%d", perfmon_prefix, _shard_no)),
+          strprintf("%s_%d", perfmon_prefix, THE_CPU_SHARD)),
       ctx(_ctx),
       table_id(_table_id),
-      shard_no(_shard_no),
       write_superblock_acq_semaphore(WRITE_SUPERBLOCK_ACQ_WAITERS_LIMIT)
 {
     cache.init(new cache_t(&perfmon_collection));
@@ -731,7 +727,7 @@ void store_t::clear_sindex_data(
         clear_sindex_traversal_cb_t traversal_cb(pkey_range_to_clear);
         try {
             std::string rocks_sindex_kv_prefix =
-                rockstore::table_secondary_prefix(table_id, shard_no, sindex_id);
+                rockstore::table_secondary_prefix(table_id, THE_CPU_SHARD, sindex_id);
             superblock->read_acq_signal()->wait_lazily_ordered();
             rockstore::snapshot snap = make_snapshot(rocks);
             reached_end =
@@ -761,7 +757,7 @@ void store_t::clear_sindex_data(
         const std::vector<store_key_t> &keys = traversal_cb.get_keys();
         for (size_t i = 0; i < keys.size(); ++i) {
             std::string rocks_kv_location =
-                rockstore::table_secondary_key(table_id, shard_no, sindex_id, key_to_unescaped_str(keys[i]));
+                rockstore::table_secondary_key(table_id, THE_CPU_SHARD, sindex_id, key_to_unescaped_str(keys[i]));
             superblock->wait_write_batch()->Delete(rocks_kv_location);
         }
 

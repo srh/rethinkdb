@@ -157,7 +157,7 @@ void insert_data(namespace_interface_t *nsi,
 
 void prepare_namespace(namespace_interface_t *nsi,
                        order_source_t *osource,
-                       const std::vector<scoped_ptr_t<store_t> > *stores,
+                       store_t *store,
                        const std::vector<datum_t> &data) {
     // Create an index
     std::string index_id = "geo";
@@ -173,12 +173,10 @@ void prepare_namespace(namespace_interface_t *nsi,
         sindex_geo_bool_t::GEO);
 
     cond_t non_interruptor;
-    for (const auto &store : *stores) {
-        store->sindex_create(index_id, sindex, &non_interruptor);
-    }
+    store->sindex_create(index_id, sindex, &non_interruptor);
 
     // Wait for it to become ready
-    wait_for_sindex(stores, index_id);
+    wait_for_sindex(store, index_id);
 
     // Insert the test data
     insert_data(nsi, osource, data);
@@ -298,7 +296,7 @@ void test_get_nearest(lon_lat_point_t center,
 void run_get_nearest_test(
         namespace_interface_t *nsi,
         order_source_t *osource,
-        const std::vector<scoped_ptr_t<store_t> > *stores) {
+        store_t *store) {
     // To reproduce a known failure: initialize the rng seed manually.
     const int rng_seed = randint(INT_MAX);
     debugf("Using RNG seed %i\n", rng_seed);
@@ -306,7 +304,7 @@ void run_get_nearest_test(
 
     const size_t num_docs = 500;
     std::vector<datum_t> data = generate_data(num_docs, &rng);
-    prepare_namespace(nsi, osource, stores, data);
+    prepare_namespace(nsi, osource, store, data);
 
     try {
         const int num_runs = 20;
@@ -432,7 +430,7 @@ void test_get_intersecting(const datum_t &query_geometry,
 void run_get_intersecting_test(
         namespace_interface_t *nsi,
         order_source_t *osource,
-        const std::vector<scoped_ptr_t<store_t> > *stores) {
+        store_t *store) {
     // To reproduce a known failure: initialize the rng seed manually.
     const int rng_seed = randint(INT_MAX);
     debugf("Using RNG seed %i\n", rng_seed);
@@ -440,7 +438,7 @@ void run_get_intersecting_test(
 
     const size_t num_docs = 500;
     std::vector<datum_t> data = generate_data(num_docs, &rng);
-    prepare_namespace(nsi, osource, stores, data);
+    prepare_namespace(nsi, osource, store, data);
 
     try {
         const int num_point_runs = 10;

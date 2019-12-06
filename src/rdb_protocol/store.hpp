@@ -61,9 +61,7 @@ class store_t final : public store_view_t {
 public:
     using home_thread_mixin_t::assert_thread;
 
-    store_t(const region_t &region,
-            int shard_no,
-            rockstore::store *rocks,
+    store_t(rockstore::store *rocks,
             const char *perfmon_prefix,
             bool create,
             version_t zero_version,  // If create is true, used to initialize metainfo.
@@ -295,7 +293,7 @@ public:
             THROWS_ONLY(interrupted_exc_t);
 
     rockshard rocksh() const {
-        return rockshard(rocks, table_id, shard_no);
+        return rockshard(rocks, table_id, THE_CPU_SHARD);
     }
 
 private:
@@ -388,7 +386,6 @@ public:
 
 private:
     namespace_id_t table_id;
-    int shard_no;
 
     sindex_context_map_t sindex_context;
 

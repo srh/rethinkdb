@@ -247,8 +247,6 @@ TPTEST(RDBBtree, SindexPostConstruct) {
     io_backender_t io_backender(temp_rocks.rocks(), file_direct_io_mode_t::buffered_desired);
 
     store_t store(
-            region_t::universe(),
-            0,
             io_backender.rocks(),
             "unit_test_store",
             true,
@@ -280,8 +278,6 @@ TPTEST(RDBBtree, SindexEraseRange) {
     io_backender_t io_backender(temp_rocks.rocks(), file_direct_io_mode_t::buffered_desired);
 
     store_t store(
-            region_t::universe(),
-            0,
             io_backender.rocks(),
             "unit_test_store",
             true,
@@ -347,8 +343,6 @@ TPTEST(RDBBtree, SindexInterruptionViaDrop) {
     io_backender_t io_backender(temp_rocks.rocks(), file_direct_io_mode_t::buffered_desired);
 
     store_t store(
-            region_t::universe(),
-            0,
             io_backender.rocks(),
             "unit_test_store",
             true,
@@ -379,8 +373,6 @@ TPTEST(RDBBtree, SindexInterruptionViaStoreDelete) {
     io_backender_t io_backender(temp_rocks.rocks(), file_direct_io_mode_t::buffered_desired);
 
     scoped_ptr_t<store_t> store(new store_t(
-            region_t::universe(),
-            0,
             io_backender.rocks(),
             "unit_test_store",
             true,

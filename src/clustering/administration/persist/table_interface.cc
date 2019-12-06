@@ -52,8 +52,6 @@ public:
             on_thread_t thread_switcher_2(store_thread_allocation->get_thread());
 
             store.init(new store_t(
-                cpu_sharding_subspace(THE_CPU_SHARD),
-                THE_CPU_SHARD,
                 rocks,
                 "shard",
                 create,

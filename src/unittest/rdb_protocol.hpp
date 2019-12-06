@@ -11,6 +11,7 @@
 
 class namespace_interface_t;
 class order_source_t;
+struct sindex_name_t;
 class store_t;
 
 namespace unittest {
@@ -21,13 +22,16 @@ void run_with_namespace_interface(
         std::function<void(
             namespace_interface_t *,
             order_source_t *,
-            const std::vector<scoped_ptr_t<store_t> > *)> fun,
+            store_t *)> fun,
         bool oversharding = false,
         int num_restarts = 1);
 
 void wait_for_sindex(
-    const std::vector<scoped_ptr_t<store_t> > *stores,
+    store_t *store,
     const std::string &id);
+
+// Defined in rdb_btree.cc.
+sindex_name_t create_sindex(store_t *store);
 
 } /* namespace unittest */
 

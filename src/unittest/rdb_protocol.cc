@@ -31,7 +31,7 @@ void run_with_namespace_interface(
         std::function<void(
             namespace_interface_t *,
             order_source_t *,
-            const std::vector<scoped_ptr_t<store_t> > *
+            store_t *
             )> fun,
         bool oversharding,
         int num_restarts) {
@@ -40,7 +40,7 @@ void run_with_namespace_interface(
     /* Pick shards */
     std::vector<region_t> store_shards;
     if (oversharding) {
-        store_shards.push_back(region_t(key_range_t(key_range_t::none, store_key_t(), key_range_t::none, store_key_t())));
+        store_shards.push_back(region_t::universe());
     } else {
         store_shards.push_back(region_t(key_range_t(key_range_t::none, store_key_t(), key_range_t::open, store_key_t("n"))));
         store_shards.push_back(region_t(key_range_t(key_range_t::closed, store_key_t("n"), key_range_t::none, store_key_t() )));
@@ -51,6 +51,7 @@ void run_with_namespace_interface(
     nsi_shards.push_back(region_t(key_range_t(key_range_t::none,   store_key_t(),  key_range_t::open, store_key_t("n"))));
     nsi_shards.push_back(region_t(key_range_t(key_range_t::closed, store_key_t("n"), key_range_t::none, store_key_t() )));
 
+    // TODO: No temp_files, sorry.
     std::vector<scoped_ptr_t<temp_file_t> > temp_files;
     for (size_t i = 0; i < store_shards.size(); ++i) {
         temp_files.push_back(make_scoped<temp_file_t>());
@@ -66,27 +67,18 @@ void run_with_namespace_interface(
 
     for (int rep = 0; rep < num_restarts; ++rep) {
         const bool do_create = rep == 0;
-        std::vector<scoped_ptr_t<store_t> > underlying_stores;
-        for (size_t i = 0; i < store_shards.size(); ++i) {
-            // TODO: Why is this not cpu_sharding_subspace(i) region?
-            underlying_stores.push_back(
-                    make_scoped<store_t>(region_t::universe(), i, io_backender.rocks(),
-                        temp_files[i]->name().permanent_path().c_str(), do_create,
-                        version_t::zero(),
-                        &get_global_perfmon_collection(), &ctx, &io_backender,
-                        base_path_t("."), table_id, update_sindexes_t::UPDATE));
-        }
+        scoped_ptr_t<store_t> underlying_store =
+                make_scoped<store_t>(io_backender.rocks(),
+                    temp_files[0]->name().permanent_path().c_str(), do_create,
+                    version_t::zero(),
+                    &get_global_perfmon_collection(), &ctx, &io_backender,
+                    base_path_t("."), table_id, update_sindexes_t::UPDATE);
 
         std::vector<scoped_ptr_t<store_view_t> > stores;
         std::vector<store_view_t *> store_ptrs;
         for (size_t i = 0; i < nsi_shards.size(); ++i) {
-            if (oversharding) {
-                stores.push_back(make_scoped<store_subview_t>(underlying_stores[0].get(),
-                                                              nsi_shards[i]));
-            } else {
-                stores.push_back(make_scoped<store_subview_t>(underlying_stores[i].get(),
-                                                              nsi_shards[i]));
-            }
+            stores.push_back(make_scoped<store_subview_t>(underlying_store.get(),
+                                                          nsi_shards[i]));
             store_ptrs.push_back(stores.back().get());
         }
 
@@ -98,7 +90,7 @@ void run_with_namespace_interface(
                                         &ctx,
                                         do_create);
 
-        fun(&nsi, &order_source, &underlying_stores);
+        fun(&nsi, &order_source, underlying_store.get());
     }
 }
 
@@ -106,7 +98,7 @@ void run_in_thread_pool_with_namespace_interface(
         std::function<void(
             namespace_interface_t *,
             order_source_t *,
-            const std::vector<scoped_ptr_t<store_t> > *)> fun,
+            store_t *)> fun,
         bool oversharded,
         int num_restarts = 1) {
     extproc_spawner_t extproc_spawner;
@@ -121,7 +113,7 @@ horribly wrong */
 void run_setup_teardown_test(
         namespace_interface_t *,
         order_source_t *,
-        const std::vector<scoped_ptr_t<store_t> > *) {
+        const store_t *) {
     /* Do nothing */
 }
 TEST(RDBProtocol, SetupTeardown) {
@@ -136,7 +128,7 @@ TEST(RDBProtocol, OvershardedSetupTeardown) {
 void run_get_set_test(
         namespace_interface_t *nsi,
         order_source_t *osource,
-        const std::vector<scoped_ptr_t<store_t> > *) {
+        store_t *) {
     {
         write_t write(
                 point_write_t(store_key_t("a"), ql::datum_t::null()),
@@ -191,42 +183,18 @@ TEST(RDBProtocol, OvershardedGetSet) {
     run_in_thread_pool_with_namespace_interface(&run_get_set_test, true);
 }
 
-std::string create_sindex(const std::vector<scoped_ptr_t<store_t> > *stores) {
-    std::string id = uuid_to_str(generate_uuid());
-
-    const ql::sym_t arg(1);
-
-    ql::minidriver_t r(ql::backtrace_id_t::empty());
-    ql::raw_term_t mapping = r.var(arg)["sid"].root_term();
-
-    sindex_config_t sindex(
-        ql::map_wire_func_t(mapping, make_vector(arg)),
-        reql_version_t::LATEST,
-        sindex_multi_bool_t::SINGLE,
-        sindex_geo_bool_t::REGULAR);
-
-    cond_t non_interruptor;
-    for (const auto &store : *stores) {
-        store->sindex_create(id, sindex, &non_interruptor);
-    }
-
-    return id;
-}
-
 void wait_for_sindex(
-        const std::vector<scoped_ptr_t<store_t> > *stores,
+        store_t *store,
         const std::string &id) {
     cond_t non_interruptor;
     for (int attempts = 0; attempts < 50; ++attempts) {
         bool all_ok = true;
-        for (const auto &store : *stores) {
-            std::map<std::string, std::pair<sindex_config_t, sindex_status_t> > res =
-                store->sindex_list(&non_interruptor);
-            auto it = res.find(id);
-            if (it == res.end() || !it->second.second.ready) {
-                all_ok = false;
-                continue;
-            }
+        std::map<std::string, std::pair<sindex_config_t, sindex_status_t> > res =
+            store->sindex_list(&non_interruptor);
+        auto it = res.find(id);
+        if (it == res.end() || !it->second.second.ready) {
+            all_ok = false;
+            continue;
         }
         if (all_ok) {
             return;
@@ -236,21 +204,19 @@ void wait_for_sindex(
     ADD_FAILURE() << "Waiting for sindex " << id << " timed out.";
 }
 
-void drop_sindex(const std::vector<scoped_ptr_t<store_t> > *stores,
+void drop_sindex(store_t *store,
                  const std::string &id) {
     cond_t non_interruptor;
-    for (const auto &store : *stores) {
-        store->sindex_drop(id, &non_interruptor);
-    }
+    store->sindex_drop(id, &non_interruptor);
 }
 
 void run_create_drop_sindex_test(
         namespace_interface_t *nsi,
         order_source_t *osource,
-        const std::vector<scoped_ptr_t<store_t> > *stores) {
+        store_t *store) {
     /* Create a secondary index. */
-    std::string id = create_sindex(stores);
-    wait_for_sindex(stores, id);
+    std::string id = create_sindex(store).name;
+    wait_for_sindex(store, id);
 
     rapidjson::Document data;
     data.Parse("{\"id\" : 0, \"sid\" : 1}");
@@ -361,7 +327,7 @@ void run_create_drop_sindex_test(
         }
     }
 
-    drop_sindex(stores, id);
+    drop_sindex(store, id);
 }
 
 void populate_sindex(namespace_interface_t *nsi,
@@ -469,7 +435,7 @@ void fuzz_sindex(namespace_interface_t *nsi,
 void run_fuzz_create_drop_sindex(
         namespace_interface_t *nsi,
         order_source_t *osource,
-        const std::vector<scoped_ptr_t<store_t> > *stores) {
+        store_t *store) {
     const int num_docs = 500;
 
     /* Start fuzzing the table. */
@@ -485,11 +451,11 @@ void run_fuzz_create_drop_sindex(
     nap(2 * num_docs);
 
     /* Create a secondary index (this will post construct the index while under load). */
-    std::string id = create_sindex(stores);
-    wait_for_sindex(stores, id);
+    std::string id = create_sindex(store).name;
+    wait_for_sindex(store, id);
 
     /* Drop the index in the middle of fuzzing to test proper interruption under load. */
-    drop_sindex(stores, id);
+    drop_sindex(store, id);
 
     /* Fuzzing is stopped here by draining `fuzzing_drainer`. */
 }
@@ -502,30 +468,30 @@ TEST(RDBProtocol, SindexFuzzCreateDrop) {
 void run_create_drop_sindex_with_data_test(
         namespace_interface_t *nsi,
         order_source_t *osource,
-        const std::vector<scoped_ptr_t<store_t> > *stores,
+        store_t *store,
         int num_docs) {
     /* Create a secondary index. */
-    std::string id = create_sindex(stores);
-    wait_for_sindex(stores, id);
+    std::string id = create_sindex(store).name;
+    wait_for_sindex(store, id);
     populate_sindex(nsi, osource, num_docs);
-    drop_sindex(stores, id);
+    drop_sindex(store, id);
 }
 
 void run_repeated_sindex_test(
         namespace_interface_t *nsi,
         order_source_t *osource,
-        const std::vector<scoped_ptr_t<store_t> > *stores,
+        store_t *store,
         void (*fn)(
             namespace_interface_t *,
             order_source_t *,
-            const std::vector<scoped_ptr_t<store_t> > *,
+            store_t *,
             int)
         ) {
     // Run the test with just a few documents in it
-    fn(nsi, osource, stores, 128);
+    fn(nsi, osource, store, 128);
     // ... and just for fun sometimes do it a second time immediately after.
     if (randint(4) == 0) {
-        fn(nsi, osource, stores, 128);
+        fn(nsi, osource, store, 128);
     }
 
     // Nap for a random time before we shut down the namespace interface
@@ -555,14 +521,12 @@ TEST(RDBProtocol, OvershardedSindexCreateDrop) {
     run_in_thread_pool_with_namespace_interface(&run_create_drop_sindex_test, true);
 }
 
-void rename_sindex(const std::vector<scoped_ptr_t<store_t> > *stores,
+void rename_sindex(store_t *store,
                    std::string old_name,
                    std::string new_name) {
     std::map<std::string, std::string> renames{ {old_name, new_name} };
     cond_t non_interruptor;
-    for (const auto &store : *stores) {
-        store->sindex_rename_multi(renames, &non_interruptor);
-    }
+    store->sindex_rename_multi(renames, &non_interruptor);
 }
 
 void read_sindex(namespace_interface_t *nsi,
@@ -600,36 +564,36 @@ void read_sindex(namespace_interface_t *nsi,
 
 void run_rename_sindex_test(namespace_interface_t *nsi,
                             order_source_t *osource,
-                            const std::vector<scoped_ptr_t<store_t> > *stores,
+                            store_t *store,
                             int num_rows) {
     bool sindex_before_data = randint(2) == 0;
     std::string id1;
     std::string id2;
 
     if (sindex_before_data) {
-        id1 = create_sindex(stores);
-        id2 = create_sindex(stores);
+        id1 = create_sindex(store).name;
+        id2 = create_sindex(store).name;
     }
 
     populate_sindex(nsi, osource, num_rows);
 
     if (!sindex_before_data) {
-        id1 = create_sindex(stores);
-        id2 = create_sindex(stores);
+        id1 = create_sindex(store).name;
+        id2 = create_sindex(store).name;
     }
 
-    wait_for_sindex(stores, id1);
-    wait_for_sindex(stores, id2);
+    wait_for_sindex(store, id1);
+    wait_for_sindex(store, id2);
 
-    rename_sindex(stores, id1, id2);
-    rename_sindex(stores, id2, "fake");
-    rename_sindex(stores, "fake", "last");
+    rename_sindex(store, id1, id2);
+    rename_sindex(store, id2, "fake");
+    rename_sindex(store, "fake", "last");
 
     // At this point the only sindex should be 'last'
     // Perform a read to make sure it survived all the moves
     read_sindex(nsi, osource, 3.0, "last", num_rows / 4);
 
-    drop_sindex(stores, "last");
+    drop_sindex(store, "last");
 }
 
 TEST(RDBProtocol, SindexRename) {
@@ -665,25 +629,23 @@ TEST(RDBProtocol, SindexRepeatedRename) {
 }
 
 void check_sindexes(
-        const std::vector<scoped_ptr_t<store_t> > *stores,
+        store_t *store,
         const std::set<std::string> &expect) {
     cond_t non_interruptor;
-    for (const auto &store : *stores) {
-        std::map<std::string, std::pair<sindex_config_t, sindex_status_t> > res =
-            store->sindex_list(&non_interruptor);
-        for (const std::string &name : expect) {
-            EXPECT_EQ(1, res.count(name));
-        }
-        for (const auto &pair : res) {
-            EXPECT_EQ(1, expect.count(pair.first));
-        }
+    std::map<std::string, std::pair<sindex_config_t, sindex_status_t> > res =
+        store->sindex_list(&non_interruptor);
+    for (const std::string &name : expect) {
+        EXPECT_EQ(1, res.count(name));
+    }
+    for (const auto &pair : res) {
+        EXPECT_EQ(1, expect.count(pair.first));
     }
 }
 
 void run_sindex_list_test(
         UNUSED namespace_interface_t *nsi,
         UNUSED order_source_t *osource,
-        const std::vector<scoped_ptr_t<store_t> > *stores) {
+        store_t *store) {
     std::set<std::string> sindexes;
 
     // Do the whole test a couple times on the same namespace for kicks
@@ -692,18 +654,18 @@ void run_sindex_list_test(
 
         // Make a bunch of sindexes
         for (size_t j = 0; j < reps; ++j) {
-            check_sindexes(stores, sindexes);
-            sindexes.insert(create_sindex(stores));
+            check_sindexes(store, sindexes);
+            sindexes.insert(create_sindex(store).name);
         }
 
         // Remove all the sindexes
         for (size_t j = 0; j < reps; ++j) {
-            check_sindexes(stores, sindexes);
-            drop_sindex(stores, *sindexes.begin());
+            check_sindexes(store, sindexes);
+            drop_sindex(store, *sindexes.begin());
             sindexes.erase(sindexes.begin());
         }
         ASSERT_TRUE(sindexes.empty());
-        check_sindexes(stores, std::set<std::string>());
+        check_sindexes(store, std::set<std::string>());
     } // Do it again
 }
 
@@ -718,9 +680,9 @@ TEST(RDBProtocol, OvershardedSindexList) {
 void run_sindex_oversized_keys_test(
         namespace_interface_t *nsi,
         order_source_t *osource,
-        const std::vector<scoped_ptr_t<store_t> > *stores) {
-    std::string sindex_id = create_sindex(stores);
-    wait_for_sindex(stores, sindex_id);
+        store_t *store) {
+    std::string sindex_id = create_sindex(store).name;
+    wait_for_sindex(store, sindex_id);
     ql::configured_limits_t limits;
 
     for (size_t i = 0; i < 20; ++i) {
@@ -821,8 +783,8 @@ TEST(RDBProtocol, OvershardedOverSizedKeys) {
 void run_sindex_missing_attr_test(
         namespace_interface_t *nsi,
         order_source_t *osource,
-        const std::vector<scoped_ptr_t<store_t> > *stores) {
-    create_sindex(stores);
+        store_t *store) {
+    create_sindex(store);
 
     ql::configured_limits_t limits;
     rapidjson::Document data;
