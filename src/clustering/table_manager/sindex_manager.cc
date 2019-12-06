@@ -68,7 +68,6 @@ void sindex_manager_t::update_blocking(signal_t *interruptor) {
         goal = config->sindexes;
     });
 
-    // TODO: THE_CPU_SHARD second look
     {
         store_t *store = multistore->get_underlying_store();
         cross_thread_signal_t ct_interruptor(interruptor, store->home_thread());

@@ -319,6 +319,8 @@ changefeed::keyspec_t empty_reader_t::get_changespec() const {
         table_name);
 }
 
+// TODO: Probably, this code is designed to unshard from hash shards.  I bet
+// this could be simpler.
 raw_stream_t rget_response_reader_t::unshard(
     sorting_t sorting,
     rget_read_response_t &&res) {

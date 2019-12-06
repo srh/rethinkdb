@@ -311,33 +311,31 @@ TPTEST(RDBBtree, SindexEraseRange) {
         store.new_write_token(&token);
 
         scoped_ptr_t<txn_t> txn;
-        {
-            scoped_ptr_t<real_superblock_lock> superblock;
-            store.acquire_superblock_for_write(
-                1,
-                write_durability_t::SOFT,
-                &token,
-                &txn,
-                &superblock,
-                &dummy_interruptor);
+        scoped_ptr_t<real_superblock_lock> superblock;
+        store.acquire_superblock_for_write(
+            1,
+            write_durability_t::SOFT,
+            &token,
+            &txn,
+            &superblock,
+            &dummy_interruptor);
 
-            const key_range_t test_range = key_range_t::universe();
-            superblock->sindex_block_write_signal()->wait();
+        const key_range_t test_range = key_range_t::universe();
+        superblock->sindex_block_write_signal()->wait();
 
-            std::vector<rdb_modification_report_t> mod_reports;
-            key_range_t deleted_range;
-            rdb_erase_small_range(
-                store.rocksh(),
-                store.btree.get(),
-                key_range_t::universe(),
-                superblock.get(),
-                &dummy_interruptor,
-                0,
-                &mod_reports,
-                &deleted_range);
+        std::vector<rdb_modification_report_t> mod_reports;
+        key_range_t deleted_range;
+        rdb_erase_small_range(
+            store.rocksh(),
+            store.btree.get(),
+            key_range_t::universe(),
+            superblock.get(),
+            &dummy_interruptor,
+            0,
+            &mod_reports,
+            &deleted_range);
 
-            store.update_sindexes(txn.get(), std::move(superblock), mod_reports);
-        }
+        store.update_sindexes(txn.get(), std::move(superblock), mod_reports);
     }
 
     check_keys_are_NOT_present(&store, sindex_name);
