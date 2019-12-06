@@ -8,10 +8,6 @@
 class branch_history_manager_t;
 class store_t;
 
-/* `cpu_sharding_subspace()` returns a `region_t` that contains the full key-range space
-but only 1/CPU_SHARDING_FACTOR of the shard space. */
-region_t cpu_sharding_subspace(int subregion_number);
-
 /* `multistore_ptr_t` is a bundle of `store_view_t`s, one for each CPU shard.  Actually
 now there is just one shard, so this holds a store pointer and a thread allocation, and
 maybe some other fluff. */

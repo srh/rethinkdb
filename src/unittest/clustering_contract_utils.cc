@@ -8,9 +8,7 @@ region_map_t<version_t> quick_cpu_version_map(
     std::vector<region_t> region_vector;
     std::vector<version_t> version_vector;
     for (const quick_cpu_version_map_args_t &qvm : qvms) {
-        key_range_t range = quick_range(qvm.quick_range_spec);
-        region_t region = region_intersection(
-            region_t(range), cpu_sharding_subspace(THE_CPU_SHARD));
+        key_range_t region = quick_range(qvm.quick_range_spec);
         version_t version;
         if (qvm.branch == nullptr) {
             guarantee(qvm.timestamp == 0);
@@ -49,8 +47,7 @@ cpu_branch_ids_t quick_cpu_branch(
     branch_birth_certificate_t bcs[CPU_SHARDING_FACTOR];
     {
         const size_t i = THE_CPU_SHARD;
-        region_t region = region_intersection(
-            region_t(res.range), cpu_sharding_subspace(THE_CPU_SHARD));
+        region_t region = res.range;
         bcs[i].initial_timestamp = state_timestamp_t::zero();
         bcs[i].origin = quick_cpu_version_map(/* THE_CPU_SHARD, */ origin);
         bcs[i].origin.visit(region, [&](const region_t &, const version_t &v) {
