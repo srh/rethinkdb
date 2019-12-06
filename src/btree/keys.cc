@@ -58,16 +58,21 @@ key_range_t::key_range_t() :
     left(), right(store_key_t()) { }
 
 key_range_t::key_range_t(bound_t lm, const store_key_t& l, bound_t rm, const store_key_t& r) {
-    init(lm, l, rm, r);
+    init(lm, store_key_t(l), rm, store_key_t(r));
 }
 
-void key_range_t::init(bound_t lm, const store_key_t &l, bound_t rm, const store_key_t &r) {
+key_range_t::key_range_t(bound_t lm, store_key_t&& l, bound_t rm, store_key_t&& r) {
+    init(lm, std::move(l), rm, std::move(r));
+}
+
+
+void key_range_t::init(bound_t lm, store_key_t &&l, bound_t rm, store_key_t &&r) {
     switch (lm) {
         case bound_t::closed:
-            left.assign(l);
+            left = std::move(l);
             break;
         case bound_t::open:
-            left.assign(l);
+            left = std::move(l);
             if (left.increment()) {
                 break;
             } else {
@@ -87,14 +92,14 @@ void key_range_t::init(bound_t lm, const store_key_t &l, bound_t rm, const store
     switch (rm) {
         case bound_t::closed: {
             right.unbounded = false;
-            right.key().assign(r);
+            right.key() = std::move(r);
             bool ok = right.increment();
             guarantee(ok);
             break;
         }
         case bound_t::open:
             right.unbounded = false;
-            right.key().assign(r);
+            right.key() = std::move(r);
             break;
         case bound_t::none:
             right.unbounded = true;

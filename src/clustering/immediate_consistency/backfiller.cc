@@ -113,8 +113,7 @@ backfiller_t::client_t::client_t(
     parent(_parent),
     intro(_intro),
     full_region(intro.initial_version.get_domain()),
-    pre_items(full_region.beg, full_region.end,
-        key_range_t::right_bound_t(full_region.inner.left)),
+    pre_items(key_range_t::right_bound_t(full_region.left)),
     item_throttler(intro.config.item_queue_mem_size),
     item_throttler_acq(&item_throttler, 0),
     pre_items_mailbox(parent->mailbox_manager,
@@ -221,7 +220,7 @@ public:
             backfill_item_seq_t<backfill_pre_item_t> *_pi,
             const key_range_t::right_bound_t &_c) :
         pre_items(_pi),
-        temp_buf(_pi->get_beg_hash(), _pi->get_end_hash(), _pi->get_left_key()),
+        temp_buf(_pi->get_left_key()),
         last_cursor(_c)
     {
         guarantee(pre_items->get_left_key() <= last_cursor);
@@ -329,7 +328,7 @@ private:
     void run(auto_drainer_t::lock_t keepalive) {
         with_priority_t p(CORO_PRIORITY_BACKFILL_SENDER);
         try {
-            while (threshold != parent->full_region.inner.right) {
+            while (threshold != parent->full_region.right) {
                 /* Wait until there's room in the semaphore for the chunk we're about to
                 process.
                 We acquire the maximum size that we want to put in this chunk first,
@@ -351,16 +350,15 @@ private:
 
                 /* Set up a `region_t` describing the range that still needs to be
                 backfilled */
-                region_t subregion = parent->full_region;
-                subregion.inner.left = threshold.key();
+                region_t subregion;
+                subregion.left = threshold.key();
+                subregion.right = parent->full_region.right;
 
                 /* Copy items from the store into `chunk` until the total size hits
                 `item_chunk_mem_size`; we finish the backfill range; or we run out of
                 pre-items. */
 
-                backfill_item_seq_t<backfill_item_t> chunk(
-                    parent->full_region.beg, parent->full_region.end,
-                    threshold);
+                backfill_item_seq_t<backfill_item_t> chunk(threshold);
                 region_map_t<version_t> metainfo = region_map_t<version_t>::empty();
 
                 {
@@ -417,10 +415,8 @@ private:
                                 return;
                             }
                             region_t mask;
-                            mask.beg = chunk->get_beg_hash();
-                            mask.end = chunk->get_end_hash();
-                            mask.inner.left = chunk->get_right_key().key();
-                            mask.inner.right = new_threshold;
+                            mask.left = chunk->get_right_key().key();
+                            mask.right = new_threshold;
                             metainfo->extend_keys_right(
                                 new_metainfo.mask(mask));
                         }
@@ -483,7 +479,7 @@ private:
                         size_t old_size = parent->pre_items.get_mem_size();
                         parent->pre_items.delete_to_key(threshold);
                         parent->pre_items.push_front_nothing(
-                            key_range_t::right_bound_t(parent->full_region.inner.left));
+                            key_range_t::right_bound_t(parent->full_region.left));
                         size_t new_size = parent->pre_items.get_mem_size();
 
                         /* Notify the backfiller that it's OK to send us more pre items.

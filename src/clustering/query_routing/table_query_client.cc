@@ -225,7 +225,7 @@ void table_query_client_t::dispatch_immediate_op(
             if (!chosen_relationship) {
                 throw cannot_perform_query_exc_t(
                     strprintf("primary replica for shard %s not available",
-                              key_range_to_string(reg.inner).c_str()),
+                              key_range_to_string(reg).c_str()),
                     query_state_t::FAILED);
             }
             new_op_info->primary_client = chosen_relationship->primary_client;

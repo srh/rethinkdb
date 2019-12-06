@@ -18,19 +18,17 @@ public:
     /* Records that the backfill has copied values up to the given timestamp for the
     given range. */
     void record_backfill(const region_t &region, const state_timestamp_t &ts) {
-        rassert(region.beg == store_region.beg);
-        rassert(region.end == store_region.end);
-        rassert(key_range_t::right_bound_t(region.inner.left) ==
+        rassert(key_range_t::right_bound_t(region.left) ==
             (entries.empty()
-                ? key_range_t::right_bound_t(store_region.inner.left)
+                ? key_range_t::right_bound_t(store_region.left)
                 : entries.back().first));
-        rassert(region.inner.right <= store_region.inner.right);
+        rassert(region.right <= store_region.right);
         if (entries.empty() || entries.back().second != ts) {
-            entries.push_back(std::make_pair(region.inner.right, ts));
+            entries.push_back(std::make_pair(region.right, ts));
         } else {
             /* Rather than making a second entry with the same timestamp, coalesce
             the two entries. */
-            entries.back().first = region.inner.right;
+            entries.back().first = region.right;
         }
     }
 
@@ -43,10 +41,8 @@ public:
             rassert(entries.empty() || entries[0].second >= ts);
             return;
         }
-        rassert(region.beg == store_region.beg);
-        rassert(region.end == store_region.end);
-        rassert(region.inner.left == store_region.inner.left);
-        rassert(region.inner.right == entries[0].first);
+        rassert(region.left == store_region.left);
+        rassert(region.right == entries[0].first);
         rassert(entries[0].second.next() == ts);
         entries[0].second = ts;
         if (entries.size() > 1 && entries[1].second == ts) {
@@ -71,7 +67,7 @@ public:
     /* Returns the rightmost point we've backfilled to so far */
     key_range_t::right_bound_t get_backfill_threshold() const {
         if (entries.empty()) {
-            return key_range_t::right_bound_t(store_region.inner.left);
+            return key_range_t::right_bound_t(store_region.left);
         } else {
             return entries.back().first;
         }
@@ -79,7 +75,7 @@ public:
 
     /* Returns `true` if the timestamp is consistent throughout the entire region */
     bool is_homogeneous() const {
-        return !entries.empty() && entries[0].first == store_region.inner.right;
+        return !entries.empty() && entries[0].first == store_region.right;
     }
 
     /* Given the next streaming write, extracts the part of it that should be applied
@@ -97,7 +93,7 @@ public:
     to or greater than the next write. */
     bool can_clip_next_write_backfilling() const {
         return !entries.empty() &&
-            (entries.size() > 1 || entries[0].first == store_region.inner.right);
+            (entries.size() > 1 || entries[0].first == store_region.right);
     }
 
     /* Similar to `clip_next_write_backfilling()`, except that if the backfill
@@ -115,7 +111,7 @@ public:
         }
         guarantee(entries[0].second == prev_timestamp);
         *region_out = store_region;
-        region_out->inner.right = entries.front().first;
+        region_out->right = entries.front().first;
     }
 
 private:
@@ -224,7 +220,7 @@ remote_replicator_client_t::remote_replicator_client_t(
     backfillee_t backfillee(mailbox_manager, branch_history_manager, store,
         replica_bcard.backfiller_bcard, backfill_config, progress_tracker, interruptor);
 
-    while (tracker_->get_backfill_threshold() != region_.inner.right) {
+    while (tracker_->get_backfill_threshold() != region_.right) {
 
         /* If the store is currently constructing a secondary index, wait until it
         finishes before we do the next phase of the backfill. This is the correct phase
@@ -298,7 +294,7 @@ remote_replicator_client_t::remote_replicator_client_t(
             tracker_->get_backfill_threshold(),
             interruptor);
 
-        if (tracker_->get_backfill_threshold() != region_.inner.right) {
+        if (tracker_->get_backfill_threshold() != region_.right) {
             /* Switch mode to `PAUSED` so that writes can proceed while we wait to
             reacquire the throttler lock */
             mutex_assertion_t::acq_t mutex_assertion_acq(&mutex_assertion_);

@@ -41,13 +41,16 @@ int sized_strcmp(const uint8_t *str1, int len1, const uint8_t *str2, int len2);
 
 struct store_key_t {
 public:
-    store_key_t() {
-        set_size(0);
-    }
+    store_key_t() = default;
 
-    store_key_t(int sz, const uint8_t *buf) {
-        assign(sz, buf);
-    }
+    store_key_t(int sz, const uint8_t *buf)
+        : str_(reinterpret_cast<const char *>(buf), sz) { }
+
+    store_key_t(const store_key_t &) = default;
+    store_key_t(store_key_t &&) = default;
+
+    store_key_t &operator=(const store_key_t &) = default;
+    store_key_t &operator=(store_key_t &&) = default;
 
     explicit store_key_t(std::string &&s) : str_(std::move(s)) {
         rassert(str_.size() <= MAX_KEY_SIZE);
@@ -72,6 +75,10 @@ public:
 
     void assign(const store_key_t &key) {
         str_ = key.str_;
+    }
+
+    void assign(store_key_t &&key) {
+        str_ = std::move(key.str_);
     }
 
     static store_key_t min() {
@@ -263,6 +270,8 @@ public:
     key_range_t();   /* creates a range containing no keys */
     key_range_t(bound_t lm, const store_key_t &l,
                 bound_t rm, const store_key_t &r);
+    key_range_t(bound_t lm, store_key_t &&l,
+                bound_t rm, store_key_t &&r);
 
     template<class T>
     static key_range_t one_key(const T &key) {
@@ -287,7 +296,6 @@ public:
         }
     }
 
-    // TODO: rename these all to `contains` for consistency with other classes.
     bool contains_key(const store_key_t& key) const {
         bool left_ok = left <= key;
         bool right_ok = right.unbounded || key < right.key();
@@ -310,8 +318,8 @@ public:
     right_bound_t right;
 
 private:
-    void init(bound_t lm, const store_key_t &l,
-              bound_t rm, const store_key_t &r);
+    void init(bound_t lm, store_key_t &&l,
+              bound_t rm, store_key_t &&r);
 };
 
 RDB_DECLARE_SERIALIZABLE(key_range_t::right_bound_t);

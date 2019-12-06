@@ -1556,7 +1556,7 @@ bool rdb_modification_report_cb_t::has_pkey_cfeeds(
                           key_range_t::closed, *max);
         auto cservers = store_->access_changefeed_servers();
         for (auto &&pair : *cservers.first) {
-            if (pair.first.inner.overlaps(range)
+            if (pair.first.overlaps(range)
                 && pair.second->has_limit(r_nullopt,
                                           pair.second->get_keepalive())) {
                 return true;

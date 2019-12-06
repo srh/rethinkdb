@@ -71,16 +71,12 @@ ql::datum_t convert_debug_store_key_to_datum(const store_key_t &store_key) {
 
 ql::datum_t convert_debug_region_to_datum(const region_t &region) {
     ql::datum_object_builder_t builder;
-    builder.overwrite("hash_min", ql::datum_t(datum_string_t(
-        strprintf("%016" PRIx64, region.beg))));
-    builder.overwrite("hash_max", ql::datum_t(datum_string_t(
-        strprintf("%016" PRIx64, region.end))));
     builder.overwrite("key_min",
-        convert_debug_store_key_to_datum(region.inner.left));
+        convert_debug_store_key_to_datum(region.left));
     builder.overwrite("key_max",
-        region.inner.right.unbounded
+        region.right.unbounded
             ? ql::datum_t::null()
-            : convert_debug_store_key_to_datum(region.inner.right.key()));
+            : convert_debug_store_key_to_datum(region.right.key()));
     return std::move(builder).to_datum();
 }
 

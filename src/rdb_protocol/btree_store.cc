@@ -239,7 +239,6 @@ void store_t::reset_data(
         const write_durability_t durability,
         signal_t *interruptor)
         THROWS_ONLY(interrupted_exc_t) {
-    guarantee(subregion.beg == get_region().beg && subregion.end == get_region().end);
     assert_thread();
     with_priority_t p(CORO_PRIORITY_RESET_DATA);
 
@@ -268,18 +267,17 @@ void store_t::reset_data(
         cond_t non_interruptor;
 
         std::vector<rdb_modification_report_t> mod_reports;
-        key_range_t deleted_range;
+        key_range_t deleted_region;
         done_erasing = rdb_erase_small_range(rocksh(),
                                              btree.get(),
                                              &key_tester,
-                                             subregion.inner,
+                                             subregion,
                                              superblock.get(),
                                              &non_interruptor,
                                              max_erased_per_pass,
                                              &mod_reports,
-                                             &deleted_range);
+                                             &deleted_region);
 
-        region_t deleted_region(subregion.beg, subregion.end, deleted_range);
         metainfo->update(superblock.get(),
                          rocksh(),
                          region_map_t<version_t>(deleted_region, zero_metainfo));

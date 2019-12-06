@@ -90,9 +90,7 @@ public:
     the coordinator receives an ack with that branch in it from the primary for a given
     range during the initial branch registration of a new primary. */
     void set_current_branches(const cpu_branch_ids_t &branches) {
-        region_t reg = cpu_sharding_subspace(THE_CPU_SHARD);
-        reg.inner = branches.range;
-        state.current_branches.update(reg, branches.branch_ids[THE_CPU_SHARD]);
+        state.current_branches.update(branches.range, branches.branch_ids[THE_CPU_SHARD]);
     }
 
     /* `add_ack()` creates one ack for each contract in the CPU-sharded contract set.
@@ -206,7 +204,7 @@ public:
         cpu_contract_ids_t res;
         bool found = false;
         for (const auto &pair : state.contracts) {
-            if (pair.second.first.inner == range) {
+            if (pair.second.first == range) {
                 EXPECT_FALSE(found);
                 found = true;
                 res.contract_ids[THE_CPU_SHARD] = pair.first;
@@ -248,10 +246,8 @@ public:
         bool mismatched = false;
         state.current_branches.visit(
             region_t(branches.range),
-            [&](const region_t &reg, const branch_id_t &branch) {
+            [&](const region_t &, const branch_id_t &branch) {
                 /* Make sure the CPU shard matches exactly and fail otherwise. */
-                EXPECT_TRUE(cpu_sharding_subspace(THE_CPU_SHARD).beg == reg.beg &&
-                    cpu_sharding_subspace(THE_CPU_SHARD).end == reg.end);
                 if (branch != branches.branch_ids[THE_CPU_SHARD]) {
                     mismatched = true;
                 }

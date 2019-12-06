@@ -4,10 +4,10 @@
 #include <vector>
 
 #include "btree/keys.hpp"
-#include "region/hash_region.hpp"
 
-typedef hash_region_t<key_range_t> region_t;
-void debug_print(printf_buffer_t *buf, const hash_range_t &hr);
+typedef key_range_t region_t;
+
+enum region_join_result_t { REGION_JOIN_OK, REGION_JOIN_BAD_JOIN, REGION_JOIN_BAD_REGION };
 
 inline bool region_is_empty(const key_range_t &r) {
     return r.is_empty();
@@ -24,6 +24,11 @@ inline key_range_t region_intersection(const key_range_t &r1, const key_range_t 
 inline bool region_overlaps(const key_range_t &r1, const key_range_t &r2) THROWS_NOTHING {
     return r1.overlaps(r2);
 }
+
+inline bool region_contains_key(const key_range_t &kr, const store_key_t &k) {
+    return kr.contains_key(k);
+}
+
 
 MUST_USE region_join_result_t region_join(const std::vector<key_range_t> &vec, key_range_t *out) THROWS_NOTHING;
 

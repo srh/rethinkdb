@@ -195,8 +195,9 @@ struct hash_range_with_cache_t {
 };
 void debug_print(printf_buffer_t *buf, const hash_range_with_cache_t &hrwc);
 
+// TODO: Rename this crazy type name.
 struct hash_ranges_t {
-    std::map<hash_range_t, hash_range_with_cache_t> hash_ranges;
+    hash_range_with_cache_t hash_range;
     // Composite state of all hash shards.
     range_state_t state() const;
     // True if all hash shards are totally exhausted.

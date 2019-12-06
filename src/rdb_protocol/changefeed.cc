@@ -628,7 +628,7 @@ void server_t::foreach_limit(
             auto *lc = &it->second[i];
             guarantee((*lc).has());
             if ((*lc)->is_aborted()
-                || (pkey && !(*lc)->region.inner.contains_key(*pkey))) {
+                || (pkey && !(*lc)->region.contains_key(*pkey))) {
                 continue;
             }
             auto_drainer_t::lock_t lc_lock(&(*lc)->drainer);
@@ -912,7 +912,7 @@ void limit_manager_t::add(
     datum_t val) THROWS_NOTHING {
     guarantee(spot->write_signal()->is_pulsed());
     guarantee((is_primary == is_primary_t::NO) == static_cast<bool>(spec.range.sindex));
-    if ((is_primary == is_primary_t::YES && region.inner.contains_key(sk))
+    if ((is_primary == is_primary_t::YES && region.contains_key(sk))
         || (is_primary == is_primary_t::NO && spec.range.datumspec.copies(key) != 0)) {
         if (optional<datum_t> d = apply_ops(val, ops, env.get(), key)) {
             auto pair = added.insert(
@@ -1128,7 +1128,7 @@ std::vector<item_t> limit_manager_t::read_more(
     const optional<item_t> &start) {
     guarantee(item_queue.size() < spec.limit);
     ref_visitor_t visitor(
-        rocksh, env.get(), &ops, &region.inner, &spec, spec.range.sorting, start, &item_queue);
+        rocksh, env.get(), &ops, &region, &spec, spec.range.sorting, start, &item_queue);
     return boost::apply_visitor(visitor, ref);
 }
 

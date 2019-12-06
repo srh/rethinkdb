@@ -6,11 +6,12 @@ bool check_all_replicas_ready(
         watchable_map_t<std::pair<server_id_t, contract_id_t>, contract_ack_t> *acks) {
     for (const auto &pair : table_state.contracts) {
 
+        // TODO: CPU Sharding logic.
         /* Find the config shard corresponding to this contract */
         const table_config_t::shard_t *shard = nullptr;
         for (size_t i = 0; i < table_state.config.config.shards.size(); ++i) {
             if (table_state.config.shard_scheme.get_shard_range(i) ==
-                    pair.second.first.inner) {
+                    pair.second.first) {
                 shard = &table_state.config.config.shards[i];
                 break;
             }

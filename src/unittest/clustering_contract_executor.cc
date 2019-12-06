@@ -63,9 +63,7 @@ public:
         state.contracts.erase(ids.contract_ids[THE_CPU_SHARD]);
     }
     void set_current_branches(const cpu_branch_ids_t &branches) {
-        region_t reg = cpu_sharding_subspace(THE_CPU_SHARD);
-        reg.inner = branches.range;
-        state.current_branches.update(reg, branches.branch_ids[THE_CPU_SHARD]);
+        state.current_branches.update(branches.range, branches.branch_ids[THE_CPU_SHARD]);
     }
     void publish() {
         published_state.set_value_no_equals(state);
@@ -219,8 +217,7 @@ public:
     server, even if it's not a primary. */
     void read_store(const std::string &key, const std::string &expect) {
         store_key_t key2(key);
-        uint64_t hash = hash_region_hasher(key2);
-        size_t cpu_shard = hash / (HASH_REGION_HASH_SIZE / CPU_SHARDING_FACTOR);
+        size_t cpu_shard = THE_CPU_SHARD;
         std::string value;
         {
             on_thread_t thread_switcher(files->stores[cpu_shard]->home_thread());

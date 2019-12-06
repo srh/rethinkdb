@@ -320,7 +320,7 @@ TPTEST(RDBBtree, SindexEraseRange) {
                 &superblock,
                 &dummy_interruptor);
 
-            const hash_region_t<key_range_t> test_range = hash_region_t<key_range_t>::universe();
+            const key_range_t test_range = key_range_t::universe();
             rdb_protocol::range_key_tester_t tester(&test_range);
             superblock->sindex_block_write_signal()->wait();
 

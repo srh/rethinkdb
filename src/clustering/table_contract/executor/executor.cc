@@ -187,8 +187,8 @@ contract_executor_t::get_shard_status() {
                 continue;
             }
             result.visit_mutable(
-            key_range_t::right_bound_t(pair.second.first.inner.left),
-            pair.second.first.inner.right,
+            key_range_t::right_bound_t(pair.second.first.left),
+            pair.second.first.right,
             [&](const key_range_t::right_bound_t &,
                     const key_range_t::right_bound_t &,
                     table_shard_status_t *status) {

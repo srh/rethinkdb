@@ -25,20 +25,15 @@ public:
     backfill_item_seq_t() { }
 
     /* Initializes an empty seq with a zero-width region at the given location */
-    backfill_item_seq_t(
-            uint64_t _beg_hash, uint64_t _end_hash, key_range_t::right_bound_t key) :
-        beg_hash(_beg_hash), end_hash(_end_hash), left_key(key), right_key(key),
+    backfill_item_seq_t(const key_range_t::right_bound_t &key) :
+        left_key(key), right_key(key),
         mem_size(0) { }
 
+    // TODO: Why not return by reference?
     /* Returns the left and right bounds of the space this `backfill_item_seq_t` applies
     to. These may be equal, in which case the sequence must be empty. */
     key_range_t::right_bound_t get_left_key() const { return left_key; }
     key_range_t::right_bound_t get_right_key() const { return right_key; }
-
-    /* The `backfill_item_seq_t` is associated with a hash range for sanity-checking
-    purposes. */
-    uint64_t get_beg_hash() const { return beg_hash; }
-    uint64_t get_end_hash() const { return end_hash; }
 
     region_t get_region() const {
         if (left_key == right_key) {
@@ -47,7 +42,7 @@ public:
             key_range_t kr;
             kr.left = left_key.key();
             kr.right = right_key;
-            return region_t(beg_hash, end_hash, kr);
+            return kr;
         }
     }
 
@@ -77,7 +72,6 @@ public:
     the other seq, shrinking the seq's domain to {after the end,before the beginning} of
     the item that was removed. */
     void pop_front_into(backfill_item_seq_t *other) {
-        guarantee(beg_hash == other->beg_hash && end_hash == other->end_hash);
         guarantee(get_left_key() == other->get_right_key());
         size_t item_size = items.front().get_mem_size();
         left_key = items.front().get_range().right;
@@ -88,7 +82,6 @@ public:
     }
 
     void pop_back_into(backfill_item_seq_t *other) {
-        guarantee(beg_hash == other->beg_hash && end_hash == other->end_hash);
         guarantee(get_right_key() == other->get_left_key());
         size_t item_size = items.back().get_mem_size();
         right_key = key_range_t::right_bound_t(items.front().get_range().left);
@@ -149,7 +142,6 @@ public:
 
     /* Concatenates two `backfill_item_seq_t`s. Their domains must be adjacent. */
     void concat(backfill_item_seq_t &&other) {
-        guarantee(beg_hash == other.beg_hash && end_hash == other.end_hash);
         guarantee(right_key == other.left_key);
         right_key = other.right_key;
         mem_size += other.mem_size;
@@ -162,7 +154,6 @@ private:
     is why this is stored as four separate variables instead of a `region_t`. We use two
     `key_range_t::right_bound_t`s instead of a `key_range_t` so that we can represent
     a zero-width region after the last key. */
-    uint64_t beg_hash, end_hash;
     key_range_t::right_bound_t left_key, right_key;
 
     /* The sum of `a.get_mem_size()` over all the items */
@@ -170,8 +161,8 @@ private:
 
     std::list<item_t> items;
 
-    RDB_MAKE_ME_SERIALIZABLE_6(backfill_item_seq_t,
-        beg_hash, end_hash, left_key, right_key, mem_size, items);
+    RDB_MAKE_ME_SERIALIZABLE_4(backfill_item_seq_t,
+        left_key, right_key, mem_size, items);
 };
 
 #endif /* CLUSTERING_IMMEDIATE_CONSISTENCY_BACKFILL_ITEM_SEQ_HPP_ */

@@ -35,8 +35,7 @@ public:
         threshold(_threshold),
         callback(_callback),
         callback_returned_false(false),
-        items(_parent->store->get_region().beg, _parent->store->get_region().end,
-            threshold),
+        items(threshold),
         items_mem_size_unacked(0),
         sent_end_session(false),
         metainfo(region_map_t<version_t>::empty()),
@@ -73,7 +72,7 @@ public:
 
     void wait_done(signal_t *interruptor) {
         wait_interruptible(&done_cond, interruptor);
-        guarantee(threshold == parent->store->get_region().inner.right
+        guarantee(threshold == parent->store->get_region().right
             || callback_returned_false);
         guarantee(got_ack_end_session.is_pulsed());
     }
@@ -89,7 +88,7 @@ private:
                 parent->fifo_source.enter_write(), threshold);
 
             /* Loop until we reach the end of the backfill range. */
-            while (threshold != parent->store->get_region().inner.right) {
+            while (threshold != parent->store->get_region().right) {
                 /* Wait until we receive some items from the backfiller so we have
                 something to do, or the session is terminated. */
                 while (items.empty_domain()) {
@@ -125,7 +124,7 @@ private:
                 /* Set up a `region_t` describing the range that still needs to be
                 backfilled */
                 region_t subregion = parent->store->get_region();
-                subregion.inner.left = threshold.key();
+                subregion.left = threshold.key();
 
                 /* Copy items from `items` into the store until we finish the backfill
                 range or we run out of items */
@@ -177,9 +176,9 @@ private:
                         the callack, so we just skip calling `on_progress()` again if it
                         has returned `false` before. */
                         if (!parent->callback_returned_false) {
-                            region_t mask = parent->parent->store->get_region();
-                            mask.inner.left = parent->threshold.key();
-                            mask.inner.right = new_threshold;
+                            region_t mask;
+                            mask.left = parent->threshold.key();
+                            mask.right = new_threshold;
                             if (!parent->callback->on_progress(
                                     parent->metainfo.mask(mask))) {
                                 parent->callback_returned_false = true;
@@ -335,8 +334,6 @@ backfillee_t::backfillee_t(
         std::bind(&backfillee_t::on_ack_pre_items, this, ph::_1, ph::_2, ph::_3))
 {
     guarantee(region_is_superset(backfiller.region, store->get_region()));
-    guarantee(store->get_region().beg == backfiller.region.beg);
-    guarantee(store->get_region().end == backfiller.region.end);
 
     backfiller_bcard_t::intro_1_t our_intro;
     our_intro.config = backfill_config;
@@ -445,8 +442,8 @@ void backfillee_t::send_pre_items(auto_drainer_t::lock_t keepalive) {
     with_priority_t p(CORO_PRIORITY_BACKFILL_RECEIVER);
     try {
         key_range_t::right_bound_t pre_item_sent_threshold(
-            store->get_region().inner.left);
-        while (pre_item_sent_threshold != store->get_region().inner.right) {
+            store->get_region().left);
+        while (pre_item_sent_threshold != store->get_region().right) {
             /* Wait until there's room in the semaphore for the chunk we're about to
             process */
             new_semaphore_in_line_t sem_acq(
@@ -457,12 +454,11 @@ void backfillee_t::send_pre_items(auto_drainer_t::lock_t keepalive) {
             /* Set up a `region_t` describing the range that still needs to be
             backfilled */
             region_t subregion = store->get_region();
-            subregion.inner.left = pre_item_sent_threshold.key();
+            subregion.left = pre_item_sent_threshold.key();
 
             /* Copy pre-items from the store into `chunk ` until the total size hits
             `backfill_config.pre_item_chunk_mem_size` or we finish the range */
             backfill_item_seq_t<backfill_pre_item_t> chunk(
-                store->get_region().beg, store->get_region().end,
                 pre_item_sent_threshold);
 
             class consumer_t : public store_view_t::backfill_pre_item_consumer_t {

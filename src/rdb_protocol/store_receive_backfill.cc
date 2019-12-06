@@ -371,8 +371,6 @@ continue_bool_t store_t::receive_backfill(
         backfill_item_producer_t *item_producer,
         signal_t *interruptor)
         THROWS_ONLY(interrupted_exc_t) {
-    guarantee(_region.beg == get_region().beg && _region.end == get_region().end);
-
     unsaved_data_limiter_t unsaved_data_limiter;
     receive_backfill_info_t info(
         general_cache_conn.get(), btree.get(), &unsaved_data_limiter);
@@ -382,16 +380,16 @@ continue_bool_t store_t::receive_backfill(
     superblock. `commit_threshold` is the point up to which we've called
     `item_producer->on_commit()`. These all increase monotonically to the right. */
     key_range_t::right_bound_t
-        spawn_threshold(_region.inner.left),
-        metainfo_threshold(_region.inner.left),
-        commit_threshold(_region.inner.left);
+        spawn_threshold(_region.left),
+        metainfo_threshold(_region.left),
+        commit_threshold(_region.left);
 
     /* We'll set `result` to `false` to record if `item_producer` returns `ABORT`. */
     continue_bool_t result = continue_bool_t::CONTINUE;
 
     /* Repeatedly request items from `item_producer` and spawn coroutines to handle them,
     but limit the number of simultaneously active coroutines. */
-    while (spawn_threshold != _region.inner.right) {
+    while (spawn_threshold != _region.right) {
         bool is_item;
         backfill_item_t item;
         key_range_t::right_bound_t empty_range;
@@ -430,8 +428,8 @@ continue_bool_t store_t::receive_backfill(
                 return;
             }
             region_t mask = _region;
-            mask.inner.left = metainfo_threshold.key();
-            mask.inner.right = progress;
+            mask.left = metainfo_threshold.key();
+            mask.right = progress;
             metainfo_threshold = progress;
 
             /* Actually apply the metainfo */
@@ -488,9 +486,9 @@ continue_bool_t store_t::receive_backfill(
     wait_interruptible(&exiter, interruptor);
 
     if (result == continue_bool_t::CONTINUE) {
-        guarantee(spawn_threshold == _region.inner.right);
-        guarantee(metainfo_threshold == _region.inner.right);
-        guarantee(commit_threshold == _region.inner.right);
+        guarantee(spawn_threshold == _region.right);
+        guarantee(metainfo_threshold == _region.right);
+        guarantee(commit_threshold == _region.right);
     }
 
     /* Flush remaining data to disk. This serves two purposes. The first reason is

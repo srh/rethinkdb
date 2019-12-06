@@ -30,8 +30,8 @@ void store_t::note_reshard(const region_t &shard_region) {
         // Shards use unbounded right boundaries, while changefeed queries use MAX_KEY.
         // We must convert the boundary here so it matches.
         region_t modified_region = shard_region;
-        modified_region.inner.right =
-            key_range_t::right_bound_t(modified_region.inner.right_or_max());
+        modified_region.right =
+            key_range_t::right_bound_t(modified_region.right_or_max());
         auto it = changefeed_servers.find(modified_region);
         if (it != changefeed_servers.end()) {
             to_destruct = std::move(it->second);
@@ -161,7 +161,7 @@ void do_snap_read(
             rocksh,
             btree,
             *rget.current_shard,
-            rget.region.inner,
+            rget.region,
             rget.primary_keys,
             env,
             rget.batchspec,
@@ -186,7 +186,7 @@ void do_snap_read(
                 sindex_info.mapping_version_info.latest_compatible_reql_version;
             res->reql_version = reql_version;
             if (rget.sindex->region.has_value()) {
-                sindex_range = rget.sindex->region->inner;
+                sindex_range = *rget.sindex->region;
             } else {
                 sindex_range =
                     rget.sindex->datumspec.covering_range().to_sindex_keyrange(
@@ -219,7 +219,7 @@ void do_snap_read(
                 rget.batchspec,
                 rget.transforms,
                 rget.terminal,
-                rget.region.inner,
+                rget.region,
                 rget.sorting,
                 rget.sindex->require_sindex_val,
                 sindex_info,
@@ -253,7 +253,7 @@ void do_read_for_changefeed(rockshard rocksh,
             rocksh,
             btree,
             *rget.current_shard,
-            rget.region.inner,
+            rget.region,
             rget.primary_keys,
             superblock,
             env,
@@ -281,7 +281,7 @@ void do_read_for_changefeed(rockshard rocksh,
                 sindex_info.mapping_version_info.latest_compatible_reql_version;
             res->reql_version = reql_version;
             if (rget.sindex->region.has_value()) {
-                sindex_range = rget.sindex->region->inner;
+                sindex_range = *rget.sindex->region;
             } else {
                 sindex_range =
                     rget.sindex->datumspec.covering_range().to_sindex_keyrange(
@@ -310,7 +310,7 @@ void do_read_for_changefeed(rockshard rocksh,
                 rget.batchspec,
                 rget.transforms,
                 rget.terminal,
-                rget.region.inner,
+                rget.region,
                 rget.sorting,
                 rget.sindex->require_sindex_val,
                 sindex_info,
@@ -455,7 +455,7 @@ struct rdb_read_visitor_t : public boost::static_visitor<void> {
     }
 
     void operator()(const changefeed_stamp_t &s) {
-        response->response = do_stamp(s, s.region, s.region.inner.left);
+        response->response = do_stamp(s, s.region, s.region.left);
     }
 
     void operator()(const changefeed_point_stamp_t &s) {
@@ -509,7 +509,7 @@ struct rdb_read_visitor_t : public boost::static_visitor<void> {
             res->stamp_response.set(changefeed_stamp_response_t());
 
             store_key_t read_left = geo_read.sindex.region
-                ? geo_read.sindex.region->inner.left
+                ? geo_read.sindex.region->left
                 : store_key_t::min();
 
             changefeed_stamp_response_t r = do_stamp(
@@ -569,12 +569,12 @@ struct rdb_read_visitor_t : public boost::static_visitor<void> {
             store->get_sindex_slice(sindex_uuid),
             geo_read.region, // This happens to always be the shard for geo reads.
             geo_read.query_geometry,
-            geo_read.sindex.region->inner,
+            *geo_read.sindex.region,
             &ql_env,
             geo_read.batchspec,
             geo_read.transforms,
             geo_read.terminal,
-            geo_read.region.inner,
+            geo_read.region,
             sindex_info,
             geo_read.stamp ? is_stamp_read_t::YES : is_stamp_read_t::NO,
             res);
@@ -632,7 +632,7 @@ struct rdb_read_visitor_t : public boost::static_visitor<void> {
             geo_read.max_results,
             geo_read.geo_system,
             &ql_env,
-            geo_read.region.inner,
+            geo_read.region,
             sindex_info,
             res);
     }
@@ -651,10 +651,10 @@ struct rdb_read_visitor_t : public boost::static_visitor<void> {
                 // sindex region yet (usually on the first read). This should be ok
                 // for our current requirements and simplifies the code.
                 read_left = rget.sindex->region
-                    ? rget.sindex->region->inner.left
+                    ? rget.sindex->region->left
                     : store_key_t::min();
             } else {
-                read_left = rget.region.inner.left;
+                read_left = rget.region.left;
             }
             changefeed_stamp_response_t r = do_stamp(
                 *rget.stamp,
@@ -706,10 +706,10 @@ struct rdb_read_visitor_t : public boost::static_visitor<void> {
         // the clustering protocol).  And make result_limit forced nonzero.
         // TODO: Reuse the scale_down_distribution function in rdb_distribution_get code.
         int keys_limit = dg.result_limit > 0 ? dg.result_limit : 1 << (4 * dg.max_depth);
-        rdb_distribution_get(store->rocksh(), keys_limit, dg.region.inner, res);
+        rdb_distribution_get(store->rocksh(), keys_limit, dg.region, res);
         // TODO: This filtering by region is now unnecessary.
         for (std::map<store_key_t, int64_t>::iterator it = res->key_counts.begin(); it != res->key_counts.end(); ) {
-            if (!dg.region.inner.contains_key(store_key_t(it->first))) {
+            if (!dg.region.contains_key(store_key_t(it->first))) {
                 std::map<store_key_t, int64_t>::iterator tmp = it;
                 ++it;
                 res->key_counts.erase(tmp);
@@ -1109,7 +1109,7 @@ std::pair<ql::changefeed::server_t *, auto_drainer_t::lock_t> store_t::changefee
         const rwlock_acq_t *acq) {
     acq->guarantee_is_holding(&changefeed_servers_lock);
     for (auto &&pair : changefeed_servers) {
-        if (pair.first.inner.is_superset(_region.inner)) {
+        if (pair.first.is_superset(_region)) {
             return std::make_pair(pair.second.get(), pair.second->get_keepalive());
         }
     }
@@ -1134,7 +1134,7 @@ std::pair<ql::changefeed::server_t *, auto_drainer_t::lock_t> store_t::changefee
         const store_key_t &key) {
     rwlock_acq_t acq(&changefeed_servers_lock, access_t::read);
     for (auto &&pair : changefeed_servers) {
-        if (pair.first.inner.contains_key(key)) {
+        if (pair.first.contains_key(key)) {
             return std::make_pair(pair.second.get(), pair.second->get_keepalive());
         }
     }
@@ -1147,7 +1147,7 @@ std::pair<ql::changefeed::server_t *, auto_drainer_t::lock_t>
     rwlock_acq_t acq(&changefeed_servers_lock, access_t::write);
     // We assume that changefeeds use MAX_KEY instead of `unbounded` right bounds.
     // If this ever changes, `note_reshard` will need to be updated.
-    guarantee(!_region.inner.right.unbounded);
+    guarantee(!_region.right.unbounded);
     guarantee(ctx != nullptr);
     guarantee(ctx->manager != nullptr);
     auto existing = changefeed_server(_region, &acq);
@@ -1155,7 +1155,7 @@ std::pair<ql::changefeed::server_t *, auto_drainer_t::lock_t>
         return existing;
     }
     for (auto &&pair : changefeed_servers) {
-        guarantee(!pair.first.inner.overlaps(_region.inner));
+        guarantee(!pair.first.overlaps(_region));
     }
     auto it = changefeed_servers.insert(
         std::make_pair(

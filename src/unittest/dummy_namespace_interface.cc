@@ -15,7 +15,7 @@ void dummy_performer_t::read(const read_t &_read,
 #ifndef NDEBUG
     metainfo_checker_t metainfo_checker(store->get_region(),
         [&](const region_t &, const version_t &bb) {
-            rassert(bb == version_t(nil_uuid(), expected_timestamp));
+            rassert(bb.timestamp == expected_timestamp);
         });
 #endif
 

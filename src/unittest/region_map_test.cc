@@ -6,9 +6,9 @@
 
 namespace unittest {
 
-hash_region_t<key_range_t> make_region(std::string low, std::string high) {
-    return hash_region_t<key_range_t>(key_range_t(key_range_t::closed, store_key_t(low),
-                                                  key_range_t::open, store_key_t(high)));
+key_range_t make_region(std::string low, std::string high) {
+    return key_range_t(key_range_t::closed, store_key_t(low),
+                       key_range_t::open, store_key_t(high));
 }
 
 TEST(RegionMap, BasicSets) {

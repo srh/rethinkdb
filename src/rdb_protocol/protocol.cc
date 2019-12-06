@@ -355,9 +355,7 @@ void post_construct_and_drain_queue(
 
 
 bool range_key_tester_t::key_should_be_erased(const store_key_t &key) {
-    uint64_t h = hash_region_hasher(key);
-    return delete_range->beg <= h && h < delete_range->end
-        && delete_range->inner.contains_key(key.data(), key.size());
+    return delete_range->contains_key(key);
 }
 
 }  // namespace rdb_protocol
@@ -365,8 +363,7 @@ bool range_key_tester_t::key_should_be_erased(const store_key_t &key) {
 namespace rdb_protocol {
 // Construct a region containing only the specified key
 region_t monokey_region(const store_key_t &k) {
-    uint64_t h = hash_region_hasher(k);
-    return region_t(h, h + 1, key_range_t(key_range_t::closed, k, key_range_t::closed, k));
+    return key_range_t(key_range_t::closed, k, key_range_t::closed, k);
 }
 
 key_range_t sindex_key_range(const store_key_t &start,
@@ -462,13 +459,13 @@ region_t read_t::get_region() const THROWS_NOTHING {
 }
 
 struct rdb_r_shard_visitor_t : public boost::static_visitor<bool> {
-    explicit rdb_r_shard_visitor_t(const hash_region_t<key_range_t> *_region,
+    explicit rdb_r_shard_visitor_t(const key_range_t *_region,
                                    read_t::variant_t *_payload_out)
         : region(*_region), payload_out(_payload_out) {
         // One day we'll get rid of unbounded right bounds, but until then
         // we canonicalize them here because otherwise life sucks.
-        if (region.inner.right.unbounded) {
-            region.inner.right = key_range_t::right_bound_t(store_key_t::max());
+        if (region.right.unbounded) {
+            region.right = key_range_t::right_bound_t(store_key_t::max());
         }
     }
 
@@ -489,7 +486,7 @@ struct rdb_r_shard_visitor_t : public boost::static_visitor<bool> {
 
     template <class T>
     bool rangey_read(const T &arg) const {
-        const hash_region_t<key_range_t> intersection
+        const region_t intersection
             = region_intersection(region, arg.region);
         if (!region_is_empty(intersection)) {
             T tmp = arg;
@@ -539,24 +536,24 @@ struct rdb_r_shard_visitor_t : public boost::static_visitor<bool> {
                     rr->hints.reset();
                     if (!rg.sindex.has_value()) {
                         if (!reversed(rg.sorting)) {
-                            guarantee(it->second >= rr->region.inner.left);
-                            rr->region.inner.left = it->second;
+                            guarantee(it->second >= rr->region.left);
+                            rr->region.left = it->second;
                         } else {
                             key_range_t::right_bound_t rb(it->second);
-                            guarantee(rb <= rr->region.inner.right);
-                            rr->region.inner.right = rb;
+                            guarantee(rb <= rr->region.right);
+                            rr->region.right = rb;
                         }
-                        r_sanity_check(!rr->region.inner.is_empty());
+                        r_sanity_check(!rr->region.is_empty());
                     } else {
                         guarantee(rr->sindex.has_value());
                         guarantee(rr->sindex->region.has_value());
                         if (!reversed(rg.sorting)) {
-                            rr->sindex->region->inner.left = it->second;
+                            rr->sindex->region->left = it->second;
                         } else {
-                            rr->sindex->region->inner.right =
+                            rr->sindex->region->right =
                                 key_range_t::right_bound_t(it->second);
                         }
-                        r_sanity_check(!rr->sindex->region->inner.is_empty());
+                        r_sanity_check(!rr->sindex->region->is_empty());
                     }
                 }
             } else {
@@ -567,7 +564,7 @@ struct rdb_r_shard_visitor_t : public boost::static_visitor<bool> {
         }
         if (do_read) {
             auto *rg_out = boost::get<rget_read_t>(payload_out);
-            guarantee(!region.inner.right.unbounded);
+            guarantee(!region.right.unbounded);
             rg_out->current_shard.set(region);
             rg_out->batchspec = rg_out->batchspec.scale_down(
                 rg.hints.has_value() ? rg.hints->size() : CPU_SHARDING_FACTOR);
@@ -619,27 +616,13 @@ struct rdb_r_shard_visitor_t : public boost::static_visitor<bool> {
     read_t::variant_t *payload_out;
 };
 
-bool read_t::shard(const hash_region_t<key_range_t> &region,
+bool read_t::shard(const region_t &region,
                    read_t *read_out) const THROWS_NOTHING {
     read_t::variant_t payload;
     bool result = boost::apply_visitor(rdb_r_shard_visitor_t(&region, &payload), read);
     *read_out = read_t(payload, profile, read_mode);
     return result;
 }
-
-/* A visitor to handle this unsharding process for us. */
-
-class distribution_read_response_less_t {
-public:
-    bool operator()(const distribution_read_response_t& x,
-                    const distribution_read_response_t& y) {
-        if (x.region.inner == y.region.inner) {
-            return x.region < y.region;
-        } else {
-            return x.region.inner < y.region.inner;
-        }
-    }
-};
 
 // Scale the distribution down by combining ranges to fit it within the limit of
 // the query
@@ -940,55 +923,18 @@ void rdb_r_unshard_visitor_t::operator()(const distribution_read_t &dg) {
         results[i] = *result; // TODO: move semantics.
     }
 
-    std::sort(results.begin(), results.end(), distribution_read_response_less_t());
+    std::sort(results.begin(), results.end(), [](const auto &x, const auto &y) {
+        return x.region < y.region;
+    });
 
     distribution_read_response_t res;
-    size_t i = 0;
-    while (i < results.size()) {
-        // Find the largest hash shard for this key range
-        key_range_t range = results[i].region.inner;
-        size_t largest_index = i;
-        size_t largest_size = 0;
-        size_t total_range_keys = 0;
-
-        while (i < results.size() && results[i].region.inner == range) {
-            size_t tmp_total_keys = 0;
-            for (auto mit = results[i].key_counts.begin();
-                 mit != results[i].key_counts.end();
-                 ++mit) {
-                tmp_total_keys += mit->second;
-            }
-
-            if (tmp_total_keys > largest_size) {
-                largest_size = tmp_total_keys;
-                largest_index = i;
-            }
-
-            total_range_keys += tmp_total_keys;
-            ++i;
-        }
-
-        if (largest_size > 0) {
-            // Scale up the selected hash shard
-            double scale_factor =
-                static_cast<double>(total_range_keys)
-                / static_cast<double>(largest_size);
-
-            guarantee(scale_factor >= 1.0);  // Directly provable from code above.
-
-            for (auto mit = results[largest_index].key_counts.begin();
-                 mit != results[largest_index].key_counts.end();
-                 ++mit) {
-                mit->second = static_cast<int64_t>(mit->second * scale_factor);
-            }
-
-            // TODO: move semantics.
-            res.key_counts.insert(
-                results[largest_index].key_counts.begin(),
-                results[largest_index].key_counts.end());
-        }
+    for (const distribution_read_response_t &result : results) {
+        res.key_counts.insert(
+            result.key_counts.begin(),
+            result.key_counts.end());
     }
 
+    // TODO: This seems F'd.
     // If the result is larger than the requested limit, scale it down
     if (dg.result_limit > 0 && res.key_counts.size() > dg.result_limit) {
         scale_down_distribution(dg.result_limit, &res.key_counts);
@@ -1054,42 +1000,30 @@ bool read_t::route_to_primary() const THROWS_NOTHING {
 
 /* write_t::get_region() implementation */
 
-// TODO: This entire type is suspect, given the performance for
-// batched_replaces_t.  Is it used in anything other than assertions?
 region_t region_from_keys(const std::vector<store_key_t> &keys) {
     // It shouldn't be empty, but we let the places that would break use a
     // guarantee.
     rassert(!keys.empty());
     if (keys.empty()) {
-        return hash_region_t<key_range_t>();
+        return region_t();
     }
 
-    store_key_t min_key = store_key_t::max();
-    store_key_t max_key = store_key_t::min();
-    uint64_t min_hash_value = HASH_REGION_HASH_SIZE - 1;
-    uint64_t max_hash_value = 0;
-
-    for (auto it = keys.begin(); it != keys.end(); ++it) {
-        const store_key_t &key = *it;
-        if (key < min_key) {
-            min_key = key;
+    size_t min_key = 0;
+    size_t max_key = 0;
+    
+    for (size_t i = 1, e = keys.size(); i < e; ++i) {
+        const store_key_t &key = keys[i];
+        if (key < keys[min_key]) {
+            min_key = i;
         }
-        if (key > max_key) {
-            max_key = key;
-        }
-
-        const uint64_t hash_value = hash_region_hasher(key);
-        if (hash_value < min_hash_value) {
-            min_hash_value = hash_value;
-        }
-        if (hash_value > max_hash_value) {
-            max_hash_value = hash_value;
+        if (key > keys[max_key]) {
+            max_key = i;
         }
     }
 
-    return hash_region_t<key_range_t>(
-        min_hash_value, max_hash_value + 1,
-        key_range_t(key_range_t::closed, min_key, key_range_t::closed, max_key));
+    return key_range_t(
+        key_range_t::closed, keys[min_key],
+        key_range_t::closed, keys[max_key]);
 }
 
 struct rdb_w_get_region_visitor : public boost::static_visitor<region_t> {
@@ -1225,7 +1159,7 @@ struct rdb_w_shard_visitor_t : public boost::static_visitor<bool> {
 
     template <class T>
     bool rangey_write(const T &arg) const {
-        const hash_region_t<key_range_t> intersection
+        const key_range_t intersection
             = region_intersection(*region, arg.region);
         if (!region_is_empty(intersection)) {
             T tmp = arg;

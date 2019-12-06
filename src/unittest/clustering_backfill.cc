@@ -119,7 +119,7 @@ TPTEST(ClusteringBackfill, BackfillTest) {
         } callback;
         backfillee.go(
             &callback,
-            key_range_t::right_bound_t(backfillee_store.get_region().inner.left),
+            key_range_t::right_bound_t(backfillee_store.get_region().left),
             &non_interruptor);
     }
 

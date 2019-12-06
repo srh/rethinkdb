@@ -250,8 +250,8 @@ continue_bool_t mock_store_t::send_backfill_pre(
         THROWS_ONLY(interrupted_exc_t) {
     /* We iterate by remembering the last key we visited, rather than by using a
     `std::map` iterator, because this lets us block between iterations. */
-    store_key_t cursor = start_point.get_domain().inner.left;
-    key_range_t::right_bound_t right_bound = start_point.get_domain().inner.right;
+    store_key_t cursor = start_point.get_domain().left;
+    key_range_t::right_bound_t right_bound = start_point.get_domain().right;
     while (true) {
         /* Randomly block in order to more effectively test the code */
         if (randint(2) == 0) {
@@ -324,8 +324,8 @@ continue_bool_t mock_store_t::send_backfill(
         backfill_item_memory_tracker_t *memory_tracker,
         signal_t *interruptor)
         THROWS_ONLY(interrupted_exc_t) {
-    key_range_t::right_bound_t table_cursor(start_point.get_domain().inner.left);
-    key_range_t::right_bound_t right_bound = start_point.get_domain().inner.right;
+    key_range_t::right_bound_t table_cursor(start_point.get_domain().left);
+    key_range_t::right_bound_t right_bound = start_point.get_domain().right;
 
     std::deque<backfill_pre_item_t> pre_items;
     key_range_t::right_bound_t pre_items_limit = table_cursor;
@@ -467,8 +467,8 @@ continue_bool_t mock_store_t::receive_backfill(
         backfill_item_producer_t *item_producer,
         signal_t *interruptor)
         THROWS_ONLY(interrupted_exc_t) {
-    key_range_t::right_bound_t cursor(_region.inner.left);
-    while (cursor < _region.inner.right) {
+    key_range_t::right_bound_t cursor(_region.left);
+    while (cursor < _region.right) {
         /* Introduce a random delay to test more code paths */
         if (randint(2) == 0) {
             nap(randint(100), interruptor);
@@ -484,7 +484,7 @@ continue_bool_t mock_store_t::receive_backfill(
         }
 
         region_t metainfo_mask = _region;
-        metainfo_mask.inner.left = cursor.key();
+        metainfo_mask.left = cursor.key();
 
         if (is_item) {
             guarantee(key_range_t::right_bound_t(item.range.left) >= cursor);
@@ -507,12 +507,12 @@ continue_bool_t mock_store_t::receive_backfill(
             cursor = empty_range;
         }
 
-        metainfo_mask.inner.right = cursor;
+        metainfo_mask.right = cursor;
         metainfo_.update(item_producer->get_metainfo()->mask(metainfo_mask));
 
         item_producer->on_commit(cursor);
     }
-    guarantee(cursor == _region.inner.right);
+    guarantee(cursor == _region.right);
     return continue_bool_t::CONTINUE;
 }
 
@@ -545,8 +545,8 @@ void mock_store_t::reset_data(
 
     rassert(region_is_superset(get_region(), subregion));
 
-    auto it = table_.lower_bound(subregion.inner.left);
-    while (it != table_.end() && subregion.inner.contains_key(it->first)) {
+    auto it = table_.lower_bound(subregion.left);
+    while (it != table_.end() && subregion.contains_key(it->first)) {
         auto jt = it;
         ++it;
         if (region_contains_key(subregion, jt->first)) {

@@ -132,8 +132,8 @@ void calculate_emergency_repair(
             table_config_t::shard_t());
         for (const auto &pair : new_state_out->contracts) {
             config.visit_mutable(
-                key_range_t::right_bound_t(pair.second.first.inner.left),
-                pair.second.first.inner.right,
+                key_range_t::right_bound_t(pair.second.first.left),
+                pair.second.first.right,
                 [&](const key_range_t::right_bound_t &,
                         const key_range_t::right_bound_t &,
                         table_config_t::shard_t *shard) {
