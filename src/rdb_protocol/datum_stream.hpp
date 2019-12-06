@@ -182,7 +182,7 @@ protected:
 enum class range_state_t { ACTIVE, SATURATED, EXHAUSTED };
 
 void debug_print(printf_buffer_t *buf, const range_state_t &rs);
-struct hash_range_with_cache_t {
+struct active_range_with_cache {
     uuid_u cfeed_shard_id;
     // This is the range of values that we have yet to read from the shard.  We
     // store a range instead of just a `store_key_t` because this range is only
@@ -193,20 +193,10 @@ struct hash_range_with_cache_t {
     // No data in the cache and nothing to read from the shards.
     bool totally_exhausted() const;
 };
-void debug_print(printf_buffer_t *buf, const hash_range_with_cache_t &hrwc);
-
-// TODO: Rename this crazy type name.
-struct hash_ranges_t {
-    hash_range_with_cache_t hash_range;
-    // Composite state of all hash shards.
-    range_state_t state() const;
-    // True if all hash shards are totally exhausted.
-    bool totally_exhausted() const;
-};
-void debug_print(printf_buffer_t *buf, const hash_ranges_t &hr);
+void debug_print(printf_buffer_t *buf, const active_range_with_cache &hrwc);
 
 struct active_ranges_t {
-    std::map<key_range_t, hash_ranges_t> ranges;
+    std::map<key_range_t, active_range_with_cache> ranges;
     bool totally_exhausted() const;
 };
 void debug_print(printf_buffer_t *buf, const active_ranges_t &ar);

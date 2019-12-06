@@ -68,34 +68,24 @@ void debug_print(printf_buffer_t *buf, const range_state_t &rs) {
     buf->appendf("%s", s);
 }
 
-void debug_print(printf_buffer_t *buf, const hash_range_with_cache_t &hrwc) {
-    buf->appendf("hash_range_with_cache_t(");
+void debug_print(printf_buffer_t *buf, const active_range_with_cache &hrwc) {
+    buf->appendf("active_range_with_cache{");
+    debug_print(buf, hrwc.cfeed_shard_id);
+    buf->appendf(", ");
     debug_print(buf, hrwc.key_range);
     buf->appendf(", ");
     debug_print(buf, hrwc.cache);
     buf->appendf(", ");
     debug_print(buf, hrwc.state);
-    buf->appendf(")\n");
-}
-
-void debug_print(printf_buffer_t *buf, const hash_ranges_t &hr) {
-    debug_print(buf, hr.hash_range);
+    buf->appendf("}\n");
 }
 
 void debug_print(printf_buffer_t *buf, const active_ranges_t &ar) {
     debug_print(buf, ar.ranges);
 }
 
-bool hash_range_with_cache_t::totally_exhausted() const {
+bool active_range_with_cache::totally_exhausted() const {
     return state == range_state_t::EXHAUSTED && cache.size() == 0;
-}
-
-range_state_t hash_ranges_t::state() const {
-    return hash_range.state;
-}
-
-bool hash_ranges_t::totally_exhausted() const {
-    return hash_range.totally_exhausted();
 }
 
 bool active_ranges_t::totally_exhausted() const {
@@ -110,10 +100,10 @@ key_range_t active_ranges_to_range(const active_ranges_t &ranges) {
     store_key_t end = store_key_t::min();
     bool seen_active = false;
     for (auto &&pair : ranges.ranges) {
-        switch (pair.second.state()) {
+        switch (pair.second.state) {
         case range_state_t::ACTIVE:
-            start = std::min(start, pair.second.hash_range.key_range.left);
-            end = std::max(end, pair.second.hash_range.key_range.right.key_or_max());
+            start = std::min(start, pair.second.key_range.left);
+            end = std::max(end, pair.second.key_range.right.key_or_max());
             seen_active = true;
             break;
         case range_state_t::SATURATED:
@@ -159,26 +149,11 @@ optional<std::map<region_t, store_key_t> > active_ranges_to_hints(
 
     std::map<region_t, store_key_t> hints;
     for (auto &&pair : ranges->ranges) {
-        switch (pair.second.state()) {
+        switch (pair.second.state) {
         case range_state_t::ACTIVE:
-            // If any of the hash shards in a range are active, we send
-            // reads for all of them, because the assumption is that data is
-            // randomly distributed across hash shards, which means the only
-            // case where some are active and some are saturated is when
-            // we're reading really small batches for some reason
-            // (e.g. because of a sparse filter), in which case we still
-            // want to read from all the hash shards at once.
-            // TODO: This .state is guaranteed ACTIVE.
-            switch (pair.second.hash_range.state) {
-            case range_state_t::ACTIVE: // fallthru
-            case range_state_t::SATURATED:
-                hints[region_t(pair.first)] = !reversed(sorting)
-                    ? pair.second.hash_range.key_range.left
-                    : pair.second.hash_range.key_range.right.key_or_max();
-                break;
-            case range_state_t::EXHAUSTED: break;
-            default: unreachable();
-            }
+            hints[region_t(pair.first)] = !reversed(sorting)
+                ? pair.second.key_range.left
+                : pair.second.key_range.right.key_or_max();
             break;
         case range_state_t::SATURATED: break;
         case range_state_t::EXHAUSTED: break;
@@ -207,8 +182,7 @@ active_ranges_t new_active_ranges(
         }
 
         ret.ranges[pair.first]
-           .hash_range
-            = hash_range_with_cache_t{
+            = active_range_with_cache{
                 cfeed_shard_id,
                 is_secondary == is_secondary_t::YES
                     ? original_range
@@ -225,8 +199,7 @@ active_ranges_t new_active_ranges(
             }
 
             ret.ranges[shard_pair.first]
-                .hash_range
-                 = hash_range_with_cache_t{
+                 = active_range_with_cache{
                      shard_pair.second,
                      is_secondary == is_secondary_t::YES
                          ? original_range
@@ -242,7 +215,7 @@ active_ranges_t new_active_ranges(
 class pseudoshard_t {
 public:
     pseudoshard_t(sorting_t _sorting,
-                  hash_range_with_cache_t *_cached,
+                  active_range_with_cache *_cached,
                   keyed_stream_t *_fresh)
         : sorting(_sorting),
           cached(_cached),
@@ -332,7 +305,7 @@ private:
     // We move out of `cached` and `fresh`, so we need to act like we have ownership.
     DISABLE_COPYING(pseudoshard_t);
     sorting_t sorting;
-    hash_range_with_cache_t *cached;
+    active_range_with_cache *cached;
     size_t cached_index;
     keyed_stream_t *fresh;
     size_t fresh_index;
@@ -379,8 +352,8 @@ raw_stream_t rget_response_reader_t::unshard(
     pseudoshards.reserve(active_ranges->ranges.size() * CPU_SHARDING_FACTOR);
     size_t n_active = 0, n_fresh = 0;
     for (auto &&pair : active_ranges->ranges) {
-        bool range_active = pair.second.state() == range_state_t::ACTIVE;
-        if (pair.second.hash_range.totally_exhausted()) continue;
+        bool range_active = pair.second.state == range_state_t::ACTIVE;
+        if (pair.second.totally_exhausted()) continue;
         keyed_stream_t *fresh = nullptr;
         // Active shards need their bounds updated.
         if (range_active) {
@@ -395,40 +368,40 @@ raw_stream_t rget_response_reader_t::unshard(
             }
             if (!reversed(sorting)) {
                 if (new_bound != nullptr && *new_bound != store_key_max) {
-                    pair.second.hash_range.key_range.left = *new_bound;
-                    bool incremented = pair.second.hash_range.key_range.left.increment();
+                    pair.second.key_range.left = *new_bound;
+                    bool incremented = pair.second.key_range.left.increment();
                     r_sanity_check(incremented); // not max key
                 } else {
-                    pair.second.hash_range.key_range.left =
-                        pair.second.hash_range.key_range.right_or_max();
+                    pair.second.key_range.left =
+                        pair.second.key_range.right_or_max();
                 }
             } else {
                 // The right bound is open so we don't need to decrement.
                 if (new_bound != nullptr && *new_bound != store_key_min) {
-                    pair.second.hash_range.key_range.right =
+                    pair.second.key_range.right =
                         key_range_t::right_bound_t(*new_bound);
                 } else {
-                    pair.second.hash_range.key_range.right =
-                        key_range_t::right_bound_t(pair.second.hash_range.key_range.left);
+                    pair.second.key_range.right =
+                        key_range_t::right_bound_t(pair.second.key_range.left);
                 }
             }
             if (new_bound) {
                 // If there's nothing left to read, it's exhausted.
-                if (pair.second.hash_range.key_range.is_empty()) {
-                    pair.second.hash_range.state = range_state_t::EXHAUSTED;
+                if (pair.second.key_range.is_empty()) {
+                    pair.second.state = range_state_t::EXHAUSTED;
                 }
             } else {
                 // If we got no data back, the logic above should have set
                 // the range to something empty.
-                r_sanity_check(pair.second.hash_range.key_range.is_empty());
-                pair.second.hash_range.state = range_state_t::EXHAUSTED;
+                r_sanity_check(pair.second.key_range.is_empty());
+                pair.second.state = range_state_t::EXHAUSTED;
             }
         }
         // If there's any data for a hash shard, we need to consider it
         // while unsharding.  Note that the shard may have *already been
         // marked exhausted* in the step above.
-        if (fresh != nullptr || pair.second.hash_range.cache.size() > 0) {
-            pseudoshards.emplace_back(sorting, &pair.second.hash_range, fresh);
+        if (fresh != nullptr || pair.second.cache.size() > 0) {
+            pseudoshards.emplace_back(sorting, &pair.second, fresh);
         }
     }
     if (pseudoshards.size() == 0) {
@@ -489,7 +462,7 @@ raw_stream_t rget_response_reader_t::unshard(
     bool seen_active = false;
     bool seen_saturated = false;
     for (auto &&pair : active_ranges->ranges) {
-        switch (pair.second.state()) {
+        switch (pair.second.state) {
         case range_state_t::ACTIVE: seen_active = true; break;
         case range_state_t::SATURATED: seen_saturated = true; break;
         case range_state_t::EXHAUSTED: break;
@@ -531,13 +504,13 @@ optional<active_state_t> rget_response_reader_t::get_active_state() {
     }
     std::map<uuid_u, std::pair<key_range_t, uint64_t> > shard_last_read_stamps;
     for (const auto &range_pair : active_ranges->ranges) {
-        const auto stamp_it = shard_stamp_infos.find(range_pair.second.hash_range.cfeed_shard_id);
+        const auto stamp_it = shard_stamp_infos.find(range_pair.second.cfeed_shard_id);
         r_sanity_check(stamp_it != shard_stamp_infos.end());
 
         key_range_t last_read_range(
             key_range_t::closed, stamp_it->second.last_read_start,
             key_range_t::open, std::max(stamp_it->second.last_read_start,
-                                        range_pair.second.hash_range.key_range.left));
+                                        range_pair.second.key_range.left));
         shard_last_read_stamps.insert(std::make_pair(
             stamp_it->first,
             std::make_pair(last_read_range, stamp_it->second.stamp)));
@@ -981,28 +954,28 @@ void primary_readgen_t::restrict_active_ranges(
         for (auto &&pair : ranges_inout->ranges) {
             const auto &keypair = limits[pair.first];
             store_key_t new_start =
-                std::max(keypair.first, pair.second.hash_range.key_range.left);
+                std::max(keypair.first, pair.second.key_range.left);
             store_key_t new_end = keypair.second;
             new_end.increment();
-            new_end = std::min(new_end, pair.second.hash_range.key_range.right_or_max());
+            new_end = std::min(new_end, pair.second.key_range.right_or_max());
 
             if (new_start > new_end) {
                 if (!reversed(_sorting)) {
-                    pair.second.hash_range.key_range.left
-                        = pair.second.hash_range.key_range.right_or_max();
+                    pair.second.key_range.left
+                        = pair.second.key_range.right_or_max();
                 } else {
-                    pair.second.hash_range.key_range.right.internal_key
-                        = pair.second.hash_range.key_range.left;
+                    pair.second.key_range.right.internal_key
+                        = pair.second.key_range.left;
                 }
-                guarantee(pair.second.hash_range.key_range.is_empty());
+                guarantee(pair.second.key_range.is_empty());
             } else {
-                pair.second.hash_range.key_range.left = new_start;
-                pair.second.hash_range.key_range.right.internal_key = new_end;
-                guarantee(!pair.second.hash_range.key_range.is_empty()
+                pair.second.key_range.left = new_start;
+                pair.second.key_range.right.internal_key = new_end;
+                guarantee(!pair.second.key_range.is_empty()
                             || new_start == new_end);
             }
-            if (pair.second.hash_range.key_range.is_empty()) {
-                pair.second.hash_range.state = range_state_t::EXHAUSTED;
+            if (pair.second.key_range.is_empty()) {
+                pair.second.state = range_state_t::EXHAUSTED;
             }
         }
     }
