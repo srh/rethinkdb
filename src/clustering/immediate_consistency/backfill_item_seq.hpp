@@ -29,11 +29,10 @@ public:
         left_key(key), right_key(key),
         mem_size(0) { }
 
-    // TODO: Why not return by reference?
     /* Returns the left and right bounds of the space this `backfill_item_seq_t` applies
     to. These may be equal, in which case the sequence must be empty. */
-    key_range_t::right_bound_t get_left_key() const { return left_key; }
-    key_range_t::right_bound_t get_right_key() const { return right_key; }
+    const key_range_t::right_bound_t &get_left_key() const { return left_key; }
+    const key_range_t::right_bound_t &get_right_key() const { return right_key; }
 
     region_t get_region() const {
         if (left_key == right_key) {
