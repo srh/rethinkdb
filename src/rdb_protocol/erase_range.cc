@@ -13,12 +13,10 @@
 
 class collect_keys_helper_t : public rocks_traversal_cb {
 public:
-    collect_keys_helper_t(key_tester_t *tester,
-                          const key_range_t &key_range,
+    collect_keys_helper_t(const key_range_t &key_range,
                           uint64_t max_keys_to_collect, /* 0 = unlimited */
                           signal_t *interruptor)
         : aborted_(false),
-          tester_(tester),
           key_range_(key_range),
           max_keys_to_collect_(max_keys_to_collect),
           interruptor_(interruptor) {
@@ -34,9 +32,6 @@ public:
         guarantee(!aborted_);
         store_key_t skey(key.second, reinterpret_cast<const uint8_t *>(key.first));
         guarantee(key_range_.contains_key(skey.data(), skey.size()));
-        if (!tester_->key_should_be_erased(skey)) {
-            return continue_bool_t::CONTINUE;
-        }
         collected_keys_.push_back(skey);
         if (collected_keys_.size() == max_keys_to_collect_ ||
                 interruptor_->is_pulsed()) {
@@ -59,7 +54,6 @@ private:
     std::vector<store_key_t> collected_keys_;
     bool aborted_;
 
-    key_tester_t *tester_;
     key_range_t key_range_;
     uint64_t max_keys_to_collect_;
     signal_t *interruptor_;
@@ -70,7 +64,6 @@ private:
 continue_bool_t rdb_erase_small_range(
         rockshard rocksh,
         btree_slice_t *btree_slice,
-        key_tester_t *tester,
         const key_range_t &key_range,
         real_superblock_lock *superblock,
         signal_t *interruptor,
@@ -87,7 +80,7 @@ continue_bool_t rdb_erase_small_range(
     // TODO: Use a rocks iterator, delete the keys while iterating.
 
     /* Step 1: Collect all keys that we want to erase using a depth-first traversal. */
-    collect_keys_helper_t key_collector(tester, key_range, max_keys_to_erase,
+    collect_keys_helper_t key_collector(key_range, max_keys_to_erase,
         interruptor);
     std::string rocks_kv_prefix =
         rockstore::table_primary_prefix(rocksh.table_id, rocksh.shard_no);

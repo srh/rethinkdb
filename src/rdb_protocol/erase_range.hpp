@@ -16,23 +16,6 @@ class real_superblock_lock;
 class rockshard;
 class signal_t;
 
-class key_tester_t {
-public:
-    key_tester_t() { }
-    virtual bool key_should_be_erased(const store_key_t &key) = 0;
-
-protected:
-    virtual ~key_tester_t() { }
-private:
-    DISABLE_COPYING(key_tester_t);
-};
-
-struct always_true_key_tester_t : public key_tester_t {
-    bool key_should_be_erased(UNUSED const store_key_t &key) {
-        return true;
-    }
-};
-
 /* `rdb_erase_small_range` has a complexity of O(log n * m) where n is the size of
 the btree, and m is the number of documents actually being deleted.
 
@@ -47,7 +30,6 @@ it stopped because it hit the end of the range. */
 continue_bool_t rdb_erase_small_range(
     rockshard rocksh,
     btree_slice_t *btree_slice,
-    key_tester_t *tester,
     const key_range_t &keys,
     real_superblock_lock *superblock,
     signal_t *interruptor,

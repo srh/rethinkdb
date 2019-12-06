@@ -243,7 +243,6 @@ void store_t::reset_data(
     with_priority_t p(CORO_PRIORITY_RESET_DATA);
 
     // Erase the data in small chunks
-    always_true_key_tester_t key_tester;
     const uint64_t max_erased_per_pass = 100;
     for (continue_bool_t done_erasing = continue_bool_t::CONTINUE;
          done_erasing == continue_bool_t::CONTINUE;) {
@@ -270,7 +269,6 @@ void store_t::reset_data(
         key_range_t deleted_region;
         done_erasing = rdb_erase_small_range(rocksh(),
                                              btree.get(),
-                                             &key_tester,
                                              subregion,
                                              superblock.get(),
                                              &non_interruptor,

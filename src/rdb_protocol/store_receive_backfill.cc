@@ -326,12 +326,11 @@ void apply_multi_key_item(
 
             /* Delete a chunk of the range, making sure to do no more than
             `MAX_CHANGES_PER_TXN / 2` changes at once. */
-            always_true_key_tester_t key_tester;
             key_range_t range_deleted;
             // TODO: We need to manage rocks transactionality
             // between erasing range, applying writes, and updating sindex.
             continue_bool_t res = rdb_erase_small_range(
-                rocksh, tokens.info->slice, &key_tester,
+                rocksh, tokens.info->slice,
                 range_to_delete, superblock.get(),
                 &non_interruptor, MAX_CHANGES_PER_TXN / 2,
                 &mod_reports, &range_deleted);

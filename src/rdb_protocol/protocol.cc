@@ -353,11 +353,6 @@ void post_construct_and_drain_queue(
     }
 }
 
-
-bool range_key_tester_t::key_should_be_erased(const store_key_t &key) {
-    return delete_range->contains_key(key);
-}
-
 }  // namespace rdb_protocol
 
 namespace rdb_protocol {

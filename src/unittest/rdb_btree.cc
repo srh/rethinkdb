@@ -273,6 +273,7 @@ TPTEST(RDBBtree, SindexPostConstruct) {
     check_keys_are_present(&store, sindex_name);
 }
 
+
 TPTEST(RDBBtree, SindexEraseRange) {
     recreate_temporary_directory(base_path_t("."));
     temp_rockstore temp_rocks;
@@ -321,7 +322,6 @@ TPTEST(RDBBtree, SindexEraseRange) {
                 &dummy_interruptor);
 
             const key_range_t test_range = key_range_t::universe();
-            rdb_protocol::range_key_tester_t tester(&test_range);
             superblock->sindex_block_write_signal()->wait();
 
             std::vector<rdb_modification_report_t> mod_reports;
@@ -329,7 +329,6 @@ TPTEST(RDBBtree, SindexEraseRange) {
             rdb_erase_small_range(
                 store.rocksh(),
                 store.btree.get(),
-                &tester,
                 key_range_t::universe(),
                 superblock.get(),
                 &dummy_interruptor,
