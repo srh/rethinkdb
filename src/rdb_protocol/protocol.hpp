@@ -629,7 +629,7 @@ public:
     ql::datum_t data;
     bool overwrite;
 };
-RDB_DECLARE_SERIALIZABLE(point_write_t);
+RDB_DECLARE_SERIALIZABLE_FOR_CLUSTER(point_write_t);
 
 class point_delete_t {
 public:
@@ -639,7 +639,7 @@ public:
 
     store_key_t key;
 };
-RDB_DECLARE_SERIALIZABLE(point_delete_t);
+RDB_DECLARE_SERIALIZABLE_FOR_CLUSTER(point_delete_t);
 
 class sync_t {
 public:
@@ -649,7 +649,7 @@ public:
 
     region_t region;
 };
-RDB_DECLARE_SERIALIZABLE(sync_t);
+RDB_DECLARE_SERIALIZABLE_FOR_CLUSTER(sync_t);
 
 // `dummy_write_t` can be used to poll for table readiness - it will go through all
 // the clustering layers, but is a no-op in the protocol layer.
@@ -658,7 +658,7 @@ public:
     dummy_write_t() : region(region_t::universe()) { }
     region_t region;
 };
-RDB_DECLARE_SERIALIZABLE(dummy_write_t);
+RDB_DECLARE_SERIALIZABLE_FOR_CLUSTER(dummy_write_t);
 
 struct write_t {
     typedef boost::variant<batched_replace_t,

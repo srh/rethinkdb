@@ -1522,9 +1522,9 @@ RDB_IMPL_SERIALIZABLE_8_FOR_CLUSTER(
         serializable_env,
         return_changes);
 
-RDB_IMPL_SERIALIZABLE_3_SINCE_v1_13(point_write_t, key, data, overwrite);
-RDB_IMPL_SERIALIZABLE_1_SINCE_v1_13(point_delete_t, key);
-RDB_IMPL_SERIALIZABLE_1_SINCE_v1_13(sync_t, region);
+RDB_IMPL_SERIALIZABLE_3_FOR_CLUSTER(point_write_t, key, data, overwrite);
+RDB_IMPL_SERIALIZABLE_1_FOR_CLUSTER(point_delete_t, key);
+RDB_IMPL_SERIALIZABLE_1_FOR_CLUSTER(sync_t, region);
 RDB_IMPL_SERIALIZABLE_1_FOR_CLUSTER(dummy_write_t, region);
 
 RDB_IMPL_SERIALIZABLE_4_FOR_CLUSTER(

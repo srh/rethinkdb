@@ -265,13 +265,11 @@ archive_result_t deserialize_for_metainfo(read_stream_t *s,
     return res;
 }
 
-template <cluster_version_t W>
-void serialize(write_message_t *wm, const hash_region_t<key_range_t> &h) {
+template <>
+void serialize<cluster_version_t::CLUSTER>(write_message_t *wm, const hash_region_t<key_range_t> &h) {
     serialize_for_metainfo(wm, h);
 }
-template <cluster_version_t W>
-archive_result_t deserialize(read_stream_t *s, hash_region_t<key_range_t> *h) {
+template <>
+archive_result_t deserialize<cluster_version_t::CLUSTER>(read_stream_t *s, hash_region_t<key_range_t> *h) {
     return deserialize_for_metainfo(s, h);
 }
-
-INSTANTIATE_SERIALIZABLE_SINCE_v1_13(hash_region_t<key_range_t>);

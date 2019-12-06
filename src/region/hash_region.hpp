@@ -85,7 +85,7 @@ void serialize_for_metainfo(write_message_t *wm, const hash_region_t<key_range_t
 MUST_USE archive_result_t deserialize_for_metainfo(read_stream_t *s,
                                                    hash_region_t<key_range_t> *out);
 
-RDB_DECLARE_SERIALIZABLE(hash_region_t<key_range_t>);
+RDB_DECLARE_SERIALIZABLE_FOR_CLUSTER(hash_region_t<key_range_t>);
 
 
 template <class inner_region_t>
