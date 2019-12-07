@@ -293,7 +293,7 @@ public:
             THROWS_ONLY(interrupted_exc_t);
 
     rockshard rocksh() const {
-        return rockshard(rocks, table_id, THE_CPU_SHARD);
+        return rockshard(rocks, table_id);
     }
 
 private:

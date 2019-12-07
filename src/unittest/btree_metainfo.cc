@@ -42,7 +42,7 @@ TPTEST(BtreeMetainfo, MetainfoTest) {
     cache_t cache(&get_global_perfmon_collection());
     cache_conn_t cache_conn(&cache);
     namespace_id_t table_id = str_to_uuid("12345678-1234-5678-abcd-12345678abcd");
-    rockshard rocksh(io_backender.rocks(), table_id, 0);
+    rockshard rocksh(io_backender.rocks(), table_id);
 
     {
         txn_t txn(&cache_conn, write_durability_t::HARD, 1);

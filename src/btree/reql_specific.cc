@@ -82,7 +82,7 @@ void get_superblock_metainfo(
         std::vector<std::pair<std::vector<char>, std::vector<char> > > *kv_pairs_out) {
     superblock->read_acq_signal()->wait_lazily_ordered();
 
-    std::string metainfo_key = rockstore::table_metadata_prefix(rocksh.table_id, rocksh.shard_no)
+    std::string metainfo_key = rockstore::table_metadata_prefix(rocksh.table_id)
         + rockstore::TABLE_METADATA_METAINFO_KEY();
     std::string metainfo = rocksh.rocks->read(metainfo_key);
 
@@ -135,7 +135,7 @@ void set_superblock_metainfo(real_superblock_lock *superblock,
 
     // Rocksdb metadata.
     rocksdb::WriteBatch batch;
-    std::string meta_prefix = rockstore::table_metadata_prefix(rocksh.table_id, rocksh.shard_no);
+    std::string meta_prefix = rockstore::table_metadata_prefix(rocksh.table_id);
     rocksdb::Status status = superblock->wait_write_batch()->Put(
         meta_prefix + rockstore::TABLE_METADATA_METAINFO_KEY(),
         rocksdb::Slice(metainfo.data(), metainfo.size()));

@@ -95,7 +95,7 @@ store_t::store_t(rockstore::store *_rocks,
       io_backender_(io_backender), base_path_(base_path),
       perfmon_collection_membership(
           parent_perfmon_collection, &perfmon_collection,
-          strprintf("%s_%d", perfmon_prefix, THE_CPU_SHARD)),
+          strprintf("%s", perfmon_prefix)),
       ctx(_ctx),
       table_id(_table_id),
       write_superblock_acq_semaphore(WRITE_SUPERBLOCK_ACQ_WAITERS_LIMIT)
@@ -727,7 +727,7 @@ void store_t::clear_sindex_data(
         clear_sindex_traversal_cb_t traversal_cb(pkey_range_to_clear);
         try {
             std::string rocks_sindex_kv_prefix =
-                rockstore::table_secondary_prefix(table_id, THE_CPU_SHARD, sindex_id);
+                rockstore::table_secondary_prefix(table_id, sindex_id);
             superblock->read_acq_signal()->wait_lazily_ordered();
             rockstore::snapshot snap = make_snapshot(rocks);
             reached_end =
@@ -757,7 +757,7 @@ void store_t::clear_sindex_data(
         const std::vector<store_key_t> &keys = traversal_cb.get_keys();
         for (size_t i = 0; i < keys.size(); ++i) {
             std::string rocks_kv_location =
-                rockstore::table_secondary_key(table_id, THE_CPU_SHARD, sindex_id, key_to_unescaped_str(keys[i]));
+                rockstore::table_secondary_key(table_id, sindex_id, key_to_unescaped_str(keys[i]));
             superblock->wait_write_batch()->Delete(rocks_kv_location);
         }
 

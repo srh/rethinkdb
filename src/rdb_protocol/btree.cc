@@ -35,7 +35,7 @@
 void rdb_get(rockshard rocksh, const store_key_t &store_key,
              real_superblock_lock *superblock, point_read_response_t *response) {
     superblock->read_acq_signal()->wait_lazily_ordered();
-    std::string loc = rockstore::table_primary_key(rocksh.table_id, rocksh.shard_no, key_to_unescaped_str(store_key));
+    std::string loc = rockstore::table_primary_key(rocksh.table_id, key_to_unescaped_str(store_key));
     std::pair<std::string, bool> val = rocksh.rocks->try_read(loc);
     superblock->reset_superblock();
     if (!val.second) {
@@ -143,7 +143,7 @@ batched_replace_response_t rdb_replace_and_return_superblock(
         info.btree->slice->stats.pm_keys_set.record();
         info.btree->slice->stats.pm_total_keys_set += 1;
 
-        std::string rocks_kv_location = rockstore::table_primary_key(rocksh.table_id, rocksh.shard_no, key_to_unescaped_str(*info.key));
+        std::string rocks_kv_location = rockstore::table_primary_key(rocksh.table_id, key_to_unescaped_str(*info.key));
         std::pair<std::string, bool> maybe_value = rocksh.rocks->try_read(rocks_kv_location);
 
         ql::datum_t old_val;
@@ -435,7 +435,7 @@ void rdb_set(rockshard rocksh,
 
     superblock->read_acq_signal()->wait_lazily_ordered();
 
-    std::string rocks_kv_location = rockstore::table_primary_key(rocksh.table_id, rocksh.shard_no, key_to_unescaped_str(key));
+    std::string rocks_kv_location = rockstore::table_primary_key(rocksh.table_id, key_to_unescaped_str(key));
     std::pair<std::string, bool> maybe_value
         = rocksh.rocks->try_read(rocks_kv_location);
 
@@ -487,7 +487,7 @@ void rdb_delete(rockshard rocksh,
 
     superblock->read_acq_signal()->wait_lazily_ordered();
 
-    std::string rocks_kv_location = rockstore::table_primary_key(rocksh.table_id, rocksh.shard_no, key_to_unescaped_str(key));
+    std::string rocks_kv_location = rockstore::table_primary_key(rocksh.table_id, key_to_unescaped_str(key));
     std::pair<std::string, bool> maybe_value = rocksh.rocks->try_read(rocks_kv_location);
 
     bool exists = maybe_value.second;
@@ -1069,7 +1069,7 @@ void rdb_rget_snapshot_slice(
 
     direction_t direction = reversed(sorting) ? direction_t::backward : direction_t::forward;
     continue_bool_t cont = continue_bool_t::CONTINUE;
-    std::string rocks_kv_prefix = rockstore::table_primary_prefix(rocksh.table_id, rocksh.shard_no);
+    std::string rocks_kv_prefix = rockstore::table_primary_prefix(rocksh.table_id);
     if (primary_keys.has_value()) {
         // TODO: Instead of holding onto the superblock, we could make an iterator once,
         // or hold a rocksdb snapshot once, out here.
@@ -1147,7 +1147,7 @@ void rdb_rget_slice(
 
     direction_t direction = reversed(sorting) ? direction_t::backward : direction_t::forward;
     continue_bool_t cont = continue_bool_t::CONTINUE;
-    std::string rocks_kv_prefix = rockstore::table_primary_prefix(rocksh.table_id, rocksh.shard_no);
+    std::string rocks_kv_prefix = rockstore::table_primary_prefix(rocksh.table_id);
     if (primary_keys.has_value()) {
         // TODO: Instead of holding onto the superblock, we could make an iterator once,
         // or hold a rocksdb snapshot once, out here.
@@ -1249,7 +1249,7 @@ void rdb_rget_secondary_snapshot_slice(
             sindex_info.mapping,
             sindex_info.multi));
 
-    std::string rocks_kv_prefix = rockstore::table_secondary_prefix(rocksh.table_id, rocksh.shard_no, sindex_uuid);
+    std::string rocks_kv_prefix = rockstore::table_secondary_prefix(rocksh.table_id, sindex_uuid);
 
     direction_t direction = reversed(sorting) ? direction_t::backward : direction_t::forward;
     auto cb = [&](const std::pair<ql::datum_range_t, uint64_t> &pair, UNUSED bool is_last) {
@@ -1326,7 +1326,7 @@ void rdb_rget_secondary_slice(
             sindex_info.mapping,
             sindex_info.multi));
 
-    std::string rocks_kv_prefix = rockstore::table_secondary_prefix(rocksh.table_id, rocksh.shard_no, sindex_uuid);
+    std::string rocks_kv_prefix = rockstore::table_secondary_prefix(rocksh.table_id, sindex_uuid);
 
     // TODO: We could make a rocksdb snapshot here, and iterate through that,
     // instead of holding a superblock.
@@ -2003,7 +2003,6 @@ void rdb_update_single_sindex(
                 std::string rocks_secondary_kv_location
                     = rockstore::table_secondary_key(
                         rocksh.table_id,
-                        rocksh.shard_no,
                         sindex->sindex.id,
                         key_to_unescaped_str(it->first));
 
@@ -2062,7 +2061,6 @@ void rdb_update_single_sindex(
                 std::string rocks_secondary_kv_location
                     = rockstore::table_secondary_key(
                         rocksh.table_id,
-                        rocksh.shard_no,
                         sindex->sindex.id,
                         key_to_unescaped_str(it->first));
 
@@ -2419,7 +2417,7 @@ void post_construct_secondary_index_range(
         = txn->cache()->create_cache_account(SINDEX_POST_CONSTRUCTION_CACHE_PRIORITY);
     txn->set_account(&cache_account);
 
-    std::string rocks_kv_prefix = rockstore::table_primary_prefix(rocksh.table_id, rocksh.shard_no);
+    std::string rocks_kv_prefix = rockstore::table_primary_prefix(rocksh.table_id);
     continue_bool_t cont = rocks_traversal(
         rocksh.rocks,
         rocksnap.snap,

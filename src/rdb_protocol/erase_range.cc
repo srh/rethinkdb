@@ -83,7 +83,7 @@ continue_bool_t rdb_erase_small_range(
     collect_keys_helper_t key_collector(key_range, max_keys_to_erase,
         interruptor);
     std::string rocks_kv_prefix =
-        rockstore::table_primary_prefix(rocksh.table_id, rocksh.shard_no);
+        rockstore::table_primary_prefix(rocksh.table_id);
 
     // Acquire read lock on superblock before taking snapshot.
     superblock->read_acq_signal()->wait_lazily_ordered();
@@ -109,7 +109,7 @@ continue_bool_t rdb_erase_small_range(
         btree_slice->stats.pm_keys_set.record();
         btree_slice->stats.pm_total_keys_set += 1;
 
-        std::string rocks_kv_location = rockstore::table_primary_key(rocksh.table_id, rocksh.shard_no, key_to_unescaped_str(key));
+        std::string rocks_kv_location = rockstore::table_primary_key(rocksh.table_id, key_to_unescaped_str(key));
         std::pair<std::string, bool> maybe_value
             = rocksh.rocks->try_read(rocks_kv_location);
 

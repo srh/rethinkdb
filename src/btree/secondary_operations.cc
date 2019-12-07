@@ -75,7 +75,7 @@ void get_secondary_indexes_internal(
         std::map<sindex_name_t, secondary_index_t> *sindexes_out) {
     superblock->read_acq_signal()->wait_lazily_ordered();
 
-    std::string kv_location = rockstore::table_sindex_map(rocksh.table_id, rocksh.shard_no);
+    std::string kv_location = rockstore::table_sindex_map(rocksh.table_id);
 
     // TODO: Some vestigial code with a guarantee here -- presumably to be cleaned up later.
     std::string rocks_sindex_blob;
@@ -97,7 +97,7 @@ void set_secondary_indexes_internal(
 
     // TODO: rocksdb transactionality
     std::string sindex_rocks_blob = serialize_to_string<cluster_version_t::LATEST_DISK>(sindexes);
-    std::string sindex_rocks_key = rockstore::table_sindex_map(rocksh.table_id, rocksh.shard_no);
+    std::string sindex_rocks_key = rockstore::table_sindex_map(rocksh.table_id);
     superblock->wait_write_batch()->Put(sindex_rocks_key, sindex_rocks_blob);
 }
 

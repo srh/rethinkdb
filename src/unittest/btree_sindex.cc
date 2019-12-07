@@ -25,14 +25,14 @@ TPTEST(BTreeSindex, LowLevelOps) {
     cache_conn_t cache_conn(&cache);
     namespace_id_t table_id = str_to_uuid("12345678-abcd-abcd-abcd-12345678abcd");
 
-    rockshard rocksh(io_backender.rocks(), table_id, 0);
+    rockshard rocksh(io_backender.rocks(), table_id);
 
     {
         txn_t txn(&cache_conn, write_durability_t::HARD, 1);
 
         auto sb_lock = make_scoped<real_superblock_lock>(&txn, access_t::write, new_semaphore_in_line_t());
         btree_slice_t::init_real_superblock(
-            sb_lock.get(), rockshard(io_backender.rocks(), table_id, 0),
+            sb_lock.get(), rockshard(io_backender.rocks(), table_id),
             std::vector<char>(), version_t::zero());
 
         txn.commit(rocksh.rocks, std::move(sb_lock));
@@ -53,7 +53,7 @@ TPTEST(BTreeSindex, LowLevelOps) {
 
         superblock->sindex_block_write_signal()->wait();
 
-        initialize_secondary_indexes(rockshard(io_backender.rocks(), table_id, 0), superblock.get());
+        initialize_secondary_indexes(rockshard(io_backender.rocks(), table_id), superblock.get());
 
         txn->commit(io_backender.rocks(), std::move(superblock));
     }

@@ -51,7 +51,7 @@ continue_bool_t send_all_in_keyrange(
     (void)reference_timestamp;  // TODO: Use this?
     rocksdb::OptimisticTransactionDB *db = rocksh.rocks->db();
 
-    std::string rocks_kv_prefix = rockstore::table_primary_prefix(rocksh.table_id, rocksh.shard_no);
+    std::string rocks_kv_prefix = rockstore::table_primary_prefix(rocksh.table_id);
 
     std::string left = rocks_kv_prefix + key_to_unescaped_str(range.left);
     std::string right = range.right.unbounded

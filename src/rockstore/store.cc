@@ -189,33 +189,27 @@ void store::sync() {
     return;
 }
 
-std::string table_overall_prefix(namespace_id_t id) {
+std::string table_prefix(namespace_id_t id) {
+    // TODO: Do we use a binary or non-binary UUID?
     std::string ret = "tables/";
     ret += uuid_to_str(id);
     ret += '/';
     return ret;
 }
 std::string table_existence_key(namespace_id_t id) {
-    std::string ret = table_overall_prefix(id);
+    std::string ret = table_prefix(id);
     ret += "exists";
     return ret;
 }
 
 
-std::string table_prefix(namespace_id_t id, int shard_no) {
-    // TODO: Do we use a binary or non-binary UUID?
-    std::string ret = "tables/";
-    ret += uuid_to_str(id);
-    ret += strprintf("/%d/", shard_no);
-    return ret;
-}
-std::string table_metadata_prefix(namespace_id_t id, int shard_no) {
-    std::string ret = table_prefix(id, shard_no);
+std::string table_metadata_prefix(namespace_id_t id) {
+    std::string ret = table_prefix(id);
     ret += "metadata/";
     return ret;
 }
-std::string table_sindex_map(namespace_id_t id, int shard_no) {
-    std::string ret = table_metadata_prefix(id, shard_no);
+std::string table_sindex_map(namespace_id_t id) {
+    std::string ret = table_metadata_prefix(id);
     ret += "sindex_map";
     return ret;
 }
@@ -224,30 +218,30 @@ std::string table_sindex_map(namespace_id_t id, int shard_no) {
 // TODO: table_secondary_key is still using gnarly 250-byte sindex keys.
 
 std::string table_secondary_prefix(
-        namespace_id_t id, int shard_no, uuid_u index_id) {
-    std::string ret = table_prefix(id, shard_no);
+        namespace_id_t id, uuid_u index_id) {
+    std::string ret = table_prefix(id);
     ret += uuid_to_str(index_id);
     ret += '/';
     return ret;
 }
 
 std::string table_secondary_key(
-        namespace_id_t id, int shard_no, uuid_u index_id,
+        namespace_id_t id, uuid_u index_id,
         const std::string &key) {
-    std::string ret = table_secondary_prefix(id, shard_no, index_id);
+    std::string ret = table_secondary_prefix(id, index_id);
     ret += key;
     return ret;
 }
 
-std::string table_primary_prefix(namespace_id_t id, int shard_no) {
-    std::string ret = table_prefix(id, shard_no);
+std::string table_primary_prefix(namespace_id_t id) {
+    std::string ret = table_prefix(id);
     // We use the empty index name for primary index.
     ret += '/';
     return ret;
 }
 
-std::string table_primary_key(namespace_id_t id, int shard_no, const std::string &key) {
-    std::string ret = table_primary_prefix(id, shard_no);
+std::string table_primary_key(namespace_id_t id, const std::string &key) {
+    std::string ret = table_primary_prefix(id);
     ret += key;
     return ret;
 }

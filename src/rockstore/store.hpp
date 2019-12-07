@@ -86,17 +86,16 @@ private:
 // directory.  Throws std::runtime_error.
 store create_rockstore(const base_path_t &base_path);
 
-std::string table_overall_prefix(namespace_id_t id);
 std::string table_existence_key(namespace_id_t id);
-std::string table_prefix(namespace_id_t id, int shard_no);
-std::string table_metadata_prefix(namespace_id_t id, int shard_no);
-std::string table_sindex_map(namespace_id_t id, int shard_no);
-std::string table_secondary_prefix(namespace_id_t id, int shard_no, uuid_u index_id);
+std::string table_prefix(namespace_id_t id);
+std::string table_metadata_prefix(namespace_id_t id);
+std::string table_sindex_map(namespace_id_t id);
+std::string table_secondary_prefix(namespace_id_t id, uuid_u index_id);
 std::string table_secondary_key(
-    namespace_id_t id, int shard_no, uuid_u index_id,
+    namespace_id_t id, uuid_u index_id,
     const std::string &key);
-std::string table_primary_prefix(namespace_id_t id, int shard_no);
-std::string table_primary_key(namespace_id_t id, int shard_no, const std::string &key);
+std::string table_primary_prefix(namespace_id_t id);
+std::string table_primary_key(namespace_id_t id, const std::string &key);
 
 std::string prefix_end(const std::string &prefix);
 

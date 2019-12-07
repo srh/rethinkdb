@@ -20,7 +20,7 @@ void get_distribution(
 
     size_t num_intervals = keys_limit + 1;
 
-    std::string rocks_kv_prefix = rockstore::table_primary_prefix(rocksh.table_id, rocksh.shard_no);
+    std::string rocks_kv_prefix = rockstore::table_primary_prefix(rocksh.table_id);
     std::string beg = rocks_kv_prefix + key_to_unescaped_str(key_range.left);
     std::string end = key_range.right.unbounded
         ? rockstore::prefix_end(rocks_kv_prefix)

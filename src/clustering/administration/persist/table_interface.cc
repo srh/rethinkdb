@@ -244,7 +244,7 @@ void real_table_persistence_interface_t::destroy_multistore(
     guarantee(multistore_ptr_in->has());
     multistore_ptr_in->reset();
 
-    std::string prefix = rockstore::table_overall_prefix(table_id);
+    std::string prefix = rockstore::table_prefix(table_id);
     std::string end_prefix = rockstore::prefix_end(end_prefix);
 
     rocksdb::WriteBatch batch;

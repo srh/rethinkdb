@@ -5,14 +5,14 @@
 
 namespace rockstore { class store; }
 
-// TODO: Optimize usage of this parameter.
+// This name is a bit outdated -- this used to have a shard_no field for
+// hash-sharding.
 class rockshard {
 public:
-    rockshard(rockstore::store *_rocks, namespace_id_t _table_id, int _shard_no)
-        : rocks(_rocks), table_id(_table_id), shard_no(_shard_no) {}
+    rockshard(rockstore::store *_rocks, namespace_id_t _table_id)
+        : rocks(_rocks), table_id(_table_id) {}
     rockstore::store *rocks;
     namespace_id_t table_id;
-    int shard_no;
 };
 
 #endif  // RETHINKDB_ROCKSTORE_ROCKSHARD_HPP_

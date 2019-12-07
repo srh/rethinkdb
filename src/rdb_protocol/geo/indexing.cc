@@ -457,7 +457,7 @@ continue_bool_t geo_traversal(
         uuid_u sindex_uuid,
         const key_range_t &sindex_range,
         geo_index_traversal_helper_t *helper) {
-    std::string rocks_kv_prefix = rockstore::table_secondary_prefix(rocksh.table_id, rocksh.shard_no, sindex_uuid);
+    std::string rocks_kv_prefix = rockstore::table_secondary_prefix(rocksh.table_id, sindex_uuid);
 
     // duh
     rocksdb::OptimisticTransactionDB *db = rocksh.rocks->db();
