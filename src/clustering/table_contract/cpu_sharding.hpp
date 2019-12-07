@@ -8,11 +8,10 @@
 class branch_history_manager_t;
 class store_t;
 
-/* `multistore_ptr_t` is a bundle of `store_view_t`s, one for each CPU shard.  Actually
-now there is just one shard, so this holds a store pointer and a thread allocation, and
-maybe some other fluff. */
+/* `multistore_ptr_t` just holds a store, its own branch history manager, and a
+thread allocation token for the store.  No more multi-stores, because there are
+not CPU shards.  It could be called a store_ptr_t. */
 
-// TODO: Remove.
 class multistore_ptr_t : public home_thread_mixin_t {
 public:
     virtual ~multistore_ptr_t() { }
@@ -21,9 +20,9 @@ public:
 
     virtual store_view_t *get_store() = 0;
 
-    /* The `sindex_manager_t` uses this interface to get at the underlying `store_t`s so
-    it can create and destroy sindexes on them. The `table_contract` code should never
-    use it, and some unit tests will return `nullptr` from here. */
+    /*  Returns the same value as get_store().  mock_store_t doesn't support
+    sindex creation/destruction functions, and strictly speaking those don't
+    belong in store_view_t. */
     virtual store_t *get_underlying_store() = 0;
 };
 

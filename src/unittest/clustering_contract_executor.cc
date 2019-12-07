@@ -90,18 +90,18 @@ public:
     explicit executor_tester_files_t(const server_id_t &_server_id) :
             server_id(_server_id) {
         int next_thread = 0;
-        stores[THE_CPU_SHARD].init(new mock_store_t(version_t::zero()));
-        stores[THE_CPU_SHARD]->rethread(threadnum_t(next_thread));
+        store.init(new mock_store_t(version_t::zero()));
+        store->rethread(threadnum_t(next_thread));
         next_thread = (next_thread + 1) % get_num_threads();
     }
     ~executor_tester_files_t() {
-        stores[THE_CPU_SHARD]->rethread(home_thread());
+        store->rethread(home_thread());
     }
     branch_history_manager_t *get_branch_history_manager() {
         return &branch_history_manager;
     }
     store_view_t *get_store() {
-        return stores[THE_CPU_SHARD].get();
+        return store.get();
     }
     store_t *get_underlying_store() {
         crash("not implemented for this unit test");
@@ -109,7 +109,7 @@ public:
 private:
     friend class executor_tester_t;
     server_id_t server_id;
-    scoped_ptr_t<mock_store_t> stores[CPU_SHARDING_FACTOR];
+    scoped_ptr_t<mock_store_t> store;
     in_memory_branch_history_manager_t branch_history_manager;
 };
 
@@ -217,11 +217,10 @@ public:
     server, even if it's not a primary. */
     void read_store(const std::string &key, const std::string &expect) {
         store_key_t key2(key);
-        size_t cpu_shard = THE_CPU_SHARD;
         std::string value;
         {
-            on_thread_t thread_switcher(files->stores[cpu_shard]->home_thread());
-            value = mock_lookup(files->stores[cpu_shard].get(), key);
+            on_thread_t thread_switcher(files->store->home_thread());
+            value = mock_lookup(files->store.get(), key);
         }
         EXPECT_EQ(expect, value);
     }
