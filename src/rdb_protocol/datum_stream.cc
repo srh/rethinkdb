@@ -355,7 +355,9 @@ raw_stream_t rget_response_reader_t::unshard(
     size_t n_active = 0, n_fresh = 0;
     for (auto &&pair : active_ranges->ranges) {
         bool range_active = pair.second.state == range_state_t::ACTIVE;
-        if (pair.second.totally_exhausted()) continue;
+        if (pair.second.totally_exhausted()) {
+            continue;
+        }
         keyed_stream_t *fresh = nullptr;
         // Active shards need their bounds updated.
         if (range_active) {
@@ -460,7 +462,9 @@ raw_stream_t rget_response_reader_t::unshard(
     r_sanity_check(ret.size() != 0);
 
     // Make sure `active_ranges` is in a clean state.
-    for (auto &&ps : pseudoshards) ps.finish();
+    for (auto &&ps : pseudoshards) {
+        ps.finish();
+    }
     bool seen_active = false;
     bool seen_saturated = false;
     for (auto &&pair : active_ranges->ranges) {
