@@ -7,7 +7,7 @@
 #include "clustering/table_manager/table_metadata.hpp"
 
 class metadata_file_t;
-class real_multistore_ptr_t;
+class real_store_ptr_t;
 class table_raft_storage_interface_t;
 
 class real_table_persistence_interface_t :
@@ -55,17 +55,17 @@ public:
     void load_multistore(
         const namespace_id_t &table_id,
         metadata_file_t::read_txn_t *metadata_read_txn,
-        scoped_ptr_t<multistore_ptr_t> *multistore_ptr_out,
+        scoped_ptr_t<store_ptr_t> *multistore_ptr_out,
         signal_t *interruptor,
         perfmon_collection_t *perfmon_collection_serializers);
     void create_multistore(
         const namespace_id_t &table_id,
-        scoped_ptr_t<multistore_ptr_t> *multistore_ptr_out,
+        scoped_ptr_t<store_ptr_t> *multistore_ptr_out,
         signal_t *interruptor,
         perfmon_collection_t *perfmon_collection_serializers);
     void destroy_multistore(
         const namespace_id_t &table_id,
-        scoped_ptr_t<multistore_ptr_t> *multistore_ptr_in);
+        scoped_ptr_t<store_ptr_t> *multistore_ptr_in);
 
     bool is_gc_active() const;
 
@@ -78,7 +78,7 @@ private:
     metadata_file_t * const metadata_file;
 
     std::map<
-        namespace_id_t, std::pair<real_multistore_ptr_t *, auto_drainer_t::lock_t>
+        namespace_id_t, std::pair<real_store_ptr_t *, auto_drainer_t::lock_t>
     > real_multistores;
 
     std::map<namespace_id_t, scoped_ptr_t<table_raft_storage_interface_t> >

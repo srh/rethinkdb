@@ -96,7 +96,7 @@ void outdated_index_issue_tracker_t::log_outdated_indexes(
     try {
         multi_table_manager->visit_tables(interruptor, access_t::read,
             [&] (const namespace_id_t &table_id,
-                 multistore_ptr_t *,
+                 store_ptr_t *,
                  table_manager_t *table_manager) {
                 table_config_and_shards_t config =
                     table_manager->get_raft()->get_committed_state()->get().state.config;

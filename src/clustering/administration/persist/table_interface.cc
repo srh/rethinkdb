@@ -11,13 +11,14 @@
 #include "clustering/administration/persist/file_keys.hpp"
 #include "clustering/administration/persist/raft_storage_interface.hpp"
 #include "clustering/administration/perfmon_collection_repo.hpp"
+#include "clustering/table_contract/store_ptr.hpp"
 #include "logger.hpp"
 #include "rdb_protocol/store.hpp"
 
-class real_multistore_ptr_t :
-    public multistore_ptr_t {
+class real_store_ptr_t :
+    public store_ptr_t {
 public:
-    real_multistore_ptr_t(
+    real_store_ptr_t(
             rockstore::store *rocks,
             const namespace_id_t &table_id,
             scoped_ptr_t<real_branch_history_manager_t> &&bhm,
@@ -27,7 +28,7 @@ public:
             perfmon_collection_t *perfmon_collection_serializers,
             scoped_ptr_t<thread_allocation_t> &&store_thread,
             std::map<
-                namespace_id_t, std::pair<real_multistore_ptr_t *, auto_drainer_t::lock_t>
+                namespace_id_t, std::pair<real_store_ptr_t *, auto_drainer_t::lock_t>
             > *real_multistores) :
         branch_history_manager(std::move(bhm)),
         store_thread_allocation(std::move(store_thread)),
@@ -74,7 +75,7 @@ public:
         }
     }
 
-    ~real_multistore_ptr_t() {
+    ~real_store_ptr_t() {
         store_thread_allocation.reset();
         map_insertion_sentry.reset();
         drainer.drain();
@@ -105,10 +106,10 @@ private:
 
     auto_drainer_t drainer;
     map_insertion_sentry_t<
-        namespace_id_t, std::pair<real_multistore_ptr_t *, auto_drainer_t::lock_t>
+        namespace_id_t, std::pair<real_store_ptr_t *, auto_drainer_t::lock_t>
     > map_insertion_sentry;
 
-    DISABLE_COPYING(real_multistore_ptr_t);
+    DISABLE_COPYING(real_store_ptr_t);
 };
 
 void real_table_persistence_interface_t::read_all_metadata(
@@ -206,7 +207,7 @@ void real_table_persistence_interface_t::delete_metadata(
 void real_table_persistence_interface_t::load_multistore(
         const namespace_id_t &table_id,
         metadata_file_t::read_txn_t *metadata_read_txn,
-        scoped_ptr_t<multistore_ptr_t> *multistore_ptr_out,
+        scoped_ptr_t<store_ptr_t> *multistore_ptr_out,
         signal_t *interruptor,
         perfmon_collection_t *perfmon_collection_serializers) {
     scoped_ptr_t<real_branch_history_manager_t> bhm(
@@ -215,7 +216,7 @@ void real_table_persistence_interface_t::load_multistore(
 
     auto store_thread = make_scoped<thread_allocation_t>(&thread_allocator);
 
-    multistore_ptr_out->init(new real_multistore_ptr_t(
+    multistore_ptr_out->init(new real_store_ptr_t(
         io_backender->rocks(),
         table_id,
         std::move(bhm),
@@ -229,7 +230,7 @@ void real_table_persistence_interface_t::load_multistore(
 
 void real_table_persistence_interface_t::create_multistore(
         const namespace_id_t &table_id,
-        scoped_ptr_t<multistore_ptr_t> *multistore_ptr_out,
+        scoped_ptr_t<store_ptr_t> *multistore_ptr_out,
         signal_t *interruptor,
         perfmon_collection_t *perfmon_collection_serializers) {
     metadata_file_t::read_txn_t read_txn(metadata_file, interruptor);
@@ -240,7 +241,7 @@ void real_table_persistence_interface_t::create_multistore(
 
 void real_table_persistence_interface_t::destroy_multistore(
         const namespace_id_t &table_id,
-        scoped_ptr_t<multistore_ptr_t> *multistore_ptr_in) {
+        scoped_ptr_t<store_ptr_t> *multistore_ptr_in) {
     guarantee(multistore_ptr_in->has());
     multistore_ptr_in->reset();
 

@@ -4,6 +4,7 @@
 #include "arch/io/disk.hpp"
 #include "clustering/immediate_consistency/standard_backfill_throttler.hpp"
 #include "clustering/table_contract/executor/executor.hpp"
+#include "clustering/table_contract/store_ptr.hpp"
 #include "clustering/table_manager/backfill_progress_tracker.hpp"
 #include "clustering/query_routing/metadata.hpp"
 #include "clustering/query_routing/primary_query_client.hpp"
@@ -85,7 +86,7 @@ private:
 /* `executor_tester_files_t` represents a set of on-disk files for an
 `executor_tester_t`. It's separate from `executor_tester_t` so that you can simulate
 shutting down and restarting an `executor_tester_t`. */
-class executor_tester_files_t : public multistore_ptr_t {
+class executor_tester_files_t : public store_ptr_t {
 public:
     explicit executor_tester_files_t(const server_id_t &_server_id) :
             server_id(_server_id) {

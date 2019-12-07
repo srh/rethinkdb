@@ -1,6 +1,6 @@
 // Copyright 2010-2015 RethinkDB, all rights reserved.
-#ifndef CLUSTERING_TABLE_CONTRACT_CPU_SHARDING_HPP_
-#define CLUSTERING_TABLE_CONTRACT_CPU_SHARDING_HPP_
+#ifndef CLUSTERING_TABLE_CONTRACT_STORE_PTR_HPP_
+#define CLUSTERING_TABLE_CONTRACT_STORE_PTR_HPP_
 
 #include "protocol_api.hpp"
 #include "region/region.hpp"
@@ -8,13 +8,13 @@
 class branch_history_manager_t;
 class store_t;
 
-/* `multistore_ptr_t` just holds a store, its own branch history manager, and a
+/* `store_ptr_t` just holds a store, its own branch history manager, and a
 thread allocation token for the store.  No more multi-stores, because there are
 not CPU shards.  It could be called a store_ptr_t. */
 
-class multistore_ptr_t : public home_thread_mixin_t {
+class store_ptr_t : public home_thread_mixin_t {
 public:
-    virtual ~multistore_ptr_t() { }
+    virtual ~store_ptr_t() { }
 
     virtual branch_history_manager_t *get_branch_history_manager() = 0;
 
@@ -26,5 +26,5 @@ public:
     virtual store_t *get_underlying_store() = 0;
 };
 
-#endif /* CLUSTERING_TABLE_CONTRACT_CPU_SHARDING_HPP_ */
+#endif /* CLUSTERING_TABLE_CONTRACT_STORE_PTR HPP_ */
 

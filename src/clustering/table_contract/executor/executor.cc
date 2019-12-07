@@ -5,6 +5,7 @@
 #include "clustering/table_contract/executor/exec_erase.hpp"
 #include "clustering/table_contract/executor/exec_primary.hpp"
 #include "clustering/table_contract/executor/exec_secondary.hpp"
+#include "clustering/table_contract/store_ptr.hpp"
 #include "store_subview.hpp"
 
 class contract_executor_t::execution_wrapper_t : private execution_t::params_t {
@@ -121,7 +122,7 @@ contract_executor_t::contract_executor_t(
         const clone_ptr_t<watchable_t<table_raft_state_t> > &_raft_state,
         watchable_map_t<std::pair<server_id_t, branch_id_t>, contract_execution_bcard_t>
             *_remote_contract_execution_bcards,
-        multistore_ptr_t *_multistore,
+        store_ptr_t *_multistore,
         const base_path_t &_base_path,
         io_backender_t *_io_backender,
         backfill_throttler_t *_backfill_throttler,

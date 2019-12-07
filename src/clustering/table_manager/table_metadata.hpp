@@ -6,10 +6,11 @@
 #include "clustering/generic/raft_core.hpp"
 #include "clustering/generic/raft_network.hpp"
 #include "clustering/table_contract/contract_metadata.hpp"
-#include "clustering/table_contract/cpu_sharding.hpp"
 #include "clustering/table_contract/executor/exec.hpp"
 #include "containers/optional.hpp"
 #include "rpc/mailbox/typed.hpp"
+
+class store_ptr_t;
 
 namespace metadata {
 class read_txn_t;
@@ -352,17 +353,17 @@ public:
     virtual void load_multistore(
         const namespace_id_t &table_id,
         metadata::read_txn_t *metadata_read_txn,
-        scoped_ptr_t<multistore_ptr_t> *multistore_ptr_out,
+        scoped_ptr_t<store_ptr_t> *multistore_ptr_out,
         signal_t *interruptor,
         perfmon_collection_t *perfmon_collection_serializers) = 0;
     virtual void create_multistore(
         const namespace_id_t &table_id,
-        scoped_ptr_t<multistore_ptr_t> *multistore_ptr_out,
+        scoped_ptr_t<store_ptr_t> *multistore_ptr_out,
         signal_t *interruptor,
         perfmon_collection_t *perfmon_collection_serializers) = 0;
     virtual void destroy_multistore(
         const namespace_id_t &table_id,
-        scoped_ptr_t<multistore_ptr_t> *multistore_ptr_in) = 0;
+        scoped_ptr_t<store_ptr_t> *multistore_ptr_in) = 0;
 
 protected:
     virtual ~table_persistence_interface_t() { }

@@ -21,7 +21,7 @@ table_manager_t::table_manager_t(
         const raft_member_id_t &_raft_member_id,
         raft_storage_interface_t<table_raft_state_t> *raft_storage,
         const raft_start_election_immediately_t start_election_immediately,
-        multistore_ptr_t *multistore_ptr,
+        store_ptr_t *multistore_ptr,
         perfmon_collection_t *perfmon_collection_namespace) :
     table_id(_table_id),
     epoch(_epoch),

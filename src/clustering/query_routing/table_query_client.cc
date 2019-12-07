@@ -4,7 +4,6 @@
 #include <functional>
 
 #include "clustering/query_routing/primary_query_client.hpp"
-#include "clustering/table_contract/cpu_sharding.hpp"
 #include "clustering/table_manager/multi_table_manager.hpp"
 #include "clustering/table_manager/table_meta_client.hpp"
 #include "concurrency/cross_thread_signal.hpp"
@@ -439,7 +438,7 @@ void table_query_client_t::dispatch_debug_direct_read(
         interruptor_on_caller, multi_table_manager->home_thread());
     on_thread_t thread_switcher(multi_table_manager->home_thread());
     multi_table_manager->visit_table(table_id, &interruptor_on_mtm, access_t::read,
-    [&](multistore_ptr_t *multistore, table_manager_t *) {
+    [&](store_ptr_t *multistore, table_manager_t *) {
         if (multistore == nullptr) {
             throw cannot_perform_query_exc_t(
                 "This server does not have any data available for the given table.",

@@ -8,7 +8,7 @@
 #include "rdb_protocol/store.hpp"
 
 sindex_manager_t::sindex_manager_t(
-        multistore_ptr_t *multistore_,
+        store_ptr_t *multistore_,
         const clone_ptr_t<watchable_t<table_config_t> > &table_config_) :
     multistore(multistore_), table_config(table_config_),
     update_pumper([this](signal_t *interruptor) { update_blocking(interruptor); }),

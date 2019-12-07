@@ -2,10 +2,11 @@
 #ifndef CLUSTERING_TABLE_MANAGER_SINDEX_MANAGER_HPP_
 #define CLUSTERING_TABLE_MANAGER_SINDEX_MANAGER_HPP_
 
-#include "clustering/table_contract/cpu_sharding.hpp"
 #include "clustering/administration/tables/table_metadata.hpp"
 #include "concurrency/pump_coro.hpp"
 #include "concurrency/watchable.hpp"
+
+class store_ptr_t;
 
 sindex_status_t empty_sindex_status();
 void combine_sindex_status(sindex_status_t *accum, const sindex_status_t &status);
@@ -17,7 +18,7 @@ the description. */
 class sindex_manager_t {
 public:
     sindex_manager_t(
-        multistore_ptr_t *multistore,
+        store_ptr_t *multistore,
         const clone_ptr_t<watchable_t<table_config_t> > &table_config);
 
     std::map<std::string, std::pair<sindex_config_t, sindex_status_t> >
@@ -26,7 +27,7 @@ public:
 private:
     void update_blocking(signal_t *interruptor);
 
-    multistore_ptr_t *const multistore;
+    store_ptr_t *const multistore;
     clone_ptr_t<watchable_t<table_config_t> > const table_config;
 
     /* Destructor order matters: The `table_config_subs` must be destroyed before the

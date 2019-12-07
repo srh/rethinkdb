@@ -4,7 +4,7 @@
 
 #include "clustering/administration/perfmon_collection_repo.hpp"
 #include "clustering/immediate_consistency/standard_backfill_throttler.hpp"
-#include "clustering/table_contract/cpu_sharding.hpp"
+#include "clustering/table_contract/store_ptr.hpp"
 #include "clustering/table_manager/table_manager.hpp"
 #include "concurrency/rwlock.hpp"
 #include "containers/optional.hpp"
@@ -117,7 +117,7 @@ public:
     }
 
     /* Calls `callable` for each active table, it must have a signature of:
-           void(const namespace_id_t &table_id, multistore_ptr_t *, table_manager_t *)
+           void(const namespace_id_t &table_id, store_ptr_t *, table_manager_t *)
     `access` must be `access_t::write` if you change the state or configuration of
     the table in the callback (but not for running queries). Otherwise
     `access_t::read` is sufficient.
@@ -158,7 +158,7 @@ public:
 
     /* Calls `callable` on the specific table, if it's available. `callable`'s signature
     must be:
-        void(multistore_ptr_t *, table_manager_t *)
+        void(store_ptr_t *, table_manager_t *)
     If the table doesn't exist or is not active on this server, calls `callable` with
     null pointers.
     `access` must be `access_t::write` if you change the state or configuration of
@@ -229,7 +229,7 @@ private:
             const raft_member_id_t &member_id,
             raft_storage_interface_t<table_raft_state_t> *raft_storage,
             const raft_start_election_immediately_t start_election_immediately,
-            multistore_ptr_t *multistore_ptr,
+            store_ptr_t *multistore_ptr,
             perfmon_collection_t *perfmon_collection_namespace);
 
         raft_member_t<table_raft_state_t> *get_raft() {
@@ -313,7 +313,7 @@ private:
         /* If `status` is `ACTIVE`, `multistore_ptr` contains our files on disk for the
         table, and `active` contains our Raft instance, etc. Otherwise these are empty.
         */
-        scoped_ptr_t<multistore_ptr_t> multistore_ptr;
+        scoped_ptr_t<store_ptr_t> multistore_ptr;
         scoped_ptr_t<active_table_t> active;
 
         /* We must destroy `active` before `multistore_ptr` because `active` uses the

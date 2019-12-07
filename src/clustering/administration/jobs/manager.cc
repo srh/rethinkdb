@@ -118,7 +118,7 @@ void jobs_manager_t::on_get_job_reports(
     try {
         multi_table_manager->visit_tables(interruptor, access_t::read,
         [&](const namespace_id_t &table_id,
-                UNUSED multistore_ptr_t *multistore_ptr,
+                UNUSED store_ptr_t *multistore_ptr,
                 table_manager_t *table_manager) {
             std::map<std::string, std::pair<sindex_config_t, sindex_status_t> > statuses =
                 table_manager->get_sindex_manager().get_status(interruptor);

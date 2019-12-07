@@ -2,7 +2,6 @@
 #include "clustering/table_contract/coordinator/calculate_contracts.hpp"
 
 #include "clustering/table_contract/branch_history_gc.hpp"
-#include "clustering/table_contract/cpu_sharding.hpp"
 #include "logger.hpp"
 
 /* A `contract_ack_t` is not necessarily homogeneous. It may have different `version_t`s

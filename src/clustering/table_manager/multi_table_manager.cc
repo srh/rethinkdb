@@ -124,7 +124,7 @@ multi_table_manager_t::active_table_t::active_table_t(
         const raft_member_id_t &member_id,
         raft_storage_interface_t<table_raft_state_t> *raft_storage,
         const raft_start_election_immediately_t start_election_immediately,
-        multistore_ptr_t *multistore_ptr,
+        store_ptr_t *multistore_ptr,
         perfmon_collection_t *perfmon_collection_namespace) :
     parent(_parent),
     table(_table),

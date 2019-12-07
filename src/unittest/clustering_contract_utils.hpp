@@ -3,7 +3,6 @@
 #define UNITTEST_CLUSTERING_CONTRACT_UTILS_HPP_
 
 #include "clustering/table_contract/contract_metadata.hpp"
-#include "clustering/table_contract/cpu_sharding.hpp"
 #include "unittest/unittest_utils.hpp"
 
 namespace unittest {

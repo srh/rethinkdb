@@ -4,13 +4,13 @@
 
 #include "clustering/generic/raft_core.hpp"
 #include "clustering/immediate_consistency/version.hpp"
-#include "clustering/table_contract/cpu_sharding.hpp"
 #include "clustering/table_contract/executor/exec.hpp"
 #include "concurrency/pump_coro.hpp"
 #include "store_subview.hpp"
 
 class backfill_progress_tracker_t;
 class contract_t;
+class store_ptr_t;
 class table_shard_status_t;
 
 /* The `contract_executor_t` is responsible for executing the instructions contained in
@@ -30,7 +30,7 @@ public:
         const clone_ptr_t<watchable_t<table_raft_state_t> > &raft_state,
         watchable_map_t<std::pair<server_id_t, branch_id_t>, contract_execution_bcard_t>
             *remote_contract_execution_bcards,
-        multistore_ptr_t *multistore,
+        store_ptr_t *multistore,
         const base_path_t &base_path,
         io_backender_t *io_backender,
         backfill_throttler_t *backfill_throttler,
@@ -117,7 +117,7 @@ private:
 
     const server_id_t server_id;
     clone_ptr_t<watchable_t<table_raft_state_t> > raft_state;
-    multistore_ptr_t *const multistore;
+    store_ptr_t *const multistore;
     perfmon_collection_t *const perfmons;
 
     /* `ack_map` contains the `contract_ack_t`s created by our execution of contracts.
