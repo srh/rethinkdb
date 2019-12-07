@@ -23,14 +23,6 @@
  * Basic configuration parameters.
  */
 
-// TODO: Remove these two
-#define THE_CPU_SHARD                             0
-
-// The number of hash-based CPU shards per table.
-// This "must" be hard-coded because a cluster cannot run with
-// differing cpu sharding factors.
-#define CPU_SHARDING_FACTOR                       1
-
 // Defines the maximum size of the batch of IO events to process on
 // each loop iteration. A larger number will increase throughput but
 // decrease concurrency

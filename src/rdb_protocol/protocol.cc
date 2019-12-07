@@ -562,7 +562,7 @@ struct rdb_r_shard_visitor_t : public boost::static_visitor<bool> {
             guarantee(!region.right.unbounded);
             rg_out->current_shard.set(region);
             rg_out->batchspec = rg_out->batchspec.scale_down(
-                rg.hints.has_value() ? rg.hints->size() : CPU_SHARDING_FACTOR);
+                rg.hints.has_value() ? rg.hints->size() : 1);
             if (rg_out->primary_keys.has_value()) {
                 for (auto it = rg_out->primary_keys->begin();
                      it != rg_out->primary_keys->end();) {

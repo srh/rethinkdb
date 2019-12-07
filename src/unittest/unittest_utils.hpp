@@ -17,6 +17,12 @@ class rng_t;
 
 namespace unittest {
 
+// Vestigial constants from hash-sharding, that some old unit test code still
+// names.
+static constexpr int THE_CPU_SHARD = 0;
+static constexpr int CPU_SHARDING_FACTOR = 1;
+
+
 std::string rand_string(int len);
 
 serializer_filepath_t make_unittest_filepaths(const std::string &permanent_path,

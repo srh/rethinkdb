@@ -351,7 +351,7 @@ raw_stream_t rget_response_reader_t::unshard(
     // hypothetical `rget_item_t`s from the shards.  We also mark shards
     // exhausted in this step.
     std::vector<pseudoshard_t> pseudoshards;
-    pseudoshards.reserve(active_ranges->ranges.size() * CPU_SHARDING_FACTOR);
+    pseudoshards.reserve(active_ranges->ranges.size());
     size_t n_active = 0, n_fresh = 0;
     for (auto &&pair : active_ranges->ranges) {
         bool range_active = pair.second.state == range_state_t::ACTIVE;
