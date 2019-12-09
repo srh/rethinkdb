@@ -367,11 +367,32 @@ public:
                             const std::function<datum_t()> &lazy_sindex_val) = 0;
 };
 
+struct limit_read_last_key {
+    limit_read_last_key() = default;
+    // Sacriligiously, an implicit ctor.
+    limit_read_last_key(const store_key_t &k) : key(k) {}
+    limit_read_last_key(store_key_t &&k) : key(std::move(k)) {}
+    bool is_decremented = false;
+    store_key_t key;
+
+    operator store_key_t() const {
+        store_key_t ret = key;
+        if (is_decremented) {
+            ret.decrement();
+            return ret;
+        }
+        return ret;
+    }
+};
+// Note that we don't actually implement this, because limit_read_t's
+// serialization (deliberately) crashes at runtime.
+RDB_DECLARE_SERIALIZABLE(limit_read_last_key);
+
 struct limit_read_t {
     is_primary_t is_primary;
     size_t n;
     region_t shard;
-    store_key_t last_key;
+    limit_read_last_key last_key;
     sorting_t sorting;
     std::vector<scoped_ptr_t<op_t> > *ops;
 };
