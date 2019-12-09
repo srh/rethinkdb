@@ -415,7 +415,7 @@ public:
     virtual ~accumulator_t();
     // May be overridden as an optimization (currently is for `count`).
     virtual bool uses_val() { return true; }
-    virtual void stop_at_boundary(store_key_t &&) { }
+    virtual void stop_at_boundary(limit_read_last_key) { }
     virtual bool should_send_batch() = 0;
     virtual continue_bool_t operator()(
             env_t *env,

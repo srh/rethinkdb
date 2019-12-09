@@ -160,15 +160,14 @@ protected:
         // If we never aborted then we've read the whole range, so update the
         // `keyed_stream_t`s to reflect that.
         if (last_cb == continue_bool_t::CONTINUE) {
-            stop_at_boundary(!reversed(sorting)
-                             ? store_key_t::max()
-                             : store_key_t::min());
+            stop_at_boundary(limit_read_last_key(!reversed(sorting)
+                                 ? store_key_t::max()
+                                 : store_key_t::min()));
         }
         grouped_acc_t::finish_impl(last_cb, out);
     }
 
-    void stop_at_boundary(store_key_t &&key_param) final {
-        store_key_t key = std::move(key_param);
+    void stop_at_boundary(limit_read_last_key key) final {
         for (auto &&pair : *get_acc()) {
             for (auto &&stream_pair : pair.second.substreams) {
                 // We have to do it this way rather than using the end of
