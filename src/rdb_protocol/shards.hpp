@@ -95,15 +95,65 @@ private:
 
 void debug_print(printf_buffer_t *, const rget_item_t &);
 
+struct limit_read_last_key {
+    limit_read_last_key() = default;
+    // Sacriligiously, an implicit ctor.
+    limit_read_last_key(const store_key_t &k) : is_decremented(false), raw_key(k) {}
+    limit_read_last_key(store_key_t &&k) : is_decremented(false), raw_key(std::move(k)) {}
+    bool is_decremented = false;
+    store_key_t raw_key;
+
+    store_key_t get_key() const {
+        // Assumes the object is in a valid state -- it's not allowed that
+        // is_decremented == true && raw_key.str() == "".
+        store_key_t ret = raw_key;
+        if (is_decremented) {
+            ret.decrement();
+            return ret;
+        }
+        return ret;
+    }
+
+    bool is_max_key() const {
+        return !is_decremented && raw_key == store_key_t::max();
+    }
+
+    bool is_min_key() const {
+        // This is just saying get_key() == "", we have this complication just
+        // to obliviously maintain identical behavior (for now).
+        return raw_key == store_key_t::min() ||
+            (is_decremented && raw_key.str().length() == 1 && raw_key.str()[0] == '\0');
+    }
+
+    bool operator<(const store_key_t &rhs) const {
+        return is_decremented ? (raw_key <= rhs) : raw_key < rhs;
+    }
+
+    bool operator>(const store_key_t &rhs) const {
+        if (!is_decremented) {
+            return raw_key > rhs;
+        }
+        if (raw_key <= rhs) {
+            return false;
+        }
+        // TODO: Performance.
+        store_key_t tmp = rhs;
+        // OK if rhs is max key -- we return false correctly.
+        tmp.increment();
+        return raw_key > tmp;
+    }
+};
+RDB_DECLARE_SERIALIZABLE(limit_read_last_key);
+
 typedef std::vector<rget_item_t> raw_stream_t;
 struct keyed_stream_t {
     raw_stream_t stream;
-    store_key_t last_key;
+    limit_read_last_key last_key;
 };
 RDB_DECLARE_SERIALIZABLE(keyed_stream_t);
 struct stream_t {
     // When we first construct a `stream_t`, it's always for a single shard.
-    stream_t(region_t region, store_key_t last_key)
+    stream_t(region_t region, limit_read_last_key last_key)
         : substreams{{
             std::move(region),
                 keyed_stream_t{raw_stream_t(), std::move(last_key)}}} { }
@@ -367,27 +417,6 @@ public:
                             const std::function<datum_t()> &lazy_sindex_val) = 0;
 };
 
-struct limit_read_last_key {
-    limit_read_last_key() = default;
-    // Sacriligiously, an implicit ctor.
-    limit_read_last_key(const store_key_t &k) : key(k) {}
-    limit_read_last_key(store_key_t &&k) : key(std::move(k)) {}
-    bool is_decremented = false;
-    store_key_t key;
-
-    operator store_key_t() const {
-        store_key_t ret = key;
-        if (is_decremented) {
-            ret.decrement();
-            return ret;
-        }
-        return ret;
-    }
-};
-// Note that we don't actually implement this, because limit_read_t's
-// serialization (deliberately) crashes at runtime.
-RDB_DECLARE_SERIALIZABLE(limit_read_last_key);
-
 struct limit_read_t {
     is_primary_t is_primary;
     size_t n;
@@ -415,7 +444,7 @@ public:
     virtual ~accumulator_t();
     // May be overridden as an optimization (currently is for `count`).
     virtual bool uses_val() { return true; }
-    virtual void stop_at_boundary(limit_read_last_key) { }
+    virtual void stop_at_boundary(const limit_read_last_key &) { }
     virtual bool should_send_batch() = 0;
     virtual continue_bool_t operator()(
             env_t *env,

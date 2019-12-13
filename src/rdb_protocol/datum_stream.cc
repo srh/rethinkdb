@@ -362,7 +362,7 @@ raw_stream_t rget_response_reader_t::unshard(
         // Active shards need their bounds updated.
         if (range_active) {
             n_active += 1;
-            store_key_t *new_bound = nullptr;
+            limit_read_last_key *new_bound = nullptr;
             auto it = stream.substreams.find(
                 region_t(pair.first));
             if (it != stream.substreams.end()) {
@@ -371,8 +371,8 @@ raw_stream_t rget_response_reader_t::unshard(
                 new_bound = &it->second.last_key;
             }
             if (!reversed(sorting)) {
-                if (new_bound != nullptr && *new_bound != store_key_max) {
-                    pair.second.key_range.left = *new_bound;
+                if (new_bound != nullptr && !new_bound->is_max_key()) {
+                    pair.second.key_range.left = new_bound->get_key();
                     bool incremented = pair.second.key_range.left.increment();
                     r_sanity_check(incremented); // not max key
                 } else {
@@ -381,9 +381,9 @@ raw_stream_t rget_response_reader_t::unshard(
                 }
             } else {
                 // The right bound is open so we don't need to decrement.
-                if (new_bound != nullptr && *new_bound != store_key_min) {
+                if (new_bound != nullptr && !new_bound->is_min_key()) {
                     pair.second.key_range.right =
-                        key_range_t::right_bound_t(*new_bound);
+                        key_range_t::right_bound_t(new_bound->get_key());
                 } else {
                     pair.second.key_range.right =
                         key_range_t::right_bound_t(pair.second.key_range.left);
@@ -658,12 +658,13 @@ void rget_reader_t::accumulate_all(env_t *env, eager_acc_t *acc) {
 
     auto *rr = boost::get<rget_read_t>(&read.read);
     r_sanity_check(rr != nullptr);
-    auto final_key = !reversed(rr->sorting) ? store_key_t::max() : store_key_t::min();
     auto *stream = boost::get<grouped_t<stream_t> >(&resp.result);
     r_sanity_check(stream != nullptr);
     for (auto &&pair : *stream) {
         for (auto &&stream_pair : pair.second.substreams) {
-            r_sanity_check(stream_pair.second.last_key == final_key);
+            r_sanity_check(!reversed(rr->sorting)
+                ? stream_pair.second.last_key.is_max_key()
+                : stream_pair.second.last_key.is_min_key());
         }
     }
     mark_shards_exhausted();
@@ -712,12 +713,11 @@ void intersecting_reader_t::accumulate_all(env_t *env, eager_acc_t *acc) {
         active_ranges, reql_version, stamp, transforms, batchspec);
     rget_read_response_t resp = do_read(env, std::move(read));
 
-    auto final_key = store_key_t::max();
     auto *stream = boost::get<grouped_t<stream_t> >(&resp.result);
     r_sanity_check(stream != nullptr);
     for (auto &&pair : *stream) {
         for (auto &&stream_pair : pair.second.substreams) {
-            r_sanity_check(stream_pair.second.last_key == final_key);
+            r_sanity_check(stream_pair.second.last_key.is_max_key());
         }
     }
     mark_shards_exhausted();

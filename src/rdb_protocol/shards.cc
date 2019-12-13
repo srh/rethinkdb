@@ -28,6 +28,12 @@ void debug_print(printf_buffer_t *buf, const rget_item_t &item) {
     buf->appendf("}");
 }
 
+void debug_print(printf_buffer_t *buf, const limit_read_last_key &lk) {
+    buf->appendf("{is_decremented: %s, raw_key: ", lk.is_decremented ? "true" : "false");
+    debug_print(buf, lk.raw_key);
+    buf->appendf("}");
+}
+
 void debug_print(printf_buffer_t *buf, const keyed_stream_t &stream) {
     buf->appendf("keyed_stream_t(");
     debug_print(buf, stream.stream);
@@ -138,7 +144,7 @@ private:
 class append_t : public grouped_acc_t<stream_t> {
 public:
     append_t(region_t region,
-             store_key_t last_key,
+             limit_read_last_key last_key,
              sorting_t _sorting,
              require_sindexes_t _require_sindex_val,
              batcher_t *_batcher)
@@ -167,7 +173,8 @@ protected:
         grouped_acc_t::finish_impl(last_cb, out);
     }
 
-    void stop_at_boundary(limit_read_last_key key) final {
+    void stop_at_boundary(const limit_read_last_key &key_param) final {
+        store_key_t key = key_param.get_key();
         for (auto &&pair : *get_acc()) {
             for (auto &&stream_pair : pair.second.substreams) {
                 // We have to do it this way rather than using the end of
@@ -250,7 +257,7 @@ public:
         is_primary_t _is_primary,
         size_t _n,
         region_t region,
-        store_key_t last_key,
+        limit_read_last_key last_key,
         sorting_t _sorting,
         std::vector<scoped_ptr_t<op_t> > *_ops)
         : append_t(region,
@@ -443,8 +450,8 @@ private:
                             is_sindex_sort.set(is_sindex);
                         }
                     }
-                    r_sanity_check(pair.second.last_key == store_key_max
-                                   || pair.second.last_key == store_key_min);
+                    r_sanity_check(pair.second.last_key.is_max_key()
+                                   || pair.second.last_key.is_min_key());
                     v.push_back(std::make_pair(pair.second.stream.begin(),
                                                pair.second.stream.end()));
                 }
@@ -470,8 +477,8 @@ private:
                 }
             } else {
                 for (auto &&pair : stream->substreams) {
-                    r_sanity_check(pair.second.last_key == store_key_max
-                                   || pair.second.last_key == store_key_min);
+                    r_sanity_check(pair.second.last_key.is_max_key()
+                                   || pair.second.last_key.is_min_key());
                     for (auto &&val : pair.second.stream) {
                         lst->push_back(std::move(val.data));
                     }
@@ -833,7 +840,7 @@ public:
             lr.is_primary,
             lr.n,
             lr.shard,
-            lr.last_key,
+            lr.last_key.get_key(),
             lr.sorting,
             lr.ops);
     }
@@ -1131,6 +1138,7 @@ scoped_ptr_t<op_t> make_op(const transform_variant_t &tv) {
 }
 
 RDB_IMPL_SERIALIZABLE_3_FOR_CLUSTER(rget_item_t, key, sindex_key, data);
+RDB_IMPL_SERIALIZABLE_2_FOR_CLUSTER(limit_read_last_key, is_decremented, raw_key);
 RDB_IMPL_SERIALIZABLE_2_FOR_CLUSTER(keyed_stream_t, stream, last_key);
 RDB_IMPL_SERIALIZABLE_1_FOR_CLUSTER(stream_t, substreams);
 

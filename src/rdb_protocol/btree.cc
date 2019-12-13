@@ -851,9 +851,9 @@ continue_bool_t rocks_rget_secondary_cb::handle_pair(
             // sindex value or none of them.
             ql::limit_read_last_key stop_key;
             if (!reversed(job.sorting)) {
-                stop_key.key = store_key_t(cur_truncated_secondary);
+                stop_key.raw_key = store_key_t(cur_truncated_secondary);
             } else {
-                stop_key.key = store_key_t(*last_truncated_secondary_for_abort);
+                stop_key.raw_key = store_key_t(*last_truncated_secondary_for_abort);
             }
             stop_key.is_decremented = true;
             job.accumulator->stop_at_boundary(std::move(stop_key));
