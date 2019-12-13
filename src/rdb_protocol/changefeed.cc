@@ -1005,7 +1005,7 @@ public:
                     // discard this information from the response later so
                     // it can be whatever we want.
                     region_t(),
-                    store_key_t::min(),
+                    limit_read_last_key(store_key_t::min()),
                     sorting,
                     ops}),
             sorting,
@@ -1084,7 +1084,7 @@ public:
                     // discard this information from the response later so
                     // it can be whatever we want.
                     region_t(),
-                    store_key_t::min(),
+                    limit_read_last_key(store_key_t::min()),
                     sorting,
                     ops}),
             *pk_range,

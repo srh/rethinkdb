@@ -173,8 +173,7 @@ protected:
         grouped_acc_t::finish_impl(last_cb, out);
     }
 
-    void stop_at_boundary(const limit_read_last_key &key_param) final {
-        store_key_t key = key_param.get_key();
+    void stop_at_boundary(const limit_read_last_key &key) final {
         for (auto &&pair : *get_acc()) {
             for (auto &&stream_pair : pair.second.substreams) {
                 // We have to do it this way rather than using the end of
@@ -206,7 +205,7 @@ protected:
         // Update the last considered key.
         if ((keyed_stream->last_key < key && !reversed(sorting))
             || (keyed_stream->last_key > key && reversed(sorting))) {
-            keyed_stream->last_key = key;
+            keyed_stream->last_key.set_to_key(key);
         }
         return true;
     }
@@ -236,7 +235,7 @@ private:
 };
 
 scoped_ptr_t<accumulator_t> make_append(region_t region,
-                                        store_key_t last_key,
+                                        limit_read_last_key last_key,
                                         sorting_t sorting,
                                         batcher_t *batcher,
                                         require_sindexes_t require_sindex_val) {
@@ -840,7 +839,7 @@ public:
             lr.is_primary,
             lr.n,
             lr.shard,
-            lr.last_key.get_key(),
+            lr.last_key,
             lr.sorting,
             lr.ops);
     }

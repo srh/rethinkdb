@@ -365,9 +365,9 @@ struct rdb_read_visitor_t : public boost::static_visitor<void> {
                     is_primary_t::NO,
                     s.spec.limit,
                     s.region,
-                    !reversed(s.spec.range.sorting)
+                    ql::limit_read_last_key(!reversed(s.spec.range.sorting)
                         ? store_key_t::min()
-                        : store_key_t::max(),
+                        : store_key_t::max()),
                     s.spec.range.sorting,
                     &ops});
                 rget.sindex.set(sindex_rangespec_t(
@@ -379,9 +379,9 @@ struct rdb_read_visitor_t : public boost::static_visitor<void> {
                     is_primary_t::YES,
                     s.spec.limit,
                     s.region,
-                    !reversed(s.spec.range.sorting)
+                    ql::limit_read_last_key(!reversed(s.spec.range.sorting)
                         ? store_key_t::min()
-                        : store_key_t::max(),
+                        : store_key_t::max()),
                     s.spec.range.sorting,
                     &ops});
             }

@@ -97,13 +97,17 @@ void debug_print(printf_buffer_t *, const rget_item_t &);
 
 struct limit_read_last_key {
     limit_read_last_key() = default;
-    // Sacriligiously, an implicit ctor.
-    limit_read_last_key(const store_key_t &k) : is_decremented(false), raw_key(k) {}
-    limit_read_last_key(store_key_t &&k) : is_decremented(false), raw_key(std::move(k)) {}
+    explicit limit_read_last_key(const store_key_t &k) : is_decremented(false), raw_key(k) {}
+    explicit limit_read_last_key(store_key_t &&k) : is_decremented(false), raw_key(std::move(k)) {}
     bool is_decremented = false;
     store_key_t raw_key;
 
-    store_key_t get_key() const {
+    void set_to_key(const store_key_t &key) {
+        is_decremented = false;
+        raw_key = key;
+    }
+
+    store_key_t get_limit_read_key() const {
         // Assumes the object is in a valid state -- it's not allowed that
         // is_decremented == true && raw_key.str() == "".
         store_key_t ret = raw_key;
@@ -473,7 +477,7 @@ public:
 };
 
 scoped_ptr_t<accumulator_t> make_append(region_t region,
-                                        store_key_t last_key,
+                                        limit_read_last_key last_key,
                                         sorting_t sorting,
                                         batcher_t *batcher,
                                         require_sindexes_t require_sindex_val);

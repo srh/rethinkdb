@@ -545,7 +545,7 @@ public:
                const std::vector<transform_variant_t> &_transforms,
                const optional<terminal_variant_t> &_terminal,
                region_t region,
-               store_key_t last_key,
+               ql::limit_read_last_key last_key,
                sorting_t _sorting,
                require_sindexes_t require_sindex_val)
         : env(_env),
@@ -1061,9 +1061,9 @@ void rdb_rget_snapshot_slice(
                    transforms,
                    terminal,
                    shard,
-                   !reversed(sorting)
+                   ql::limit_read_last_key(!reversed(sorting)
                        ? range.left
-                       : range.right.key_or_max(),
+                       : range.right.key_or_max()),
                    sorting,
                    require_sindexes_t::NO));
 
@@ -1139,9 +1139,9 @@ void rdb_rget_slice(
                    transforms,
                    terminal,
                    shard,
-                   !reversed(sorting)
+                   ql::limit_read_last_key(!reversed(sorting)
                        ? range.left
-                       : range.right.key_or_max(),
+                       : range.right.key_or_max()),
                    sorting,
                    require_sindexes_t::NO));
 
@@ -1236,9 +1236,9 @@ void rdb_rget_secondary_snapshot_slice(
                    transforms,
                    terminal,
                    shard,
-                   !reversed(sorting)
+                   ql::limit_read_last_key(!reversed(sorting)
                        ? sindex_region_range.left
-                       : sindex_region_range.right.key_or_max(),
+                       : sindex_region_range.right.key_or_max()),
                    sorting,
                    require_sindex_val),
         rget_sindex_data_t(
@@ -1313,9 +1313,9 @@ void rdb_rget_secondary_slice(
                    transforms,
                    terminal,
                    shard,
-                   !reversed(sorting)
+                   ql::limit_read_last_key(!reversed(sorting)
                        ? sindex_region_range.left
-                       : sindex_region_range.right.key_or_max(),
+                       : sindex_region_range.right.key_or_max()),
                    sorting,
                    require_sindex_val),
         rget_sindex_data_t(
@@ -1392,7 +1392,7 @@ void rdb_get_intersecting_slice(
         geo_job_data_t(ql_env,
                        shard,
                        // The sorting is never `DESCENDING`, so this is always right.
-                       sindex_range.left,
+                       ql::limit_read_last_key(sindex_range.left),
                        batchspec,
                        transforms,
                        terminal,

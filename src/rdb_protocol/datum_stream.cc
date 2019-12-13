@@ -372,7 +372,7 @@ raw_stream_t rget_response_reader_t::unshard(
             }
             if (!reversed(sorting)) {
                 if (new_bound != nullptr && !new_bound->is_max_key()) {
-                    pair.second.key_range.left = new_bound->get_key();
+                    pair.second.key_range.left = new_bound->get_limit_read_key();
                     bool incremented = pair.second.key_range.left.increment();
                     r_sanity_check(incremented); // not max key
                 } else {
@@ -383,7 +383,7 @@ raw_stream_t rget_response_reader_t::unshard(
                 // The right bound is open so we don't need to decrement.
                 if (new_bound != nullptr && !new_bound->is_min_key()) {
                     pair.second.key_range.right =
-                        key_range_t::right_bound_t(new_bound->get_key());
+                        key_range_t::right_bound_t(new_bound->get_limit_read_key());
                 } else {
                     pair.second.key_range.right =
                         key_range_t::right_bound_t(pair.second.key_range.left);

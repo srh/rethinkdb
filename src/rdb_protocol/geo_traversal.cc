@@ -50,7 +50,7 @@ const unsigned int NEAREST_NUM_VERTICES = 8;
 geo_job_data_t::geo_job_data_t(
     ql::env_t *_env,
     region_t region,
-    store_key_t last_key,
+    ql::limit_read_last_key last_key,
     const ql::batchspec_t &batchspec,
     const std::vector<ql::transform_variant_t> &_transforms,
     const optional<ql::terminal_variant_t> &_terminal,
