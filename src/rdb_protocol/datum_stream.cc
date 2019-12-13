@@ -362,7 +362,7 @@ raw_stream_t rget_response_reader_t::unshard(
         // Active shards need their bounds updated.
         if (range_active) {
             n_active += 1;
-            limit_read_last_key *new_bound = nullptr;
+            const limit_read_last_key *new_bound = nullptr;
             auto it = stream.substreams.find(
                 region_t(pair.first));
             if (it != stream.substreams.end()) {
@@ -372,9 +372,12 @@ raw_stream_t rget_response_reader_t::unshard(
             }
             if (!reversed(sorting)) {
                 if (new_bound != nullptr && !new_bound->is_max_key()) {
-                    pair.second.key_range.left = new_bound->get_limit_read_key();
-                    bool incremented = pair.second.key_range.left.increment();
-                    r_sanity_check(incremented); // not max key
+                    // TODO: raw_key usage -- make this a method in shards.hpp.
+                    pair.second.key_range.left = new_bound->raw_key;
+                    if (!new_bound->is_decremented) {
+                        bool incremented = pair.second.key_range.left.increment();
+                        r_sanity_check(incremented); // not max key
+                    }
                 } else {
                     pair.second.key_range.left =
                         pair.second.key_range.right_or_max();
