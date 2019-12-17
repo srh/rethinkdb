@@ -24,10 +24,6 @@
 
 #include "debug.hpp"
 
-store_key_t key_max(sorting_t sorting) {
-    return !reversed(sorting) ? store_key_t::max() : store_key_t::min();
-}
-
 namespace rdb_protocol {
 
 void post_construct_and_drain_queue(
