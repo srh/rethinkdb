@@ -353,7 +353,7 @@ raw_stream_t rget_response_reader_t::unshard(
     std::vector<pseudoshard_t> pseudoshards;
     pseudoshards.reserve(active_ranges->ranges.size());
     size_t n_active = 0, n_fresh = 0;
-    for (auto &&pair : active_ranges->ranges) {
+    for (std::pair<const key_range_t, ql::active_range_with_cache> &pair : active_ranges->ranges) {
         bool range_active = pair.second.state == range_state_t::ACTIVE;
         if (pair.second.totally_exhausted()) {
             continue;
