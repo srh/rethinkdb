@@ -385,8 +385,12 @@ raw_stream_t rget_response_reader_t::unshard(
             } else {
                 // The right bound is open so we don't need to decrement.
                 if (new_bound != nullptr && !new_bound->is_min_key()) {
+                    // Even if the key was decremented, the right bound is open, and the
+                    // decremented key is outside the truncated secondary keyspace (since
+                    // it is 250 bytes long and the secondary keyspace is 125 or so),
+                    // which means we can get away with using raw_key.
                     pair.second.key_range.right =
-                        key_range_t::right_bound_t(new_bound->get_limit_read_key());
+                        key_range_t::right_bound_t(new_bound->raw_key);
                 } else {
                     pair.second.key_range.right =
                         key_range_t::right_bound_t(pair.second.key_range.left);

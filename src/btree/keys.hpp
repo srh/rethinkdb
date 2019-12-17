@@ -114,22 +114,6 @@ public:
         return true;
     }
 
-    // TODO: It would be nice if we never called this.
-    bool decrement() {
-        if (str_.empty()) {
-            return false;
-        } else if (str_.back() != 0) {
-            str_.back() = static_cast<uint8_t>(str_.back()) - 1;
-            for (int i = str_.size(); i < MAX_KEY_SIZE; i++) {
-                str_.push_back(static_cast<char>(255));
-            }
-            return true;
-        } else {
-            str_.pop_back();
-            return true;
-        }
-    }
-
     int compare(const store_key_t& k) const {
         return sized_strcmp(data(), size(), k.data(), k.size());
     }

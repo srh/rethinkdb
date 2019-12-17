@@ -107,25 +107,14 @@ struct limit_read_last_key {
         raw_key = key;
     }
 
-    store_key_t get_limit_read_key() const {
-        // Assumes the object is in a valid state -- it's not allowed that
-        // is_decremented == true && raw_key.str() == "".
-        store_key_t ret = raw_key;
-        if (is_decremented) {
-            ret.decrement();
-            return ret;
-        }
-        return ret;
-    }
-
     bool is_max_key() const {
-        return !is_decremented && raw_key == store_key_t::max();
+        return !is_decremented && raw_key == store_key_max;
     }
 
     bool is_min_key() const {
         // This is just saying get_key() == "", we have this complication just
         // to obliviously maintain identical behavior (for now).
-        return raw_key == store_key_t::min() ||
+        return raw_key == store_key_min ||
             (is_decremented && raw_key.str().length() == 1 && raw_key.str()[0] == '\0');
     }
 
