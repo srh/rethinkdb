@@ -9,6 +9,7 @@
 #include <utility>
 #include <vector>
 
+#include "btree/key_edges.hpp"
 #include "containers/counted.hpp"
 #include "containers/optional.hpp"
 #include "containers/scoped.hpp"
@@ -187,7 +188,7 @@ struct active_range_with_cache {
     // This is the range of values that we have yet to read from the shard.  We
     // store a range instead of just a `store_key_t` because this range is only
     // a restriction of the indexed range for primary key reads.
-    key_range_t key_range;
+    lower_key_bound_range key_range;
     raw_stream_t cache; // Entries we weren't able to unshard.
     range_state_t state;
     // No data in the cache and nothing to read from the shards.

@@ -12,6 +12,7 @@
 #include "errors.hpp"
 #include <boost/variant.hpp>
 
+#include "btree/key_edges.hpp"
 #include "btree/secondary_operations.hpp"
 #include "clustering/administration/auth/user_context.hpp"
 #include "concurrency/cond_var.hpp"
@@ -297,7 +298,7 @@ public:
 
     rget_read_t(optional<changefeed_stamp_t> &&_stamp,
                 region_t _region,
-                optional<std::map<region_t, store_key_t> > _hints,
+                optional<std::map<region_t, lower_key_bound> > _hints,
                 optional<std::map<store_key_t, uint64_t> > _primary_keys,
                 serializable_env_t s_env,
                 std::string _table_name,
@@ -322,7 +323,7 @@ public:
 
     region_t region; // We need this even for sindex reads due to sharding.
     optional<region_t> current_shard;
-    optional<std::map<region_t, store_key_t> > hints;
+    optional<std::map<region_t, lower_key_bound> > hints;
 
     // The `uint64_t`s here are counts.  This map is used to make `get_all` more
     // efficient, and it's legal to pass duplicate keys to `get_all`.

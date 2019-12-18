@@ -95,15 +95,15 @@ bool active_ranges_t::totally_exhausted() const {
     return true;
 }
 
-key_range_t active_ranges_to_range(const active_ranges_t &ranges) {
-    store_key_t start = store_key_t::max();
-    store_key_t end = store_key_t::min();
+lower_key_bound_range active_ranges_to_range(const active_ranges_t &ranges) {
+    lower_key_bound start = lower_key_bound::infinity();
+    lower_key_bound end = lower_key_bound::min();
     bool seen_active = false;
     for (auto &&pair : ranges.ranges) {
         switch (pair.second.state) {
         case range_state_t::ACTIVE:
             start = std::min(start, pair.second.key_range.left);
-            end = std::max(end, pair.second.key_range.right.key_or_max());
+            end = std::max(end, pair.second.key_range.right);
             seen_active = true;
             break;
         case range_state_t::SATURATED:
@@ -119,7 +119,7 @@ key_range_t active_ranges_to_range(const active_ranges_t &ranges) {
 
     // We shouldn't get here unless there's at least one active range.
     r_sanity_check(seen_active);
-    return key_range_t(key_range_t::closed, start, key_range_t::open, end);
+    return lower_key_bound_range::half_open(start, end);
 }
 
 static void validate_and_record_stamps(
@@ -142,25 +142,27 @@ static void validate_and_record_stamps(
     }
 }
 
-optional<std::map<region_t, store_key_t> > active_ranges_to_hints(
+optional<std::map<region_t, lower_key_bound> > active_ranges_to_hints(
     sorting_t sorting, const optional<active_ranges_t> &ranges) {
 
-    if (!ranges) { return r_nullopt; }
+    if (!ranges) {
+        return r_nullopt;
+    }
 
-    std::map<region_t, store_key_t> hints;
+    std::map<region_t, lower_key_bound> hints;
     for (auto &&pair : ranges->ranges) {
         switch (pair.second.state) {
         case range_state_t::ACTIVE:
             hints[region_t(pair.first)] = !reversed(sorting)
                 ? pair.second.key_range.left
-                : pair.second.key_range.right.key_or_max();
+                : pair.second.key_range.right;
             break;
         case range_state_t::SATURATED: break;
         case range_state_t::EXHAUSTED: break;
         default: unreachable();
         }
     }
-    r_sanity_check(hints.size() > 0);
+    r_sanity_check(!hints.empty());
     return make_optional(std::move(hints));
 }
 
@@ -184,9 +186,9 @@ active_ranges_t new_active_ranges(
         ret.ranges[pair.first]
             = active_range_with_cache{
                 cfeed_shard_id,
-                is_secondary == is_secondary_t::YES
+                lower_key_bound_range::from_key_range(is_secondary == is_secondary_t::YES
                     ? original_range
-                    : pair.first.intersection(original_range),
+                    : pair.first.intersection(original_range)),
                 raw_stream_t(),
                 range_state_t::ACTIVE};
     }
@@ -201,15 +203,30 @@ active_ranges_t new_active_ranges(
             ret.ranges[shard_pair.first]
                  = active_range_with_cache{
                      shard_pair.second,
-                     is_secondary == is_secondary_t::YES
+                     lower_key_bound_range::from_key_range(is_secondary == is_secondary_t::YES
                          ? original_range
-                         : shard_pair.first.intersection(original_range),
+                         : shard_pair.first.intersection(original_range)),
                      raw_stream_t(),
                      range_state_t::ACTIVE};
         }
     }
 
     return ret;
+}
+
+// This type saves us from copying the store_key_t.
+struct indirect_lower_key_bound {
+    // Never null.
+    const store_key_t *key;
+    bool infinite;
+
+    bool operator<(const indirect_lower_key_bound &rhs) const {
+        return infinite ? false : rhs.infinite ? true : *key < *rhs.key;
+    }
+};
+
+indirect_lower_key_bound to_indirect(const lower_key_bound *kb) {
+    return indirect_lower_key_bound{&kb->key, kb->infinite};
 }
 
 class pseudoshard_t {
@@ -272,21 +289,22 @@ public:
         finished = true;
     }
 
-    const store_key_t *best_unpopped_key() const {
+    indirect_lower_key_bound best_unpopped_key() const {
         r_sanity_check(!finished);
         if (cached_index < cached->cache.size()) {
-            return &cached->cache[cached_index].key;
+            return indirect_lower_key_bound{&cached->cache[cached_index].key, false};
         } else if (fresh != nullptr && fresh_index < fresh->stream.size()) {
-            return &fresh->stream[fresh_index].key;
+            return indirect_lower_key_bound{&fresh->stream[fresh_index].key, false};
         } else {
             if (!reversed(sorting)) {
+                // Thus left is not infinite.
                 return cached->key_range.is_empty()
-                    ? &store_key_max
-                    : &cached->key_range.left;
+                    ? indirect_lower_key_bound{nullptr /* unused */, true}
+                    : to_indirect(&cached->key_range.left);
             } else {
                 return cached->key_range.is_empty()
-                    ? &store_key_min
-                    : &cached->key_range.right_or_max();
+                    ? indirect_lower_key_bound{&store_key_min, false}
+                    : to_indirect(&cached->key_range.right);
             }
         }
     }
@@ -371,16 +389,18 @@ raw_stream_t rget_response_reader_t::unshard(
                 new_bound = &it->second.last_key;
             }
             if (!reversed(sorting)) {
+                // TODO: Maybe new_bound should be a lower_key_bound?? Eh... maybe.
                 if (new_bound != nullptr && !new_bound->is_max_key()) {
                     // TODO: raw_key usage -- make this a method in shards.hpp.
-                    pair.second.key_range.left = new_bound->raw_key;
+                    // TODO: Maybe lower_key_bound isn't the best choice for the types here.  But it's okay.
+                    pair.second.key_range.left = lower_key_bound(new_bound->raw_key);
                     if (!new_bound->is_decremented) {
-                        bool incremented = pair.second.key_range.left.increment();
+                        bool incremented = pair.second.key_range.left.key.increment();
                         r_sanity_check(incremented); // not max key
                     }
                 } else {
                     pair.second.key_range.left =
-                        pair.second.key_range.right_or_max();
+                        pair.second.key_range.right;
                 }
             } else {
                 // The right bound is open so we don't need to decrement.
@@ -389,11 +409,9 @@ raw_stream_t rget_response_reader_t::unshard(
                     // decremented key is outside the truncated secondary keyspace (since
                     // it is 250 bytes long and the secondary keyspace is 125 or so),
                     // which means we can get away with using raw_key.
-                    pair.second.key_range.right =
-                        key_range_t::right_bound_t(new_bound->raw_key);
+                    pair.second.key_range.right = lower_key_bound(new_bound->raw_key);
                 } else {
-                    pair.second.key_range.right =
-                        key_range_t::right_bound_t(pair.second.key_range.left);
+                    pair.second.key_range.right = pair.second.key_range.left;
                 }
             }
             if (new_bound) {
@@ -429,11 +447,11 @@ raw_stream_t rget_response_reader_t::unshard(
                 coro_t::yield();
             }
             pseudoshard_t *best_shard = &pseudoshards[0];
-            const store_key_t *best_key = best_shard->best_unpopped_key();
+            indirect_lower_key_bound best_key = best_shard->best_unpopped_key();
             for (size_t i = 1; i < pseudoshards.size(); ++i) {
                 pseudoshard_t *cur_shard = &pseudoshards[i];
-                const store_key_t *cur_key = cur_shard->best_unpopped_key();
-                if (is_better(*cur_key, *best_key, sorting)) {
+                indirect_lower_key_bound cur_key = cur_shard->best_unpopped_key();
+                if (is_better(cur_key, best_key, sorting)) {
                     best_shard = cur_shard;
                     best_key = cur_key;
                 }
@@ -520,10 +538,10 @@ optional<active_state_t> rget_response_reader_t::get_active_state() {
         const auto stamp_it = shard_stamp_infos.find(range_pair.second.cfeed_shard_id);
         r_sanity_check(stamp_it != shard_stamp_infos.end());
 
-        key_range_t last_read_range(
-            key_range_t::closed, stamp_it->second.last_read_start,
-            key_range_t::open, std::max(stamp_it->second.last_read_start,
-                                        range_pair.second.key_range.left));
+        key_range_t last_read_range = half_open_key_range(
+            stamp_it->second.last_read_start,
+            std::max(lower_key_bound(stamp_it->second.last_read_start) /* TODO: Performance, and maybe last_read_start should be a lower_key_bound. */,
+                     range_pair.second.key_range.left));
         shard_last_read_stamps.insert(std::make_pair(
             stamp_it->first,
             std::make_pair(last_read_range, stamp_it->second.stamp)));
@@ -947,43 +965,46 @@ void primary_readgen_t::restrict_active_ranges(
     active_ranges_t *ranges_inout) const {
     if (store_keys.has_value() && ranges_inout->ranges.size() != 0) {
         std::map<key_range_t,
-                 std::pair<store_key_t, store_key_t> > limits;
+                 std::pair<lower_key_bound, lower_key_bound> > limits;
         for (auto &&pair : ranges_inout->ranges) {
             limits[pair.first] =
-                std::make_pair(store_key_t::max(), store_key_t::min());
+                std::make_pair(lower_key_bound::infinity(), lower_key_bound::min());
         }
         for (const auto &key_pair : *store_keys) {
             const store_key_t &key = key_pair.first;
             for (auto &&pair : limits) {
                 if (pair.first.contains_key(key)) {
-                    pair.second.first =
-                        std::min(pair.second.first, key);
-                    pair.second.second =
-                        std::max(pair.second.second, key);
+                    if (left_of_bound(key, pair.second.first)) {
+                        pair.second.first = lower_key_bound(key);
+                    }
+                    if (right_of_bound(key, pair.second.second)) {
+                        // Would be a good place for an upper_key_bound.
+                        store_key_t tmp = key;
+                        tmp.increment();
+                        pair.second.second = lower_key_bound(std::move(tmp));
+                    }
                     break;
                 }
             }
         }
         for (auto &&pair : ranges_inout->ranges) {
             const auto &keypair = limits[pair.first];
-            store_key_t new_start =
+            lower_key_bound new_start =
                 std::max(keypair.first, pair.second.key_range.left);
-            store_key_t new_end = keypair.second;
-            new_end.increment();
-            new_end = std::min(new_end, pair.second.key_range.right_or_max());
+            lower_key_bound new_end = std::min(keypair.second, pair.second.key_range.right);
 
             if (new_start > new_end) {
                 if (!reversed(_sorting)) {
                     pair.second.key_range.left
-                        = pair.second.key_range.right_or_max();
+                        = pair.second.key_range.right;
                 } else {
-                    pair.second.key_range.right.internal_key
+                    pair.second.key_range.right
                         = pair.second.key_range.left;
                 }
                 guarantee(pair.second.key_range.is_empty());
             } else {
                 pair.second.key_range.left = new_start;
-                pair.second.key_range.right.internal_key = new_end;
+                pair.second.key_range.right = new_end;
                 guarantee(!pair.second.key_range.is_empty()
                             || new_start == new_end);
             }
@@ -1016,9 +1037,10 @@ rget_read_t primary_readgen_t::next_read_impl(
     optional<changefeed_stamp_t> stamp,
     std::vector<transform_variant_t> transforms,
     const batchspec_t &batchspec) const {
+    // TODO: Make this region a lower_key_bound_range?
     region_t region = active_ranges
-        ? region_t(active_ranges_to_range(*active_ranges))
-        : region_t(datumspec.covering_range().to_primary_keyrange());
+        ? to_key_range(active_ranges_to_range(*active_ranges))
+        : datumspec.covering_range().to_primary_keyrange();
     r_sanity_check(!region.is_empty());
     return rget_read_t(
         std::move(stamp),
@@ -1119,7 +1141,8 @@ rget_read_t sindex_readgen_t::next_read_impl(
     optional<region_t> region;
     datumspec_t ds;
     if (active_ranges) {
-        region.set(region_t(active_ranges_to_range(*active_ranges)));
+        // TODO: Maybe make region a lower_key_bound_range.
+        region.set(to_key_range(active_ranges_to_range(*active_ranges)));
         r_sanity_check(reql_version);
         ds = datumspec.trim_secondary(*region, *reql_version);
     } else {
@@ -1235,8 +1258,9 @@ intersecting_geo_read_t intersecting_readgen_t::next_read_impl(
     optional<changefeed_stamp_t> stamp,
     std::vector<transform_variant_t> transforms,
     const batchspec_t &batchspec) const {
+    // TODO: Maybe make region a lower_bound_key_range.
     region_t region = active_ranges
-        ? region_t(active_ranges_to_range(*active_ranges))
+        ? to_key_range(active_ranges_to_range(*active_ranges))
         : region_t(safe_universe());
     // For stamped reads, we disable batching. This is a temporary work-around for the
     // problem that the keys associated with geospatial change events don't match

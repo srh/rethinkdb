@@ -527,22 +527,23 @@ struct rdb_r_shard_visitor_t : public boost::static_visitor<bool> {
                     rr->hints.reset();
                     if (!rg.sindex.has_value()) {
                         if (!reversed(rg.sorting)) {
-                            guarantee(it->second >= rr->region.left);
-                            rr->region.left = it->second;
+                            guarantee(it->second.infinite || it->second.key >= rr->region.left);
+                            r_sanity_check(!it->second.infinite);  // See is_empty check below.
+                            rr->region.left = it->second.key;
                         } else {
-                            key_range_t::right_bound_t rb(it->second);
+                            key_range_t::right_bound_t rb = to_right_bound(it->second);
                             guarantee(rb <= rr->region.right);
-                            rr->region.right = rb;
+                            rr->region.right = std::move(rb);
                         }
                         r_sanity_check(!rr->region.is_empty());
                     } else {
                         guarantee(rr->sindex.has_value());
                         guarantee(rr->sindex->region.has_value());
                         if (!reversed(rg.sorting)) {
-                            rr->sindex->region->left = it->second;
+                            r_sanity_check(!it->second.infinite);  // See is_empty check below.
+                            rr->sindex->region->left = it->second.key;
                         } else {
-                            rr->sindex->region->right =
-                                key_range_t::right_bound_t(it->second);
+                            rr->sindex->region->right = to_right_bound(it->second);
                         }
                         r_sanity_check(!rr->sindex->region->is_empty());
                     }
