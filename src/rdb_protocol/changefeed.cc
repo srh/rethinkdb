@@ -3,6 +3,7 @@
 
 #include <queue>
 
+#include "btree/key_edges.hpp"
 #include "btree/reql_specific.hpp"
 #include "clustering/administration/auth/user_context.hpp"
 #include "clustering/administration/tables/name_resolver.hpp"
@@ -46,12 +47,12 @@ struct stamped_range_t {
     explicit stamped_range_t(uint64_t _next_expected_stamp)
         : next_expected_stamp(_next_expected_stamp),
           left_fencepost(store_key_t::min()) { }
-    const store_key_t &get_right_fencepost() {
-        return ranges.size() == 0 ? left_fencepost : ranges.back().first.right.key();
+    const lower_key_bound &get_right_fencepost() const {
+        return ranges.size() == 0 ? left_fencepost : ranges.back().first.right;
     }
     uint64_t next_expected_stamp;
-    store_key_t left_fencepost;
-    std::deque<std::pair<key_range_t, uint64_t> > ranges;
+    lower_key_bound left_fencepost;
+    std::deque<std::pair<lower_key_bound_range, uint64_t> > ranges;
     // This should be true, but it breaks with GCC 4.6's STL.  (The cost of
     // copying is low because if you look below we only ever copy
     // `stamped_range_t` before populating `ranges`.)
@@ -119,6 +120,11 @@ std::string print(uint64_t i) {
 }
 std::string print(const key_range_t &rng) {
     return rng.print();
+}
+std::string print(const lower_key_bound_range &rng) {
+    printf_buffer_t buf;
+    debug_print(&buf, rng);
+    return std::string(buf.data(), buf.size());
 }
 template<class A, class B>
 std::string print(const std::pair<A, B> &p) {
@@ -3137,8 +3143,12 @@ private:
         auto it = stamped_ranges.find(source_stamp.first);
         r_sanity_check(it != stamped_ranges.end());
         it->second.next_expected_stamp = source_stamp.second + 1;
-        if (key < it->second.left_fencepost) return false;
-        if (key >= it->second.get_right_fencepost()) return true;
+        if (left_of_bound(key, it->second.left_fencepost)) {
+            return false;
+        }
+        if (right_of_bound(key, it->second.get_right_fencepost())) {
+            return true;
+        }
         // `ranges` should be extremely small
         for (const auto &pair : it->second.ranges) {
             if (pair.first.contains_key(key)) {
@@ -3181,12 +3191,9 @@ private:
         }
     }
 
-    void add_range(uuid_u uuid, key_range_t read_range, uint64_t stamp) {
+    void add_range(uuid_u uuid, key_range_t read_range_param, uint64_t stamp) {
         // Safe because we never generate `store_key_t::max()`.
-        if (read_range.right.unbounded) {
-            read_range.right.unbounded = false;
-            read_range.right.internal_key = store_key_t::max();
-        }
+        lower_key_bound_range read_range = lower_key_bound_range::from_key_range(std::move(read_range_param));
         auto it = stamped_ranges.find(uuid);
         r_sanity_check(it != stamped_ranges.end());
         if (it->second.ranges.size() == 0) {
@@ -3205,7 +3212,7 @@ private:
             while (ranges->size() > 0) {
                 uint64_t read_stamp = ranges->front().second;
                 if (pair.second.next_expected_stamp >= read_stamp) {
-                    pair.second.left_fencepost = ranges->front().first.right.key();
+                    pair.second.left_fencepost = ranges->front().first.right;
                     ranges->pop_front();
                 } else {
                     break;
