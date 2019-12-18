@@ -438,8 +438,8 @@ raw_stream_t rget_response_reader_t::unshard(
                     best_key = cur_key;
                 }
             }
-            if (auto maybe_item = best_shard->pop()) {
-                ret.push_back(*maybe_item);
+            if (optional<ql::rget_item_t> maybe_item = best_shard->pop()) {
+                ret.push_back(std::move(*maybe_item));
             } else {
                 break;
             }
