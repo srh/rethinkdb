@@ -9,10 +9,12 @@
 and `in2`; if it's 0.25, the return value will be closer to `in1`; and so on. This
 function is not exact; the only absolute guarantee it provides is that the return value
 will lie in the range `in1 <= out <= in2`. */
-static store_key_t interpolate_key(store_key_t in1, store_key_t in2, double fraction) {
-    rassert(in1 <= in2);
+store_key_t interpolate_key(const store_key_t &in1, const lower_key_bound &in2_param, double fraction) {
+    rassert(in2_param.infinite || in1 <= in2_param.key);
     rassert(fraction >= 0 && fraction <= 1);
-    const uint8_t *in1_buf = in1.data(), *in2_buf = in2.data();
+    const store_key_t &in2 = in2_param.infinite ? in2_param.key : store_key_max;
+    const uint8_t *in1_buf = in1.data();
+    const uint8_t *in2_buf = in2.data();
     uint8_t out_buf[MAX_KEY_SIZE];
 
     /* Calculate the shared prefix of `in1` and `in2` */
@@ -163,10 +165,10 @@ bool calculate_split_points_with_distribution(
             ++left_pair;
         }
         std::pair<int64_t, store_key_t> left = pairs[left_pair];
-        std::pair<int64_t, store_key_t> right =
+        std::pair<int64_t, lower_key_bound> right =
             (left_pair == pairs.size() - 1)
-                ? std::make_pair(total_count, store_key_t::max())
-                : pairs[left_pair+1];
+                ? std::make_pair(total_count, lower_key_bound::infinity())
+                : std::make_pair(pairs[left_pair+1].first, lower_key_bound(pairs[left_pair+1].second));
         store_key_t split_key = interpolate_key(left.second, right.second,
             (split_count - left.first) / static_cast<double>(right.first - left.first));
         split_points_out->split_points.push_back(split_key);
@@ -224,10 +226,10 @@ void calculate_split_points_by_interpolation(
             (left_old_index == 0)
                 ? store_key_t::min()
                 : old_split_points.split_points[left_old_index-1];
-        store_key_t right_key =
+        lower_key_bound right_key =
             (left_old_index == old_split_points.num_shards() - 1)
-                ? store_key_t::max()
-                : old_split_points.split_points[left_old_index];
+                ? lower_key_bound::infinity()
+                : lower_key_bound(old_split_points.split_points[left_old_index]);
         store_key_t split_key = interpolate_key(left_key, right_key,
             split_old_index-left_old_index);
         split_points_out->split_points.push_back(split_key);
