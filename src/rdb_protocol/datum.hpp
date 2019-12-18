@@ -65,6 +65,7 @@ enum class use_json_t { NO = 0, YES = 1 };
 // used for sorting datums by type, and NO if the name is to be given to a user.
 enum class name_for_sorting_t { NO = 0, YES = 1 };
 
+// TODO: Remove extrema_encoding_t for rocksdb.
 // `r.minval` and `r.maxval` were encoded in keys differently before 2.3. Determines
 // which encoding should be used.
 enum class extrema_encoding_t { PRE_v2_3, LATEST };
