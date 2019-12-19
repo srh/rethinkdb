@@ -1929,9 +1929,9 @@ optional<obsolete_reql_version_t> deserialize_sindex_info(
         break;
     default: unreachable();
     }
-    // TODO: When deserializing user sindex descriptor, we should not have a guarantee.
-    guarantee(static_cast<size_t>(read_stream.tell()) == data.size(),
-              "An sindex description was incompletely deserialized.");
+    if (static_cast<size_t>(read_stream.tell()) != data.size()) {
+        throw archive_exc_t("An sindex description was incompletely deserialized.");
+    }
     return r_nullopt;
 }
 
