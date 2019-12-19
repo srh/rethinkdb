@@ -11,7 +11,6 @@
 #include <utility>
 #include <vector>
 
-#include "cjson/json.hpp"
 #include "containers/archive/archive.hpp"
 #include "containers/counted.hpp"
 #include "containers/optional.hpp"
@@ -440,10 +439,6 @@ public:
 };
 
 datum_t to_datum(const Datum *d, const configured_limits_t &, reql_version_t);
-
-
-// DEPRECATED: Used in the r.json term for pre 2.1 backwards compatibility
-datum_t to_datum(cJSON *json, const configured_limits_t &, reql_version_t);
 
 // This should only be used to send responses to the client.
 datum_t to_datum_for_client_serialization(

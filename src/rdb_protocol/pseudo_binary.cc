@@ -43,16 +43,6 @@ rapidjson::Value encode_base64_ptype(const datum_string_t &data,
     return res;
 }
 
-scoped_cJSON_t encode_base64_ptype(const datum_string_t &data) {
-    scoped_cJSON_t res(cJSON_CreateObject());
-    res.AddItemToObject(datum_t::reql_type_string.to_std().c_str(),
-                        cJSON_CreateString(binary_string));
-    res.AddItemToObject(
-        data_key,
-        cJSON_CreateString(encode_base64(data.data(), data.size()).c_str()));
-    return res;
-}
-
 // Given a `r.binary` pseudotype with base64 encoding, decodes it into a raw data string
 datum_string_t decode_base64_ptype(
         const std::vector<std::pair<datum_string_t, datum_t> > &ptype) {

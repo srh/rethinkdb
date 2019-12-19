@@ -1,5 +1,4 @@
 // Copyright 2010-2015 RethinkDB, all rights reserved.
-#include "cjson/json.hpp"
 #include "rdb_protocol/datum_json.hpp"
 #include "rdb_protocol/op.hpp"
 #include "rdb_protocol/term.hpp"
@@ -19,33 +18,30 @@ public:
     scoped_ptr_t<val_t> eval_impl(scope_env_t *env, args_t *args, eval_flags_t) const {
         const datum_string_t data = args->arg(env, 0)->as_str();
 
-        // TODO: Can we now get rid of cJSON?
-        if (true) {
-            // Copy the string into a null-terminated c-string that we can write
-            // to, so we can use RapidJSON in-situ parsing (and at least avoid
-            // some additional copying).
-            std::vector<char> str_buf(data.size() + 1);
-            memcpy(str_buf.data(), data.data(), data.size());
-            for (size_t i = 0; i < data.size(); ++i) {
-                rcheck(str_buf[i] != '\0', base_exc_t::LOGIC,
-                       "Encountered unescaped null byte in JSON string.");
-            }
-            str_buf[data.size()] = '\0';
-
-            rapidjson::Document json;
-            // Note: Insitu will cause some parts of `json` to directly point into
-            // `str_buf`. `str_buf`'s life time must be at least as long as `json`'s.
-            json.ParseInsitu(str_buf.data());
-
-            rcheck(!json.HasParseError(), base_exc_t::LOGIC,
-                   strprintf("Failed to parse \"%s\" as JSON: %s",
-                       (data.size() > 40
-                        ? (data.to_std().substr(0, 37) + "...").c_str()
-                        : data.to_std().c_str()),
-                       rapidjson::GetParseError_En(json.GetParseError())));
-            return new_val(to_datum(json, env->env->limits(),
-                                    env->env->reql_version()));
+        // Copy the string into a null-terminated c-string that we can write
+        // to, so we can use RapidJSON in-situ parsing (and at least avoid
+        // some additional copying).
+        std::vector<char> str_buf(data.size() + 1);
+        memcpy(str_buf.data(), data.data(), data.size());
+        for (size_t i = 0; i < data.size(); ++i) {
+            rcheck(str_buf[i] != '\0', base_exc_t::LOGIC,
+                    "Encountered unescaped null byte in JSON string.");
         }
+        str_buf[data.size()] = '\0';
+
+        rapidjson::Document json;
+        // Note: Insitu will cause some parts of `json` to directly point into
+        // `str_buf`. `str_buf`'s life time must be at least as long as `json`'s.
+        json.ParseInsitu(str_buf.data());
+
+        rcheck(!json.HasParseError(), base_exc_t::LOGIC,
+                strprintf("Failed to parse \"%s\" as JSON: %s",
+                    (data.size() > 40
+                    ? (data.to_std().substr(0, 37) + "...").c_str()
+                    : data.to_std().c_str()),
+                    rapidjson::GetParseError_En(json.GetParseError())));
+        return new_val(to_datum(json, env->env->limits(),
+                                env->env->reql_version()));
     }
 
     virtual const char *name() const { return "json"; }

@@ -26,9 +26,6 @@ void encode_base64_ptype(
 rapidjson::Value encode_base64_ptype(const datum_string_t &data,
                                      rapidjson::Value::AllocatorType *allocator);
 
-// DEPRECATED
-scoped_cJSON_t encode_base64_ptype(const datum_string_t &data);
-
 // Given a `r.binary` pseudotype with base64 encoding, decodes it into a raw data string
 datum_string_t decode_base64_ptype(
     const std::vector<std::pair<datum_string_t, datum_t> > &ptype);

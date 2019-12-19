@@ -15,7 +15,6 @@
 #include <boost/detail/endian.hpp>
 
 #include "arch/runtime/coroutines.hpp"
-#include "cjson/json.hpp"
 #include "containers/archive/stl_types.hpp"
 #include "containers/scoped.hpp"
 #include "math.hpp"
@@ -1775,49 +1774,6 @@ datum_t to_datum(const Datum *d, const configured_limits_t &limits,
         }
         const std::set<std::string> pts = { pseudo::literal_string };
         return datum_t(std::move(map), pts);
-    } break;
-    default: unreachable();
-    }
-}
-
-datum_t to_datum(cJSON *json, const configured_limits_t &limits,
-                 reql_version_t reql_version) {
-    switch (json->type) {
-    case cJSON_False: {
-        return datum_t::boolean(false);
-    } break;
-    case cJSON_True: {
-        return datum_t::boolean(true);
-    } break;
-    case cJSON_NULL: {
-        return datum_t::null();
-    } break;
-    case cJSON_Number: {
-        return datum_t(json->valuedouble);
-    } break;
-    case cJSON_String: {
-        fail_if_invalid(json->valuestring);
-        return datum_t(json->valuestring);
-    } break;
-    case cJSON_Array: {
-        std::vector<datum_t> array;
-        json_array_iterator_t it(json);
-        while (cJSON *item = it.next()) {
-            array.push_back(to_datum(item, limits, reql_version));
-        }
-        return datum_t(std::move(array), limits);
-    } break;
-    case cJSON_Object: {
-        datum_object_builder_t builder;
-        json_object_iterator_t it(json);
-        while (cJSON *item = it.next()) {
-            fail_if_invalid(item->string);
-            bool dup = builder.add(item->string, to_datum(item, limits, reql_version));
-            rcheck_datum(!dup, base_exc_t::LOGIC,
-                         strprintf("Duplicate key `%s` in JSON.", item->string));
-        }
-        const std::set<std::string> pts = { pseudo::literal_string };
-        return std::move(builder).to_datum(pts);
     } break;
     default: unreachable();
     }
