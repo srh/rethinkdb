@@ -30,13 +30,13 @@ cluster_version_result_t deserialize_cluster_version(
 }
 
 
-reql_version_result_t deserialize_reql_version(
-        read_stream_t *s, reql_version_t *out) {
+reql_version_result_t deserialize_importable_reql_version(
+        read_stream_t *s, importable_reql_version_t *out) {
     // Initialize `out` to *something* because GCC 4.6.3 thinks that `thing`
     // could be used uninitialized, even when the return value of this function
     // is checked through `guarantee_deserialization()`.
     // See https://github.com/rethinkdb/rethinkdb/issues/2640
-    *out = reql_version_t::LATEST;
+    *out = importable_reql_version_t::LATEST;
     int8_t raw;
     archive_result_t res = deserialize_universal(s, &raw);
     obsolete_reql_version_t FAKE = static_cast<obsolete_reql_version_t>(-1);
@@ -57,7 +57,7 @@ reql_version_result_t deserialize_reql_version(
         // This is the same rassert in `ARCHIVE_PRIM_MAKE_RANGED_SERIALIZABLE`.
         if (raw >= static_cast<int8_t>(reql_version_t::EARLIEST)
                 && raw <= static_cast<int8_t>(reql_version_t::LATEST)) {
-            *out = static_cast<reql_version_t>(raw);
+            *out = static_cast<importable_reql_version_t>(raw);
             return reql_version_result_t{cluster_version_result_t::SUCCESS, FAKE};
         } else {
             return reql_version_result_t{cluster_version_result_t::UNRECOGNIZED_VERSION, FAKE};

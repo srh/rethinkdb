@@ -90,24 +90,39 @@ enum class obsolete_reql_version_t {
     LATEST = v1_15_is_latest
 };
 
-// Reql versions define how secondary index functions should be evaluated.  Older
-// versions have bugs that are fixed in newer versions.  They also define how secondary
-// index keys are generated.
-enum class reql_version_t {
+// This describes reql versions whose sindex descriptions can be imported (via
+// r.index_create with a binary function description), but which cannot possibly
+// appear in storage.  A superset of reql_version_t.
+enum class importable_reql_version_t {
     v1_16 = 2,
     v2_0 = 3,
     v2_1 = 4,
     v2_2 = 5,
     v2_3 = 6,
     v2_4 = 7,
+    v2_4_is_latest = v2_4,
+
+    EARLIEST = v1_16,
+    LATEST = v2_4_is_latest,
+};
+
+// Reql versions define how secondary index functions should be evaluated.  Older
+// versions have bugs that are fixed in newer versions.  They also define how secondary
+// index keys are generated.
+enum class reql_version_t {
+    v2_4 = 7,
 
     // Code that uses _is_latest may need to be updated when the
     // version changes
     v2_4_is_latest = v2_4,
 
-    EARLIEST = v1_16,
+    EARLIEST = v2_4,
     LATEST = v2_4_is_latest
 };
+
+inline importable_reql_version_t to_importable(reql_version_t r) {
+    return static_cast<importable_reql_version_t>(r);
+}
 
 // Serialization of reql_version_t is defined in protocol_api.hpp.
 

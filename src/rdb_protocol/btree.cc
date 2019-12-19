@@ -1777,9 +1777,6 @@ void compute_keys(const store_key_t &primary_key,
                             std::make_pair(skey, std::move(store_key)));
                     }
                 } catch (const ql::base_exc_t &e) {
-                    if (reql_version < reql_version_t::v2_1) {
-                        throw;
-                    }
                     // One of the values couldn't be converted to an index key.
                     // Ignore it and move on to the next one.
                 }
@@ -1883,7 +1880,7 @@ optional<obsolete_reql_version_t> deserialize_sindex_info(
     case cluster_version_t::v2_3:
     case cluster_version_t::v2_4:
     case cluster_version_t::v2_5_is_latest: {
-        reql_version_result_t res = deserialize_reql_version(
+        reql_version_result_t res = deserialize_importable_reql_version(
                 &read_stream,
                 &info_out->mapping_version_info.original_reql_version);
         switch (res.code) {

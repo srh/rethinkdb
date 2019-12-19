@@ -41,8 +41,8 @@ MUST_USE cluster_version_result_t deserialize_cluster_version(
         read_stream_t *s,
         cluster_version_t *out) noexcept;
 
-MUST_USE reql_version_result_t deserialize_reql_version(
-        read_stream_t *s, reql_version_t *thing);
+MUST_USE reql_version_result_t deserialize_importable_reql_version(
+        read_stream_t *s, importable_reql_version_t *thing);
 
 template <class T>
 void serialize_for_cluster(write_message_t *wm, const T &value) {

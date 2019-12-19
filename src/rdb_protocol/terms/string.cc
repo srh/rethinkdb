@@ -222,36 +222,6 @@ private:
         }
         return res;
     }
-    std::vector<datum_t> old_split(const std::string &s,
-                                    const optional<std::string> &delim,
-                                    size_t maxnum) const {
-        const char *const splitchars = " \t\n\r\x0B\x0C";
-        // This logic is extremely finicky so as to mimick the behavior of
-        // Python's `split` in edge cases.
-        std::vector<datum_t> res;
-        size_t last = 0;
-        while (last != std::string::npos) {
-            size_t next = res.size() == maxnum
-                ? std::string::npos
-                : (delim
-                   ? (delim->size() == 0 ? last + 1 : s.find(*delim, last))
-                   : s.find_first_of(splitchars, last));
-            std::string tmp;
-            if (next == std::string::npos) {
-                size_t start = delim ? last : s.find_first_not_of(splitchars, last);
-                tmp = start == std::string::npos ? "" : s.substr(start);
-            } else {
-                tmp = s.substr(last, next - last);
-            }
-            if ((delim && delim->size() != 0) || tmp.size() != 0) {
-                res.push_back(datum_t(datum_string_t(tmp)));
-            }
-            last = (next == std::string::npos || next >= s.size())
-                ? std::string::npos
-                : next + (delim ? delim->size() : 1);
-        }
-        return res;
-    }
     virtual scoped_ptr_t<val_t> eval_impl(
         scope_env_t *env, args_t *args, eval_flags_t) const {
         std::string s = args->arg(env, 0)->as_str().to_std();
@@ -277,13 +247,6 @@ private:
         std::vector<datum_t> res;
 
         switch (env->env->reql_version()) {
-        case reql_version_t::v1_16:
-        case reql_version_t::v2_0:
-            res = old_split(s, delim, maxnum);
-            break;
-        case reql_version_t::v2_1:
-        case reql_version_t::v2_2:
-        case reql_version_t::v2_3:
         case reql_version_t::v2_4_is_latest:
             res = utf8_aware_split(s, delim, maxnum);
             break;

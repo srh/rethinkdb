@@ -23,8 +23,9 @@ const char *const sindex_blob_prefix = "$reql_index_function$";
 
 datum_string_t sindex_config_to_string(const sindex_config_t &config) {
     sindex_reql_version_info_t version;
+    // TODO: sindex_config_t and user-exported sindex_config_t should be distinct types (sindex_config_t should use reql_version_t).
     version.original_reql_version = config.func_version;
-    version.latest_compatible_reql_version = config.func_version;
+    version.latest_compatible_reql_version = static_cast<reql_version_t>(config.func_version);
     version.latest_checked_reql_version = reql_version_t::LATEST;
     sindex_disk_info_t disk_info(config.func, version, config.multi, config.geo);
 
@@ -182,7 +183,7 @@ public:
                     // We ignore the sindex's old `reql_version` and make the new version
                     // just be `reql_version_t::LATEST`; but in the future we may have
                     // to do some conversions for compatibility.
-                    config.func_version = reql_version_t::LATEST;
+                    config.func_version = importable_reql_version_t::LATEST;
                     got_func = true;
                 }
             }
@@ -190,7 +191,7 @@ public:
             // a type error asking for a function rather than BINARY.
             if (!got_func) {
                 config.func = ql::map_wire_func_t(v->as_func());
-                config.func_version = reql_version_t::LATEST;
+                config.func_version = importable_reql_version_t::LATEST;
             }
         } else {
             minidriver_t r(backtrace());
@@ -202,7 +203,7 @@ public:
                                           r.fun(x, r.var(x)[name_datum]).root_term());
 
             config.func = ql::map_wire_func_t(func_term_term->eval_to_func(env->scope));
-            config.func_version = reql_version_t::LATEST;
+            config.func_version = importable_reql_version_t::LATEST;
         }
 
         config.func.compile_wire_func()->assert_deterministic(

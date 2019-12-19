@@ -179,6 +179,10 @@ ARCHIVE_PRIM_MAKE_RANGED_SERIALIZABLE(read_mode_t,
                                       read_mode_t::DEBUG_DIRECT);
 
 ARCHIVE_PRIM_MAKE_RANGED_SERIALIZABLE(
+        importable_reql_version_t, int8_t,
+        importable_reql_version_t::EARLIEST, importable_reql_version_t::LATEST);
+
+ARCHIVE_PRIM_MAKE_RANGED_SERIALIZABLE(
         reql_version_t, int8_t,
         reql_version_t::EARLIEST, reql_version_t::LATEST);
 

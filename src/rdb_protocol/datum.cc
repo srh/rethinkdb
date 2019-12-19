@@ -576,20 +576,16 @@ std::string datum_t::get_type_name(name_for_sorting_t for_sorting) const {
     }
 }
 
-std::string datum_t::print(reql_version_t reql_version) const {
+std::string datum_t::print() const {
     if (has()) {
-        if (reql_version < reql_version_t::v2_1) {
-            return as_json().Print();
-        } else {
-            rapidjson::StringBuffer buffer;
-            rapidjson::PrettyWriter<rapidjson::StringBuffer> writer(buffer);
-            // Change indentation character to tab for compatibility with cJSON
-            // (it doesn't actually matter, but many of our tests are currently
-            //  assuming this format)
-            writer.SetIndent('\t', 1);
-            write_json(&writer);
-            return std::string(buffer.GetString(), buffer.GetSize());
-        }
+        rapidjson::StringBuffer buffer;
+        rapidjson::PrettyWriter<rapidjson::StringBuffer> writer(buffer);
+        // Change indentation character to tab for compatibility with cJSON
+        // (it doesn't actually matter, but many of our tests are currently
+        //  assuming this format)
+        writer.SetIndent('\t', 1);
+        write_json(&writer);
+        return std::string(buffer.GetString(), buffer.GetSize());
     } else {
         return "UNINITIALIZED";
     }
@@ -1179,20 +1175,14 @@ std::string datum_t::print_secondary(reql_version_t reql_version,
     return compose_secondary(secondary_key_string, primary_key, tag_num);
 }
 
-escape_nulls_t escape_nulls_from_reql_version_for_sindex(reql_version_t rv) {
-    if (rv < reql_version_t::v2_2) {
-        return escape_nulls_t::NO;
-    } else {
-        return escape_nulls_t::YES;
-    }
+escape_nulls_t escape_nulls_from_reql_version_for_sindex(reql_version_t) {
+    // TODO: Always YES -- probably remove escape_nulls_t.
+    return escape_nulls_t::YES;
 }
 
-extrema_encoding_t extrema_encoding_from_reql_version_for_sindex(reql_version_t rv) {
-    if (rv < reql_version_t::v2_3) {
-        return extrema_encoding_t::PRE_v2_3;
-    } else {
-        return extrema_encoding_t::LATEST;
-    }
+extrema_encoding_t extrema_encoding_from_reql_version_for_sindex(reql_version_t) {
+    // TODO: Always YES -- probably remove extrema_encoding_t.
+    return extrema_encoding_t::LATEST;
 }
 
 components_t parse_secondary(const std::string &key) THROWS_NOTHING {
@@ -1535,43 +1525,6 @@ template void datum_t::write_json(
 template void datum_t::write_json(
     rapidjson::PrettyWriter<rapidjson::StringBuffer> *writer) const;
 
-cJSON *datum_t::as_json_raw() const {
-    switch (get_type()) {
-    case MINVAL: rfail_datum(base_exc_t::LOGIC, "Cannot convert `r.minval` to JSON.");
-    case MAXVAL: rfail_datum(base_exc_t::LOGIC, "Cannot convert `r.maxval` to JSON.");
-    case R_NULL: return cJSON_CreateNull();
-    case R_BINARY: return pseudo::encode_base64_ptype(as_binary()).release();
-    case R_BOOL: return cJSON_CreateBool(as_bool());
-    case R_NUM: return cJSON_CreateNumber(as_num());
-    case R_STR: return cJSON_CreateStringN(as_str().data(), as_str().size());
-    case R_ARRAY: {
-        scoped_cJSON_t arr(cJSON_CreateArray());
-        const size_t sz = arr_size();
-        for (size_t i = 0; i < sz; ++i) {
-            arr.AddItemToArray(unchecked_get(i).as_json_raw());
-        }
-        return arr.release();
-    } break;
-    case R_OBJECT: {
-        scoped_cJSON_t obj(cJSON_CreateObject());
-        const size_t sz = obj_size();
-        for (size_t i = 0; i < sz; ++i) {
-            auto pair = get_pair(i);
-            obj.AddItemToObject(pair.first.data(), pair.first.size(),
-                                pair.second.as_json_raw());
-        }
-        return obj.release();
-    } break;
-    case UNINITIALIZED: // fallthru
-    default: unreachable();
-    }
-    unreachable();
-}
-
-scoped_cJSON_t datum_t::as_json() const {
-    return scoped_cJSON_t(as_json_raw());
-}
-
 // TODO: make BINARY, STR, and OBJECT convertible to sequence?
 counted_t<datum_stream_t>
 datum_t::as_datum_stream(backtrace_id_t backtrace) const {
@@ -1794,14 +1747,9 @@ datum_t to_datum(const Datum *d, const configured_limits_t &limits,
     } break;
     case Datum::R_JSON: {
         fail_if_invalid(d->r_str());
-        if (reql_version < reql_version_t::v2_1) {
-            scoped_cJSON_t cjson(cJSON_Parse(d->r_str().c_str()));
-            return to_datum(cjson.get(), limits, reql_version);
-        } else {
-            rapidjson::Document json;
-            json.Parse(d->r_str().c_str());
-            return to_datum(json, limits, reql_version);
-        }
+        rapidjson::Document json;
+        json.Parse(d->r_str().c_str());
+        return to_datum(json, limits, reql_version);
     } break;
     case Datum::R_ARRAY: {
         datum_array_builder_t out(limits);

@@ -76,12 +76,12 @@ bool outdated_index_issue_tracker_t::is_acceptable_outdated(const sindex_config_
     if (sindex_config.func.is_simple_selector()) {
         switch(sindex_config.func_version) {
             // A version should return false if it breaks compatibility for even simple sindexes.
-        case reql_version_t::v1_16:
-        case reql_version_t::v2_0:
-        case reql_version_t::v2_1:
-        case reql_version_t::v2_2:
-        case reql_version_t::v2_3:
-        case reql_version_t::v2_4_is_latest:
+        case importable_reql_version_t::v1_16:
+        case importable_reql_version_t::v2_0:
+        case importable_reql_version_t::v2_1:
+        case importable_reql_version_t::v2_2:
+        case importable_reql_version_t::v2_3:
+        case importable_reql_version_t::v2_4_is_latest:
         default:
             return true;
         }
@@ -103,7 +103,7 @@ void outdated_index_issue_tracker_t::log_outdated_indexes(
 
                 std::string indexes;
                 for (auto const &sindex_pair : config.config.sindexes) {
-                    if (sindex_pair.second.func_version != reql_version_t::LATEST
+                    if (sindex_pair.second.func_version != importable_reql_version_t::LATEST
                         && !is_acceptable_outdated(sindex_pair.second )) {
                         indexes += (indexes.empty() ? "'" : ", '") + sindex_pair.first + "'";
                     }
@@ -144,7 +144,7 @@ std::vector<scoped_ptr_t<issue_t> > outdated_index_issue_tracker_t::get_issues(
     for (auto const &table_pair : configs) {
         std::set<std::string> indexes;
         for (auto const &sindex_pair : table_pair.second.config.sindexes) {
-            if (sindex_pair.second.func_version != reql_version_t::LATEST
+            if (sindex_pair.second.func_version != importable_reql_version_t::LATEST
                 && !is_acceptable_outdated(sindex_pair.second)) {
                 indexes.insert(sindex_pair.first);
             }

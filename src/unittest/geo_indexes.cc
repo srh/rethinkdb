@@ -168,7 +168,7 @@ void prepare_namespace(namespace_interface_t *nsi,
 
     sindex_config_t sindex(
         ql::map_wire_func_t(mapping, make_vector(arg)),
-        reql_version_t::LATEST,
+        importable_reql_version_t::LATEST,
         sindex_multi_bool_t::SINGLE,
         sindex_geo_bool_t::GEO);
 

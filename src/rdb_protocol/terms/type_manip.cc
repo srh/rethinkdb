@@ -201,10 +201,7 @@ private:
 
                 // DATUM -> STR
                 if (end_type == R_STR_TYPE) {
-                    if (env->env->reql_version() < reql_version_t::v2_1) {
-                        return new_val(datum_t(
-                            datum_string_t(d.print(env->env->reql_version()))));
-                    } else {
+                    if (true) {
                         rapidjson::StringBuffer buffer;
                         rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
                         d.write_json(&writer);
@@ -505,7 +502,7 @@ private:
         case DATUM_TYPE: {
             b |= info.add("value",
                           datum_t(datum_string_t(
-                              v->as_datum().print(env->env->reql_version()))));
+                              v->as_datum().print())));
         } // fallthru
         case R_NULL_TYPE:   // fallthru
         case MINVAL_TYPE:   // fallthru
