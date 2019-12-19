@@ -1831,6 +1831,15 @@ void serialize_sindex_info(write_message_t *wm,
     serialize<cluster_version_t::LATEST_DISK>(wm, info.geo);
 }
 
+#define throw_if_bad_deserialization(result, ...) do { \
+        if ((result) != archive_result_t::SUCCESS) { \
+            throw archive_exc_t( \
+                strprintf("Deserialization of %s failed with error %s.", \
+                          strprintf(__VA_ARGS__).c_str(), \
+                          archive_result_as_str((result)))); \
+        } \
+    } while (0)
+
 optional<obsolete_reql_version_t> deserialize_sindex_info(
         const std::vector<char> &data,
         sindex_disk_info_t *info_out) {

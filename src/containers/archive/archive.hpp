@@ -56,26 +56,6 @@ const char *archive_result_as_str(archive_result_t archive_result);
                   archive_result_as_str(result));                       \
     } while (0)
 
-class archive_exc_t : public std::exception {
-public:
-    explicit archive_exc_t(std::string _s) : s(std::move(_s)) { }
-    ~archive_exc_t() throw () { }
-    const char *what() const throw() {
-        return s.c_str();
-    }
-private:
-    std::string s;
-};
-
-#define throw_if_bad_deserialization(result, ...) do {                  \
-        if (result != archive_result_t::SUCCESS) {                      \
-            throw archive_exc_t(                                        \
-                strprintf("Deserialization of %s failed with error %s.", \
-                          strprintf(__VA_ARGS__).c_str(),               \
-                          archive_result_as_str(result)));              \
-        }                                                               \
-    } while (0)
-
 // Returns the number of bytes written, or -1.  Returns a
 // non-negative value less than n upon EOF.
 MUST_USE int64_t force_read(read_stream_t *s, void *p, int64_t n);
