@@ -672,6 +672,7 @@ void datum_t::binary_to_str_key(std::string *str_out) const {
 }
 
 void datum_t::str_to_str_key(escape_nulls_t escape_nulls, std::string *str_out) const {
+    // (escape_nulls is YES for secondary keys, NO for primary keys)
     r_sanity_check(get_type() == R_STR);
     str_out->append("S");
 
@@ -1138,14 +1139,13 @@ std::string datum_t::print_secondary(reql_version_t reql_version,
     // Reserve max key size to reduce reallocations
     secondary_key_string.reserve(MAX_KEY_SIZE);
 
-    escape_nulls_t escape_nulls = escape_nulls_from_reql_version_for_sindex(reql_version);
     extrema_encoding_t extrema_encoding =
         extrema_encoding_from_reql_version_for_sindex(reql_version);
 
     if (get_type() == R_NUM) {
         num_to_str_key(&secondary_key_string);
     } else if (get_type() == R_STR) {
-        str_to_str_key(escape_nulls, &secondary_key_string);
+        str_to_str_key(escape_nulls_t::YES, &secondary_key_string);
     } else if (get_type() == R_BINARY) {
         binary_to_str_key(&secondary_key_string);
     } else if (get_type() == R_BOOL) {
@@ -1158,7 +1158,7 @@ std::string datum_t::print_secondary(reql_version_t reql_version,
             extrema_encoding == extrema_encoding_t::PRE_v2_3
             ? extrema_ok_t::OK
             : extrema_ok_t::NOT_OK,
-            escape_nulls,
+            escape_nulls_t::YES,
             &secondary_key_string);
     } else if (get_type() == R_OBJECT && is_ptype()) {
         pt_to_str_key(&secondary_key_string);
@@ -1172,11 +1172,6 @@ std::string datum_t::print_secondary(reql_version_t reql_version,
     secondary_key_string.append(1, '\x00');
 
     return compose_secondary(secondary_key_string, primary_key, tag_num);
-}
-
-escape_nulls_t escape_nulls_from_reql_version_for_sindex(reql_version_t) {
-    // TODO: Always YES -- probably remove escape_nulls_t.
-    return escape_nulls_t::YES;
 }
 
 extrema_encoding_t extrema_encoding_from_reql_version_for_sindex(reql_version_t) {
@@ -1262,8 +1257,6 @@ store_key_t datum_t::truncated_secondary(
     reql_version_t reql_version,
     extrema_ok_t extrema_ok) const {
 
-    escape_nulls_t escape_nulls =
-        escape_nulls_from_reql_version_for_sindex(reql_version);
     extrema_encoding_t extrema_encoding =
         extrema_encoding_from_reql_version_for_sindex(reql_version);
 
@@ -1271,13 +1264,13 @@ store_key_t datum_t::truncated_secondary(
     if (get_type() == R_NUM) {
         num_to_str_key(&s);
     } else if (get_type() == R_STR) {
-        str_to_str_key(escape_nulls, &s);
+        str_to_str_key(escape_nulls_t::YES, &s);
     } else if (get_type() == R_BINARY) {
         binary_to_str_key(&s);
     } else if (get_type() == R_BOOL) {
         bool_to_str_key(&s);
     } else if (get_type() == R_ARRAY) {
-        array_to_str_key(extrema_encoding, extrema_ok, escape_nulls, &s);
+        array_to_str_key(extrema_encoding, extrema_ok, escape_nulls_t::YES, &s);
     } else if (get_type() == R_OBJECT && is_ptype()) {
         pt_to_str_key(&s);
     } else if (get_type() == MINVAL || get_type() == MAXVAL) {

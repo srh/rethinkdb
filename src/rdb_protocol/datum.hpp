@@ -75,12 +75,8 @@ extrema_encoding_t extrema_encoding_from_reql_version_for_sindex(reql_version_t 
 enum class extrema_ok_t { NOT_OK = 0, OK = 1 };
 
 // When printing keys, nulls in strings can be escaped or disallowed. Primary
-// keys always disallow nulls, and the most recent secondary indexes escape them.
-//
-// Use escape_nulls_from_reql_version_for_sindex to get a value appropriate for
-// sindexes created using a given reql_version_t.
+// keys always disallow nulls, and secondary indexes escape them.
 enum class escape_nulls_t { NO = 0, YES = 1 };
-escape_nulls_t escape_nulls_from_reql_version_for_sindex(reql_version_t rv);
 
 void debug_print(printf_buffer_t *, const datum_t &);
 
