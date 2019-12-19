@@ -22,10 +22,20 @@ inline void serialize_cluster_version(write_message_t *wm, cluster_version_t v) 
     serialize<cluster_version_t::LATEST_OVERALL>(wm, raw);
 }
 
-MUST_USE archive_result_t deserialize_cluster_version(
+// This is a (hopefully) temporary type designed to pick apart the cluster
+// version deserialization failure modes.
+enum class cluster_version_result_t {
+    SUCCESS,
+    SOCK_ERROR,
+    SOCK_EOF,
+    INT8_RANGE_ERROR,
+    OBSOLETE_CLUSTER_VERSION,  // This would call obsolete_cb which would crash or throw.
+    UNRECOGNIZED_CLUSTER_VERSION,  // This previously threw an archive_exc_t.
+};
+
+MUST_USE cluster_version_result_t deserialize_cluster_version(
         read_stream_t *s,
-        cluster_version_t *thing,
-        const std::function<void()> &obsolete_cb);
+        cluster_version_t *out) noexcept;
 
 MUST_USE archive_result_t deserialize_reql_version(
         read_stream_t *s, reql_version_t *thing,

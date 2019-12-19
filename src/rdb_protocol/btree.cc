@@ -1839,26 +1839,32 @@ void deserialize_sindex_info(
     // This cluster version field is _not_ a ReQL evaluation version field, which is
     // in secondary_index_t -- it only says how the value was serialized.
     cluster_version_t cluster_version;
+    // TODO: Um, LOL vvv.
     static_assert(obsolete_cluster_version_t::v1_13_2_is_latest
                   == obsolete_cluster_version_t::v1_13_2,
                   "1.13 is no longer the only obsolete cluster version.  "
                   "Instead of passing a constant obsolete_reql_version_t::v1_13 into "
                   "`obsolete_cb` below, there should be a separate `obsolete_cb` to "
                   "handle the different obsolete cluster versions.");
-    archive_result_t success;
 
-    try {
-        success = deserialize_cluster_version(
-            &read_stream,
-            &cluster_version,
-            std::bind(obsolete_cb, obsolete_reql_version_t::v1_13));
-
-    } catch (const archive_exc_t &e) {
-        rfail_toplevel(ql::base_exc_t::INTERNAL,
-                       "Unrecognized secondary index version,"
-                       " secondary index not created.");
+    {
+        cluster_version_result_t res = deserialize_cluster_version(&read_stream, &cluster_version);
+        switch (res) {
+        case cluster_version_result_t::OBSOLETE_CLUSTER_VERSION:
+            obsolete_cb(obsolete_reql_version_t::v1_13);
+            crash("obsolete_cb should have crashed or thrown");
+        case cluster_version_result_t::UNRECOGNIZED_CLUSTER_VERSION:
+            rfail_toplevel(ql::base_exc_t::INTERNAL,
+                    "Unrecognized secondary index version,"
+                    " secondary index not created.");
+        case cluster_version_result_t::SUCCESS:
+        case cluster_version_result_t::SOCK_ERROR:
+        case cluster_version_result_t::SOCK_EOF:
+        case cluster_version_result_t::INT8_RANGE_ERROR:
+        default:
+            throw_if_bad_deserialization(static_cast<archive_result_t>(res), "sindex description");
+        }
     }
-    throw_if_bad_deserialization(success, "sindex description");
 
     switch (cluster_version) {
     case cluster_version_t::v1_14:
@@ -1869,8 +1875,8 @@ void deserialize_sindex_info(
     case cluster_version_t::v2_2:
     case cluster_version_t::v2_3:
     case cluster_version_t::v2_4:
-    case cluster_version_t::v2_5_is_latest:
-        success = deserialize_reql_version(
+    case cluster_version_t::v2_5_is_latest: {
+        archive_result_t success = deserialize_reql_version(
                 &read_stream,
                 &info_out->mapping_version_info.original_reql_version,
                 obsolete_cb);
@@ -1885,12 +1891,12 @@ void deserialize_sindex_info(
                 &read_stream,
                 &info_out->mapping_version_info.latest_checked_reql_version);
         throw_if_bad_deserialization(success, "latest_checked_reql_version");
-        break;
+    } break;
     default:
         unreachable();
     }
 
-    success = deserialize_for_version(cluster_version,
+    archive_result_t success = deserialize_for_version(cluster_version,
         &read_stream, &info_out->mapping);
     throw_if_bad_deserialization(success, "sindex description");
 
