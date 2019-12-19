@@ -284,10 +284,9 @@ void serialize_sindex_info(write_message_t *wm,
 
 // Note that the behavior for how this reacts to obsolete indexes is controlled
 // by the `outdated_cb`.  All other errors will throw an `archive_exc_t`.
-void deserialize_sindex_info(
+MUST_USE optional<obsolete_reql_version_t> deserialize_sindex_info(
         const std::vector<char> &data,
-        sindex_disk_info_t *info_out,
-        const std::function<void(obsolete_reql_version_t)> &obsolete_cb);
+        sindex_disk_info_t *info_out);
 
 // Utility function that will call deserialize_sindex_info with an `obsolete_cb`
 // that will `fail_due_to_user_error` when an obsolete index is encountered.

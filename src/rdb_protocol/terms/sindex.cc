@@ -55,26 +55,28 @@ sindex_config_t sindex_config_from_string(
     std::vector<char> vec(data + prefix_sz, data + sz);
     sindex_disk_info_t sindex_info;
     try {
-        deserialize_sindex_info(vec, &sindex_info,
-            [target](obsolete_reql_version_t ver) {
-                switch (ver) {
-                case obsolete_reql_version_t::v1_13:
-                    rfail_target(target, base_exc_t::LOGIC,
-                                 "Attempted to import a RethinkDB 1.13 secondary index, "
-                                 "which is no longer supported.  This secondary index "
-                                 "may be updated by importing into RethinkDB 2.0.");
-                    break;
-                // v1_15 is equal to v1_14
-                case obsolete_reql_version_t::v1_14:
-                    rfail_target(target, base_exc_t::LOGIC,
-                                 "Attempted to import a secondary index from before "
-                                 "RethinkDB 1.16, which is no longer supported.  This "
-                                 "secondary index may be updated by importing into "
-                                 "RethinkDB 2.1.");
-                    break;
-                default: unreachable();
-                }
-            });
+        optional<obsolete_reql_version_t> res = deserialize_sindex_info(vec, &sindex_info);
+        if (res.has_value()) {
+            obsolete_reql_version_t ver = *res;
+            switch (ver) {
+            case obsolete_reql_version_t::v1_13:
+                rfail_target(target, base_exc_t::LOGIC,
+                                "Attempted to import a RethinkDB 1.13 secondary index, "
+                                "which is no longer supported.  This secondary index "
+                                "may be updated by importing into RethinkDB 2.0.");
+                break;
+            // v1_15 is equal to v1_14
+            case obsolete_reql_version_t::v1_15_is_latest:
+                rfail_target(target, base_exc_t::LOGIC,
+                                "Attempted to import a secondary index from before "
+                                "RethinkDB 1.16, which is no longer supported.  This "
+                                "secondary index may be updated by importing into "
+                                "RethinkDB 2.1.");
+                break;
+            default:
+                unreachable();
+            }
+        }
     } catch (const archive_exc_t &e) {
         rfail_target(
             target,

@@ -39,8 +39,9 @@ reql_version_result_t deserialize_reql_version(
     *out = reql_version_t::LATEST;
     int8_t raw;
     archive_result_t res = deserialize_universal(s, &raw);
+    obsolete_reql_version_t FAKE = static_cast<obsolete_reql_version_t>(-1);
     if (bad(res)) {
-        return reql_version_result_t{static_cast<cluster_version_result_t>(res)};
+        return reql_version_result_t{static_cast<cluster_version_result_t>(res), FAKE};
     }
     if (raw < static_cast<int8_t>(reql_version_t::EARLIEST)) {
         if (raw >= static_cast<int8_t>(obsolete_reql_version_t::EARLIEST)
@@ -50,16 +51,16 @@ reql_version_result_t deserialize_reql_version(
                 static_cast<obsolete_reql_version_t>(raw)
             };
         } else {
-            return reql_version_result_t{cluster_version_result_t::UNRECOGNIZED_VERSION};
+            return reql_version_result_t{cluster_version_result_t::UNRECOGNIZED_VERSION, FAKE};
         }
     } else {
         // This is the same rassert in `ARCHIVE_PRIM_MAKE_RANGED_SERIALIZABLE`.
         if (raw >= static_cast<int8_t>(reql_version_t::EARLIEST)
                 && raw <= static_cast<int8_t>(reql_version_t::LATEST)) {
             *out = static_cast<reql_version_t>(raw);
-            return reql_version_result_t{cluster_version_result_t::SUCCESS};
+            return reql_version_result_t{cluster_version_result_t::SUCCESS, FAKE};
         } else {
-            return reql_version_result_t{cluster_version_result_t::UNRECOGNIZED_VERSION};
+            return reql_version_result_t{cluster_version_result_t::UNRECOGNIZED_VERSION, FAKE};
         }
     }
 }
