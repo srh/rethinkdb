@@ -1,8 +1,6 @@
 #ifndef CONTAINERS_ARCHIVE_VERSIONED_HPP_
 #define CONTAINERS_ARCHIVE_VERSIONED_HPP_
 
-#include <functional>
-
 #include "containers/archive/archive.hpp"
 #include "version.hpp"
 
@@ -22,24 +20,29 @@ inline void serialize_cluster_version(write_message_t *wm, cluster_version_t v) 
     serialize<cluster_version_t::LATEST_OVERALL>(wm, raw);
 }
 
-// This is a (hopefully) temporary type designed to pick apart the cluster
-// version deserialization failure modes.
+// Same values as archive_result_t.  Maybe UNRECOGNIZED_VERSION should get folded
+// into RANGE_ERROR (which is impossible when deserializing an INT8, fwiw).
 enum class cluster_version_result_t {
     SUCCESS,
     SOCK_ERROR,
     SOCK_EOF,
     INT8_RANGE_ERROR,
-    OBSOLETE_CLUSTER_VERSION,  // This would call obsolete_cb which would crash or throw.
-    UNRECOGNIZED_CLUSTER_VERSION,  // This previously threw an archive_exc_t.
+    OBSOLETE_VERSION,  // This would call obsolete_cb which would crash or throw.
+    UNRECOGNIZED_VERSION,  // This previously threw an archive_exc_t.
+};
+
+struct reql_version_result_t {
+    cluster_version_result_t code;
+    // If code is OBSOLETE_VERSION, this field gets used.
+    obsolete_reql_version_t obsolete_version;
 };
 
 MUST_USE cluster_version_result_t deserialize_cluster_version(
         read_stream_t *s,
         cluster_version_t *out) noexcept;
 
-MUST_USE archive_result_t deserialize_reql_version(
-        read_stream_t *s, reql_version_t *thing,
-        const std::function<void(obsolete_reql_version_t)> &obsolete_cb);
+MUST_USE reql_version_result_t deserialize_reql_version(
+        read_stream_t *s, reql_version_t *thing);
 
 template <class T>
 void serialize_for_cluster(write_message_t *wm, const T &value) {

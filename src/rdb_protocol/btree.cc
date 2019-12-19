@@ -1850,10 +1850,10 @@ void deserialize_sindex_info(
     {
         cluster_version_result_t res = deserialize_cluster_version(&read_stream, &cluster_version);
         switch (res) {
-        case cluster_version_result_t::OBSOLETE_CLUSTER_VERSION:
+        case cluster_version_result_t::OBSOLETE_VERSION:
             obsolete_cb(obsolete_reql_version_t::v1_13);
             crash("obsolete_cb should have crashed or thrown");
-        case cluster_version_result_t::UNRECOGNIZED_CLUSTER_VERSION:
+        case cluster_version_result_t::UNRECOGNIZED_VERSION:
             rfail_toplevel(ql::base_exc_t::INTERNAL,
                     "Unrecognized secondary index version,"
                     " secondary index not created.");
@@ -1876,12 +1876,25 @@ void deserialize_sindex_info(
     case cluster_version_t::v2_3:
     case cluster_version_t::v2_4:
     case cluster_version_t::v2_5_is_latest: {
-        archive_result_t success = deserialize_reql_version(
+        reql_version_result_t res = deserialize_reql_version(
                 &read_stream,
-                &info_out->mapping_version_info.original_reql_version,
-                obsolete_cb);
-        throw_if_bad_deserialization(success, "original_reql_version");
-        success = deserialize_for_version(
+                &info_out->mapping_version_info.original_reql_version);
+        switch (res.code) {
+        case cluster_version_result_t::OBSOLETE_VERSION:
+            obsolete_cb(res.obsolete_version);
+            crash("obsolete_cb should have crashed or thrown");
+        case cluster_version_result_t::UNRECOGNIZED_VERSION:
+            rfail_toplevel(ql::base_exc_t::INTERNAL,
+                "Unrecognized secondary index version,"
+                " secondary index not created.");
+        case cluster_version_result_t::SUCCESS:
+        case cluster_version_result_t::SOCK_ERROR:
+        case cluster_version_result_t::SOCK_EOF:
+        case cluster_version_result_t::INT8_RANGE_ERROR:
+        default:
+            throw_if_bad_deserialization(static_cast<archive_result_t>(res.code), "sindex description");
+        }
+        archive_result_t success = deserialize_for_version(
                 cluster_version,
                 &read_stream,
                 &info_out->mapping_version_info.latest_compatible_reql_version);
