@@ -3,7 +3,7 @@
 
 #include "rocksdb/write_batch.h"
 
-#include "btree/secondary_operations.hpp"
+#include "rdb_protocol/secondary_operations.hpp"
 #include "clustering/immediate_consistency/version.hpp"
 #include "rockstore/store.hpp"
 

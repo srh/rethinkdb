@@ -1,5 +1,5 @@
 // Copyright 2010-2014 RethinkDB, all rights reserved.
-#include "btree/secondary_operations.hpp"
+#include "rdb_protocol/secondary_operations.hpp"
 
 #include "rocksdb/options.h"
 

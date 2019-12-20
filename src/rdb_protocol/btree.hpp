@@ -232,53 +232,6 @@ struct rdb_modification_report_t {
 
 RDB_DECLARE_SERIALIZABLE(rdb_modification_report_t);
 
-// The query evaluation reql version information that we store with each secondary
-// index function.
-struct sindex_reql_version_info_t {
-    // Generally speaking, original_reql_version <= latest_compatible_reql_version <=
-    // latest_checked_reql_version.  When a new sindex is created, the values are the
-    // same.  When a new version of RethinkDB gets run, latest_checked_reql_version
-    // will get updated, and latest_compatible_reql_version will get updated if the
-    // sindex function is compatible with a later version than the original value of
-    // `latest_checked_reql_version`.
-
-    // The original ReQL version of the sindex function.  The value here never
-    // changes.  This might become useful for tracking down some bugs or fixing them
-    // in-place, or performing a desperate reverse migration.
-    importable_reql_version_t original_reql_version;
-
-    // This is the latest version for which evaluation of the sindex function remains
-    // compatible.
-    reql_version_t latest_compatible_reql_version;
-
-    // If this is less than the current server version, we'll re-check
-    // opaque_definition for compatibility and update this value and
-    // `latest_compatible_reql_version` accordingly.
-    reql_version_t latest_checked_reql_version;
-
-    // To be used for new secondary indexes.
-    static sindex_reql_version_info_t LATEST() {
-        sindex_reql_version_info_t ret = { importable_reql_version_t::LATEST,
-                                           reql_version_t::LATEST,
-                                           reql_version_t::LATEST };
-        return ret;
-    }
-};
-
-struct sindex_disk_info_t {
-    sindex_disk_info_t() { }
-    sindex_disk_info_t(const ql::map_wire_func_t &_mapping,
-                       const sindex_reql_version_info_t &_mapping_version_info,
-                       sindex_multi_bool_t _multi,
-                       sindex_geo_bool_t _geo) :
-        mapping(_mapping), mapping_version_info(_mapping_version_info),
-        multi(_multi), geo(_geo) { }
-    ql::map_wire_func_t mapping;
-    sindex_reql_version_info_t mapping_version_info;
-    sindex_multi_bool_t multi;
-    sindex_geo_bool_t geo;
-};
-
 void serialize_sindex_info(write_message_t *wm,
                            const sindex_disk_info_t &info);
 

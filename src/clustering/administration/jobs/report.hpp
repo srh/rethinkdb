@@ -5,7 +5,6 @@
 #include <string>
 
 #include "arch/address.hpp"
-#include "btree/secondary_operations.hpp"
 #include "clustering/administration/auth/user_context.hpp"
 #include "clustering/administration/datum_adapter.hpp"
 #include "concurrency/signal.hpp"

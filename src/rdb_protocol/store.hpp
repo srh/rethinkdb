@@ -7,7 +7,7 @@
 #include <string>
 #include <vector>
 
-#include "btree/secondary_operations.hpp"
+#include "rdb_protocol/secondary_operations.hpp"
 #include "buffer_cache/types.hpp"
 #include "concurrency/auto_drainer.hpp"
 #include "concurrency/queue/disk_backed_queue_wrapper.hpp"

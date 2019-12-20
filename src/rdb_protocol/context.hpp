@@ -8,6 +8,7 @@
 #include <string>
 #include <vector>
 
+#include "rdb_protocol/secondary_operations.hpp"
 #include "concurrency/one_per_thread.hpp"
 #include "concurrency/promise.hpp"
 #include "concurrency/watchable.hpp"
@@ -61,14 +62,6 @@ class name_string_t;
 class namespace_interface_t;
 template <class> class cross_thread_watchable_variable_t;
 template <class> class semilattice_read_view_t;
-
-enum class sindex_multi_bool_t { SINGLE = 0, MULTI = 1};
-enum class sindex_geo_bool_t { REGULAR = 0, GEO = 1};
-
-ARCHIVE_PRIM_MAKE_RANGED_SERIALIZABLE(sindex_multi_bool_t, int8_t,
-        sindex_multi_bool_t::SINGLE, sindex_multi_bool_t::MULTI);
-ARCHIVE_PRIM_MAKE_RANGED_SERIALIZABLE(sindex_geo_bool_t, int8_t,
-        sindex_geo_bool_t::REGULAR, sindex_geo_bool_t::GEO);
 
 class sindex_config_t {
 public:
