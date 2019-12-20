@@ -66,7 +66,7 @@ template <class> class semilattice_read_view_t;
 class sindex_config_t {
 public:
     sindex_config_t() { }
-    sindex_config_t(const ql::map_wire_func_t &_func, importable_reql_version_t _func_version,
+    sindex_config_t(const ql::map_wire_func_t &_func, reql_version_t _func_version,
             sindex_multi_bool_t _multi, sindex_geo_bool_t _geo) :
         func(_func), func_version(_func_version), multi(_multi), geo(_geo) { }
 
@@ -76,7 +76,7 @@ public:
     }
 
     ql::map_wire_func_t func;
-    importable_reql_version_t func_version;
+    reql_version_t func_version;
     sindex_multi_bool_t multi;
     sindex_geo_bool_t geo;
 };

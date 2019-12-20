@@ -203,7 +203,8 @@ sindex_config_t sindex_config_from_string(
         throw_if_bad_deserialization(target, success, "latest_checked_reql_version");
 
         // But no matter how it deserializes, we set the reql version to latest.
-        sindex_config.func_version = importable_reql_version_t::LATEST;
+        // In the future, we might have to do some conversions for compatibility.
+        sindex_config.func_version = reql_version_t::LATEST;
 
         success = deserialize_for_version(cluster_version, &read_stream, &sindex_config.func);
         if (bad(success)) {
@@ -326,10 +327,6 @@ public:
                 datum_t d = v->as_datum();
                 if (d.get_type() == datum_t::R_BINARY) {
                     config = sindex_config_from_string(d.as_binary(), v.get());
-                    // We ignore the sindex's old `reql_version` and make the new version
-                    // just be `reql_version_t::LATEST`; but in the future we may have
-                    // to do some conversions for compatibility.
-                    config.func_version = importable_reql_version_t::LATEST;
                     got_func = true;
                 }
             }
@@ -337,7 +334,7 @@ public:
             // a type error asking for a function rather than BINARY.
             if (!got_func) {
                 config.func = ql::map_wire_func_t(v->as_func());
-                config.func_version = importable_reql_version_t::LATEST;
+                config.func_version = reql_version_t::LATEST;
             }
         } else {
             minidriver_t r(backtrace());
@@ -349,7 +346,7 @@ public:
                                           r.fun(x, r.var(x)[name_datum]).root_term());
 
             config.func = ql::map_wire_func_t(func_term_term->eval_to_func(env->scope));
-            config.func_version = importable_reql_version_t::LATEST;
+            config.func_version = reql_version_t::LATEST;
         }
 
         config.func.compile_wire_func()->assert_deterministic(

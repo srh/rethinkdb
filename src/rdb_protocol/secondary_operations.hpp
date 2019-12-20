@@ -30,7 +30,7 @@ struct sindex_reql_version_info_t {
     // The original ReQL version of the sindex function.  The value here never
     // changes.  This might become useful for tracking down some bugs or fixing them
     // in-place, or performing a desperate reverse migration.
-    importable_reql_version_t original_reql_version;
+    reql_version_t original_reql_version;
 
     // This is the latest version for which evaluation of the sindex function remains
     // compatible.
@@ -43,7 +43,7 @@ struct sindex_reql_version_info_t {
 
     // To be used for new secondary indexes.
     static sindex_reql_version_info_t LATEST() {
-        sindex_reql_version_info_t ret = { importable_reql_version_t::LATEST,
+        sindex_reql_version_info_t ret = { reql_version_t::LATEST,
                                            reql_version_t::LATEST,
                                            reql_version_t::LATEST };
         return ret;
