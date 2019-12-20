@@ -104,10 +104,7 @@ struct secondary_index_t {
         return post_construction_complete() && !being_deleted;
     }
 
-    /* An opaque blob that describes the index.  See serialize_sindex_info and
-     deserialize_sindex_info.  At one point it contained a serialized map_wire_func_t
-     and a sindex_multi_bool_t.  Now it also contains reql version info.  (This being
-     a std::vector<char> is a holdover from when we had multiple protocols.) */
+    /* Contains the ReQL info defining sindex query behavior. */
     sindex_disk_info_t definition;
 
     /* Sindexes contain a uuid_u to prevent a rapid deletion and recreation of

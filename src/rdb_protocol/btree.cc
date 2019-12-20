@@ -1982,32 +1982,6 @@ optional<obsolete_reql_version_t> deserialize_sindex_info(
     return r_nullopt;
 }
 
-void deserialize_sindex_info_or_crash(
-        const std::vector<char> &data,
-        sindex_disk_info_t *info_out)
-            THROWS_ONLY(archive_exc_t) {
-    optional<obsolete_reql_version_t> res = deserialize_sindex_info(data, info_out);
-    if (res.has_value()) {
-        obsolete_reql_version_t ver = *res;
-        switch (ver) {
-        case obsolete_reql_version_t::v1_13:
-            fail_due_to_user_error("Encountered a RethinkDB 1.13 secondary index, "
-                                    "which is no longer supported.  You can use "
-                                    "RethinkDB 2.0.5 to update your secondary index.");
-            break;
-        // v1_15 is equal to v1_14
-        case obsolete_reql_version_t::v1_15_is_latest:
-            fail_due_to_user_error("Encountered an index from before RethinkDB "
-                                    "1.16, which is no longer supported.  You can "
-                                    "use RethinkDB 2.1 to update your secondary "
-                                    "index.");
-            break;
-        default:
-            unreachable();
-        }
-    }
-}
-
 /* Used below by rdb_update_sindexes. */
 void rdb_update_single_sindex(
         rockshard rocksh,

@@ -252,13 +252,6 @@ MUST_USE optional<obsolete_reql_version_t> deserialize_sindex_info(
         const std::vector<char> &data,
         sindex_disk_info_t *info_out) THROWS_ONLY(archive_exc_t);
 
-// Utility function that will call deserialize_sindex_info with an `obsolete_cb`
-// that will `fail_due_to_user_error` when an obsolete index is encountered.
-void deserialize_sindex_info_or_crash(
-        const std::vector<char> &data,
-        sindex_disk_info_t *info_out)
-    THROWS_ONLY(archive_exc_t);
-
 /* An rdb_modification_cb_t is passed to BTree operations and allows them to
  * modify the secondary while they perform an operation. */
 class superblock_queue_t;

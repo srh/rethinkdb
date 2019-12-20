@@ -791,27 +791,6 @@ void store_t::drop_sindex(uuid_u sindex_id) THROWS_NOTHING {
     txn->commit(rocks, std::move(superblock));
 }
 
-bool secondary_indexes_are_equivalent(const std::vector<char> &left,
-                                      const std::vector<char> &right) {
-    sindex_disk_info_t sindex_info_left;
-    sindex_disk_info_t sindex_info_right;
-    deserialize_sindex_info_or_crash(left, &sindex_info_left);
-    deserialize_sindex_info_or_crash(right, &sindex_info_right);
-
-    if (sindex_info_left.multi == sindex_info_right.multi &&
-        sindex_info_left.geo == sindex_info_right.geo &&
-        sindex_info_left.mapping_version_info.original_reql_version ==
-            sindex_info_right.mapping_version_info.original_reql_version) {
-        // Need to determine if the mapping function is the same, re-serialize them
-        // and compare the vectors
-        std::vector<char> serialized_left = serialize_for_cluster_to_vector(sindex_info_left.mapping);
-        std::vector<char> serialized_right = serialize_for_cluster_to_vector(sindex_info_right.mapping);
-        return serialized_left == serialized_right;
-    }
-
-    return false;
-}
-
 std::map<sindex_name_t, secondary_index_t> store_t::get_sindexes() const {
     assert_thread();
 
