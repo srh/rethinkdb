@@ -232,26 +232,6 @@ struct rdb_modification_report_t {
 
 RDB_DECLARE_SERIALIZABLE(rdb_modification_report_t);
 
-void serialize_sindex_info(write_message_t *wm,
-                           const sindex_disk_info_t &info);
-
-class archive_exc_t : public std::exception {
-public:
-    explicit archive_exc_t(std::string _s) : s(std::move(_s)) { }
-    ~archive_exc_t() throw () { }
-    const char *what() const throw() {
-        return s.c_str();
-    }
-private:
-    std::string s;
-};
-
-// Note that the behavior for how this reacts to obsolete indexes is controlled
-// by the `outdated_cb`.  All other errors will throw an `archive_exc_t`.
-MUST_USE optional<obsolete_reql_version_t> deserialize_sindex_info(
-        const std::vector<char> &data,
-        sindex_disk_info_t *info_out) THROWS_ONLY(archive_exc_t);
-
 /* An rdb_modification_cb_t is passed to BTree operations and allows them to
  * modify the secondary while they perform an operation. */
 class superblock_queue_t;
