@@ -57,145 +57,24 @@ reql_version_result_t deserialize_importable_reql_version(
     }
 }
 
-class archive_exc_t : public std::exception {
-public:
-    explicit archive_exc_t(std::string _s) : s(std::move(_s)) { }
-    ~archive_exc_t() throw () { }
-    const char *what() const throw() {
-        return s.c_str();
-    }
-private:
-    std::string s;
-};
-
-void serialize_sindex_info(write_message_t *wm,
-                           const sindex_disk_info_t &info) {
-    serialize_cluster_version(wm, cluster_version_t::LATEST_DISK);
-    serialize<cluster_version_t::LATEST_DISK>(
-        wm, info.mapping_version_info.original_reql_version);
-    serialize<cluster_version_t::LATEST_DISK>(
-        wm, info.mapping_version_info.latest_compatible_reql_version);
-    serialize<cluster_version_t::LATEST_DISK>(
-        wm, info.mapping_version_info.latest_checked_reql_version);
-
-    serialize<cluster_version_t::LATEST_DISK>(wm, info.mapping);
-    serialize<cluster_version_t::LATEST_DISK>(wm, info.multi);
-    serialize<cluster_version_t::LATEST_DISK>(wm, info.geo);
+std::string bad_deserialization_message(archive_result_t res, const char *thing) {
+    std::string ret = "Deserialization of ";
+    ret += thing;
+    ret += " failed with error ";
+    ret += archive_result_as_str(res);
+    return ret;
 }
 
-#define throw_if_bad_deserialization(result, ...) do { \
-        if ((result) != archive_result_t::SUCCESS) { \
-            throw archive_exc_t( \
-                strprintf("Deserialization of %s failed with error %s.", \
-                          strprintf(__VA_ARGS__).c_str(), \
-                          archive_result_as_str((result)))); \
-        } \
-    } while (0)
-
-optional<obsolete_reql_version_t> deserialize_sindex_info(
-        const std::vector<char> &data,
-        sindex_disk_info_t *info_out) THROWS_ONLY(archive_exc_t) {
-    buffer_read_stream_t read_stream(data.data(), data.size());
-    // This cluster version field is _not_ a ReQL evaluation version field, which is
-    // in secondary_index_t -- it only says how the value was serialized.
-    cluster_version_t cluster_version;
-    static_assert(obsolete_cluster_version_t::v1_13_2_is_latest
-                  == obsolete_cluster_version_t::v1_13_2,
-                  "1.13 is no longer the only obsolete cluster version.  "
-                  "Instead of passing a constant obsolete_reql_version_t::v1_13 into "
-                  "`obsolete_cb` below, there should be a separate `obsolete_cb` to "
-                  "handle the different obsolete cluster versions.");
-
-    {
-        cluster_version_result_t res = deserialize_cluster_version(&read_stream, &cluster_version);
-        switch (res) {
-        case cluster_version_result_t::OBSOLETE_VERSION:
-            // Cluster versions v1_13 and v1_13_2 both have reql version v1_13.
-            return make_optional(obsolete_reql_version_t::v1_13);
-        case cluster_version_result_t::UNRECOGNIZED_VERSION:
-            rfail_toplevel(ql::base_exc_t::INTERNAL,
-                    "Unrecognized secondary index version,"
-                    " secondary index not created.");
-        case cluster_version_result_t::SUCCESS:
-        case cluster_version_result_t::SOCK_ERROR:
-        case cluster_version_result_t::SOCK_EOF:
-        case cluster_version_result_t::INT8_RANGE_ERROR:
-        default:
-            throw_if_bad_deserialization(static_cast<archive_result_t>(res), "sindex description");
-        }
+void throw_if_bad_deserialization(rcheckable_t *target, archive_result_t res, const char *thing) {
+    if (bad(res)) {
+        rfail_target(
+            (target),
+            base_exc_t::LOGIC,
+            "Binary blob passed to index create could not be interpreted as a "
+            "reql_index_function (%s).",
+            bad_deserialization_message(res, thing).c_str());
     }
-
-    switch (cluster_version) {
-    case cluster_version_t::v1_14:
-    case cluster_version_t::v1_15:
-    case cluster_version_t::v1_16:
-    case cluster_version_t::v2_0:
-    case cluster_version_t::v2_1:
-    case cluster_version_t::v2_2:
-    case cluster_version_t::v2_3:
-    case cluster_version_t::v2_4:
-    case cluster_version_t::v2_5_is_latest: {
-        reql_version_result_t res = deserialize_importable_reql_version(
-                &read_stream,
-                &info_out->mapping_version_info.original_reql_version);
-        switch (res.code) {
-        case cluster_version_result_t::OBSOLETE_VERSION:
-            return make_optional(res.obsolete_version);
-        case cluster_version_result_t::UNRECOGNIZED_VERSION:
-            rfail_toplevel(ql::base_exc_t::INTERNAL,
-                "Unrecognized secondary index version,"
-                " secondary index not created.");
-        case cluster_version_result_t::SUCCESS:
-        case cluster_version_result_t::SOCK_ERROR:
-        case cluster_version_result_t::SOCK_EOF:
-        case cluster_version_result_t::INT8_RANGE_ERROR:
-        default:
-            throw_if_bad_deserialization(static_cast<archive_result_t>(res.code), "sindex description");
-        }
-        archive_result_t success = deserialize_for_version(
-                cluster_version,
-                &read_stream,
-                &info_out->mapping_version_info.latest_compatible_reql_version);
-        throw_if_bad_deserialization(success, "latest_compatible_reql_version");
-        success = deserialize_for_version(
-                cluster_version,
-                &read_stream,
-                &info_out->mapping_version_info.latest_checked_reql_version);
-        throw_if_bad_deserialization(success, "latest_checked_reql_version");
-    } break;
-    default:
-        unreachable();
-    }
-
-    archive_result_t success = deserialize_for_version(cluster_version,
-        &read_stream, &info_out->mapping);
-    throw_if_bad_deserialization(success, "sindex description");
-
-    success = deserialize_for_version(cluster_version, &read_stream, &info_out->multi);
-    throw_if_bad_deserialization(success, "sindex description");
-    switch (cluster_version) {
-    case cluster_version_t::v1_14:
-        info_out->geo = sindex_geo_bool_t::REGULAR;
-        break;
-    case cluster_version_t::v1_15: // fallthru
-    case cluster_version_t::v1_16: // fallthru
-    case cluster_version_t::v2_0: // fallthru
-    case cluster_version_t::v2_1: // fallthru
-    case cluster_version_t::v2_2: // fallthru
-    case cluster_version_t::v2_3: // fallthru
-    case cluster_version_t::v2_4: // fallthru
-    case cluster_version_t::v2_5_is_latest:
-        success = deserialize_for_version(cluster_version, &read_stream, &info_out->geo);
-        throw_if_bad_deserialization(success, "sindex description");
-        break;
-    default: unreachable();
-    }
-    if (static_cast<size_t>(read_stream.tell()) != data.size()) {
-        throw archive_exc_t("An sindex description was incompletely deserialized.");
-    }
-    return r_nullopt;
 }
-
 
 /* `sindex_config_to_string` produces the string that goes in the `function` field of
 `sindex_status()`. `sindex_config_from_string()` parses that string when it's passed to
@@ -204,28 +83,40 @@ optional<obsolete_reql_version_t> deserialize_sindex_info(
 const char sindex_blob_prefix[] = "$reql_index_function$";
 
 datum_string_t sindex_config_to_string(const sindex_config_t &config) {
-    sindex_reql_version_info_t version;
-    // TODO: sindex_config_t and user-exported sindex_config_t should be distinct types (sindex_config_t should use reql_version_t).
-    version.original_reql_version = config.func_version;
-    version.latest_compatible_reql_version = static_cast<reql_version_t>(config.func_version);
-    version.latest_checked_reql_version = reql_version_t::LATEST;
-    sindex_disk_info_t disk_info(config.func, version, config.multi, config.geo);
-
-    write_message_t wm;
-    serialize_sindex_info(&wm, disk_info);
     string_stream_t stream;
     UNUSED int64_t res = stream.write(sindex_blob_prefix, strlen(sindex_blob_prefix));
+
+    write_message_t wm;
+    serialize_cluster_version(&wm, cluster_version_t::LATEST_DISK);
+    // Yes, we serialize it _twice_.  Really, _three times_.  We are maintaining
+    // compatibility with prior behavior, which serialized sinedx_disk_info_t,
+    // so that sindex configs can be imported (after being dumped from an older
+    // version database).
+    serialize<cluster_version_t::LATEST_DISK>(&wm, config.func_version);
+    serialize<cluster_version_t::LATEST_DISK>(&wm, config.func_version);
+    serialize<cluster_version_t::LATEST_DISK>(&wm, reql_version_t::LATEST);
+
+    serialize<cluster_version_t::LATEST_DISK>(&wm, config.func);
+    serialize<cluster_version_t::LATEST_DISK>(&wm, config.multi);
+    serialize<cluster_version_t::LATEST_DISK>(&wm, config.geo);
+
     DEBUG_VAR int write_res = send_write_message(&stream, &wm);
     rassert(write_res == 0);
     return datum_string_t(std::move(stream.str()));
 }
 
+void rfail_reql_v1_13(rcheckable_t *target) {
+    rfail_target(target, base_exc_t::LOGIC,
+        "Attempted to import a RethinkDB 1.13 secondary index, "
+        "which is no longer supported.  This secondary index "
+        "may be updated by importing into RethinkDB 2.0.");
+}
+
 sindex_config_t sindex_config_from_string(
         const datum_string_t &string, rcheckable_t *target) {
-    sindex_config_t config;
-    const char *data = string.data();
-    size_t sz = string.size();
-    size_t prefix_sz = strlen(sindex_blob_prefix);
+    const char *const data = string.data();
+    const size_t sz = string.size();
+    const size_t prefix_sz = strlen(sindex_blob_prefix);
     bool bad_prefix = (sz < prefix_sz);
     for (size_t i = 0; !bad_prefix && i < prefix_sz; ++i) {
         bad_prefix |= (data[i] != sindex_blob_prefix[i]);
@@ -236,44 +127,116 @@ sindex_config_t sindex_config_from_string(
         base_exc_t::LOGIC,
         "Cannot create an sindex except from a reql_index_function returned from "
         "`index_status` in the field `function`.");
-    std::vector<char> vec(data + prefix_sz, data + sz);
-    sindex_disk_info_t sindex_info;
-    try {
-        optional<obsolete_reql_version_t> res = deserialize_sindex_info(vec, &sindex_info);
-        if (res.has_value()) {
-            obsolete_reql_version_t ver = *res;
-            switch (ver) {
+
+    sindex_config_t sindex_config;
+    {
+        buffer_read_stream_t read_stream(data + prefix_sz, sz - prefix_sz);
+        cluster_version_t cluster_version;
+        cluster_version_result_t cv_res = deserialize_cluster_version(&read_stream, &cluster_version);
+        switch (cv_res) {
+        case cluster_version_result_t::OBSOLETE_VERSION:
+            rfail_reql_v1_13(target);
+            break;
+        case cluster_version_result_t::UNRECOGNIZED_VERSION:
+            rfail_toplevel(ql::base_exc_t::INTERNAL,
+                "Unrecognized secondary index version,"
+                " secondary index not created.");
+            break;
+        case cluster_version_result_t::SUCCESS:
+            // Do nothing, break.
+            break;
+        case cluster_version_result_t::SOCK_ERROR:
+        case cluster_version_result_t::SOCK_EOF:
+        case cluster_version_result_t::INT8_RANGE_ERROR:
+        default:
+            rfail_target(target,
+                base_exc_t::LOGIC,
+                "Binary blob passed to index create could not be interpreted as a "
+                "reql_index_function (%s).",
+                bad_deserialization_message(static_cast<archive_result_t>(cv_res), "sindex description").c_str());
+        }
+
+        // All we're really doing here is checking that it's importable and creating
+        // a friendlier message (than a generic deserialization result) if it's not.
+        importable_reql_version_t original_reql_version;
+        reql_version_result_t res = deserialize_importable_reql_version(
+                &read_stream,
+                &original_reql_version);
+        switch (res.code) {
+        case cluster_version_result_t::OBSOLETE_VERSION:
+            switch (res.obsolete_version) {
             case obsolete_reql_version_t::v1_13:
-                rfail_target(target, base_exc_t::LOGIC,
-                                "Attempted to import a RethinkDB 1.13 secondary index, "
-                                "which is no longer supported.  This secondary index "
-                                "may be updated by importing into RethinkDB 2.0.");
+                rfail_reql_v1_13(target);
                 break;
             // v1_15 is equal to v1_14
             case obsolete_reql_version_t::v1_15_is_latest:
                 rfail_target(target, base_exc_t::LOGIC,
-                                "Attempted to import a secondary index from before "
-                                "RethinkDB 1.16, which is no longer supported.  This "
-                                "secondary index may be updated by importing into "
-                                "RethinkDB 2.1.");
+                    "Attempted to import a secondary index from before "
+                    "RethinkDB 1.16, which is no longer supported.  This "
+                    "secondary index may be updated by importing into "
+                    "RethinkDB 2.1.");
                 break;
             default:
                 unreachable();
             }
+        case cluster_version_result_t::UNRECOGNIZED_VERSION:
+            rfail_toplevel(ql::base_exc_t::INTERNAL,
+                "Unrecognized secondary index version,"
+                " secondary index not created.");
+        case cluster_version_result_t::SUCCESS:
+        case cluster_version_result_t::SOCK_ERROR:
+        case cluster_version_result_t::SOCK_EOF:
+        case cluster_version_result_t::INT8_RANGE_ERROR:
+        default:
+            throw_if_bad_deserialization(target, static_cast<archive_result_t>(res.code), "sindex description");
         }
-    } catch (const archive_exc_t &e) {
-        rfail_target(
-            target,
-            base_exc_t::LOGIC,
-            "Binary blob passed to index create could not be interpreted as a "
-            "reql_index_function (%s).",
-            e.what());
+        importable_reql_version_t unused_version;
+        archive_result_t success = deserialize_for_version(
+                cluster_version,
+                &read_stream,
+                &unused_version);
+        throw_if_bad_deserialization(target, success, "latest_compatible_reql_version");
+        success = deserialize_for_version(
+                cluster_version,
+                &read_stream,
+                &unused_version);
+        throw_if_bad_deserialization(target, success, "latest_checked_reql_version");
+
+        // But no matter how it deserializes, we set the reql version to latest.
+        sindex_config.func_version = importable_reql_version_t::LATEST;
+
+        success = deserialize_for_version(cluster_version, &read_stream, &sindex_config.func);
+        if (bad(success)) {
+            throw_if_bad_deserialization(target, success, "sindex description");
+        }
+        success = deserialize_for_version(cluster_version, &read_stream, &sindex_config.multi);
+        throw_if_bad_deserialization(target, success, "sindex description");
+        switch (cluster_version) {
+        case cluster_version_t::v1_14:
+            sindex_config.geo = sindex_geo_bool_t::REGULAR;
+            break;
+        case cluster_version_t::v1_15: // fallthru
+        case cluster_version_t::v1_16: // fallthru
+        case cluster_version_t::v2_0: // fallthru
+        case cluster_version_t::v2_1: // fallthru
+        case cluster_version_t::v2_2: // fallthru
+        case cluster_version_t::v2_3: // fallthru
+        case cluster_version_t::v2_4: // fallthru
+        case cluster_version_t::v2_5_is_latest:
+            success = deserialize_for_version(cluster_version, &read_stream, &sindex_config.geo);
+            throw_if_bad_deserialization(target, success, "sindex description");
+            break;
+        default: unreachable();
+        }
+        if (static_cast<size_t>(read_stream.tell()) != read_stream.size()) {
+            rfail_target(
+                target,
+                base_exc_t::LOGIC,
+                "Binary blob passed to index create could not be interpreted as a reql_index function (%s).",
+                "The sindex description was incompletely deserialized.");
+        }
     }
-    return sindex_config_t(
-        sindex_info.mapping,
-        sindex_info.mapping_version_info.original_reql_version,
-        sindex_info.multi,
-        sindex_info.geo);
+    return sindex_config;
 }
 
 // Helper for `sindex_status_to_datum()`

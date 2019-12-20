@@ -7,7 +7,7 @@
 #include "containers/archive/archive.hpp"
 
 // Reads from a buffer without taking ownership over it
-class buffer_read_stream_t : public read_stream_t {
+class buffer_read_stream_t final : public read_stream_t {
 public:
     // Note: These are implemented in the header file because inlining them in
     // combination with `deserialize_varint_uint64()` yields significant performance
@@ -21,9 +21,9 @@ public:
         guarantee(pos_ >= 0);
         guarantee(static_cast<uint64_t>(pos_) <= size_);
     }
-    virtual ~buffer_read_stream_t() { }
+    ~buffer_read_stream_t() final { }
 
-    virtual MUST_USE int64_t read(void *p, int64_t n) {
+    MUST_USE int64_t read(void *p, int64_t n) final {
         int64_t num_left = size_ - pos_;
         int64_t num_to_read = n < num_left ? n : num_left;
 
@@ -35,6 +35,7 @@ public:
     }
 
     int64_t tell() const { return pos_; }
+    size_t size() const { return size_; }
 
 private:
     int64_t pos_;
