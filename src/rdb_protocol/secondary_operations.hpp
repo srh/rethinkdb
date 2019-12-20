@@ -50,6 +50,8 @@ struct sindex_reql_version_info_t {
     }
 };
 
+RDB_DECLARE_SERIALIZABLE(sindex_reql_version_info_t);
+
 enum class sindex_multi_bool_t { SINGLE = 0, MULTI = 1};
 enum class sindex_geo_bool_t { REGULAR = 0, GEO = 1};
 
@@ -71,6 +73,8 @@ struct sindex_disk_info_t {
     sindex_multi_bool_t multi;
     sindex_geo_bool_t geo;
 };
+
+RDB_DECLARE_SERIALIZABLE(sindex_disk_info_t);
 
 struct secondary_index_t {
     secondary_index_t()
@@ -104,7 +108,7 @@ struct secondary_index_t {
      deserialize_sindex_info.  At one point it contained a serialized map_wire_func_t
      and a sindex_multi_bool_t.  Now it also contains reql version info.  (This being
      a std::vector<char> is a holdover from when we had multiple protocols.) */
-    std::vector<char> opaque_definition;
+    sindex_disk_info_t definition;
 
     /* Sindexes contain a uuid_u to prevent a rapid deletion and recreation of
      * a sindex with the same name from tricking a post construction in to

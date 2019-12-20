@@ -127,21 +127,14 @@ ql::grouped_t<ql::stream_t> read_row_via_sindex(
 
     uuid_u sindex_uuid;
 
-    std::vector<char> opaque_definition;
+    sindex_disk_info_t sindex_info;
     bool sindex_exists = store->acquire_sindex_superblock_for_read(
             sindex_name,
             "",
             superblock.get(),
-            &opaque_definition,
+            &sindex_info,
             &sindex_uuid);
     guarantee(sindex_exists);
-
-    sindex_disk_info_t sindex_info;
-    try {
-        deserialize_sindex_info_or_crash(opaque_definition, &sindex_info);
-    } catch (const archive_exc_t &e) {
-        crash("%s", e.what());
-    }
 
     rget_read_response_t res;
     ql::datum_range_t datum_range(ql::datum_t(static_cast<double>(sindex_value)));

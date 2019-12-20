@@ -1812,6 +1812,48 @@ void compute_keys(const store_key_t &primary_key,
     }
 }
 
+
+struct reql_version_result_t {
+    cluster_version_result_t code;
+    // If code is OBSOLETE_VERSION, this field gets used.
+    obsolete_reql_version_t obsolete_version;
+};
+
+reql_version_result_t deserialize_importable_reql_version(
+        read_stream_t *s, importable_reql_version_t *out) {
+    // Initialize `out` to *something* because GCC 4.6.3 thinks that `thing`
+    // could be used uninitialized, even when the return value of this function
+    // is checked through `guarantee_deserialization()`.
+    // See https://github.com/rethinkdb/rethinkdb/issues/2640
+    *out = importable_reql_version_t::LATEST;
+    int8_t raw;
+    archive_result_t res = deserialize_universal(s, &raw);
+    obsolete_reql_version_t FAKE = static_cast<obsolete_reql_version_t>(-1);
+    if (bad(res)) {
+        return reql_version_result_t{static_cast<cluster_version_result_t>(res), FAKE};
+    }
+    if (raw < static_cast<int8_t>(reql_version_t::EARLIEST)) {
+        if (raw >= static_cast<int8_t>(obsolete_reql_version_t::EARLIEST)
+            && raw <= static_cast<int8_t>(obsolete_reql_version_t::LATEST)) {
+            return reql_version_result_t{
+                cluster_version_result_t::OBSOLETE_VERSION,
+                static_cast<obsolete_reql_version_t>(raw)
+            };
+        } else {
+            return reql_version_result_t{cluster_version_result_t::UNRECOGNIZED_VERSION, FAKE};
+        }
+    } else {
+        // This is the same rassert in `ARCHIVE_PRIM_MAKE_RANGED_SERIALIZABLE`.
+        if (raw >= static_cast<int8_t>(importable_reql_version_t::EARLIEST)
+                && raw <= static_cast<int8_t>(importable_reql_version_t::LATEST)) {
+            *out = static_cast<importable_reql_version_t>(raw);
+            return reql_version_result_t{cluster_version_result_t::SUCCESS, FAKE};
+        } else {
+            return reql_version_result_t{cluster_version_result_t::UNRECOGNIZED_VERSION, FAKE};
+        }
+    }
+}
+
 void serialize_sindex_info(write_message_t *wm,
                            const sindex_disk_info_t &info) {
     serialize_cluster_version(wm, cluster_version_t::LATEST_DISK);
@@ -1988,12 +2030,8 @@ void rdb_update_single_sindex(
     guarantee(cfeed_old_keys_out == nullptr || cfeed_old_keys_out->size() == 0);
     guarantee(cfeed_new_keys_out == nullptr || cfeed_new_keys_out->size() == 0);
 
-    sindex_disk_info_t sindex_info;
-    try {
-        deserialize_sindex_info_or_crash(sindex->sindex.opaque_definition, &sindex_info);
-    } catch (const archive_exc_t &e) {
-        crash("%s", e.what());
-    }
+    const sindex_disk_info_t &sindex_info = sindex->sindex.definition;
+
     // TODO(2015-01): Actually get real profiling information for
     // secondary index updates.
     UNUSED profile::trace_t *const trace = nullptr;

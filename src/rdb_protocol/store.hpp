@@ -202,7 +202,7 @@ public:
     // already existed.
     MUST_USE optional<uuid_u> add_sindex_internal(
         const sindex_name_t &name,
-        const std::vector<char> &opaque_definition,
+        const sindex_disk_info_t &definition,
         real_superblock_lock *sindex_block);
 
     std::map<sindex_name_t, secondary_index_t> get_sindexes() const;
@@ -217,7 +217,7 @@ public:
             const sindex_name_t &name,
             const std::string &table_name,
             real_superblock_lock *superblock,
-            std::vector<char> *opaque_definition_out,
+            sindex_disk_info_t *definition_out,
             uuid_u *sindex_uuid_out)
         THROWS_ONLY(sindex_not_ready_exc_t);
 

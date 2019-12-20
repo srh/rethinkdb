@@ -31,18 +31,9 @@ enum class cluster_version_result_t {
     UNRECOGNIZED_VERSION,  // This previously threw an archive_exc_t.
 };
 
-struct reql_version_result_t {
-    cluster_version_result_t code;
-    // If code is OBSOLETE_VERSION, this field gets used.
-    obsolete_reql_version_t obsolete_version;
-};
-
 MUST_USE cluster_version_result_t deserialize_cluster_version(
         read_stream_t *s,
         cluster_version_t *out) noexcept;
-
-MUST_USE reql_version_result_t deserialize_importable_reql_version(
-        read_stream_t *s, importable_reql_version_t *thing);
 
 template <class T>
 void serialize_for_cluster(write_message_t *wm, const T &value) {

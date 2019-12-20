@@ -115,13 +115,14 @@ void acquire_sindex_for_read(
 
     std::vector<char> sindex_mapping_data;
 
+    sindex_disk_info_t sindex_info;
     uuid_u sindex_uuid;
     try {
         bool found = store->acquire_sindex_superblock_for_read(
             sindex_name_t(sindex_id),
             table_name,
             superblock,
-            &sindex_mapping_data,
+            &sindex_info,
             &sindex_uuid);
         // TODO: consider adding some logic on the machine handling the
         // query to attach a real backtrace here.
@@ -133,12 +134,7 @@ void acquire_sindex_for_read(
             ql::base_exc_t::OP_FAILED, e.what(), ql::backtrace_id_t::empty());
     }
 
-    try {
-        deserialize_sindex_info_or_crash(sindex_mapping_data, sindex_info_out);
-    } catch (const archive_exc_t &e) {
-        crash("%s", e.what());
-    }
-
+    *sindex_info_out = sindex_info;
     *sindex_uuid_out = sindex_uuid;
 }
 

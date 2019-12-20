@@ -305,12 +305,7 @@ std::map<std::string, std::pair<sindex_config_t, sindex_status_t> > store_t::sin
             continue;
         }
         std::pair<sindex_config_t, sindex_status_t> *res = &results[pair.first.name];
-        sindex_disk_info_t disk_info;
-        try {
-            deserialize_sindex_info_or_crash(pair.second.opaque_definition, &disk_info);
-        } catch (const archive_exc_t &) {
-            crash("corrupted sindex definition");
-        }
+        const sindex_disk_info_t &disk_info = pair.second.definition;
 
         res->first.func = disk_info.mapping;
         res->first.func_version = disk_info.mapping_version_info.original_reql_version;
@@ -362,16 +357,9 @@ void store_t::sindex_create(
     version_info.latest_checked_reql_version = reql_version_t::LATEST;
     sindex_disk_info_t info(config.func, version_info, config.multi, config.geo);
 
-    write_message_t wm;
-    serialize_sindex_info(&wm, info);
-    vector_stream_t stream;
-    stream.reserve(wm.size());
-    int write_res = send_write_message(&stream, &wm);
-    guarantee(write_res == 0);
-
     sindex_name_t sindex_name(name);
     optional<uuid_u> sindex_id = add_sindex_internal(
-        sindex_name, stream.vector(), superblock.get());
+        sindex_name, info, superblock.get());
     guarantee(sindex_id, "sindex_create() called with a sindex name that exists");
 
     // Kick off index post construction
@@ -614,13 +602,13 @@ microtime_t store_t::get_sindex_start_time(uuid_u const &id) {
 
 optional<uuid_u> store_t::add_sindex_internal(
         const sindex_name_t &name,
-        const std::vector<char> &opaque_definition,
+        const sindex_disk_info_t &definition,
         real_superblock_lock *sindex_block) {
     secondary_index_t sindex;
     if (::get_secondary_index(rocksh(), sindex_block, name, &sindex)) {
         return r_nullopt; // sindex was already created
     } else {
-        sindex.opaque_definition = opaque_definition;
+        sindex.definition = definition;
 
         secondary_index_slices.insert(
                 std::make_pair(sindex.id,
@@ -869,11 +857,11 @@ MUST_USE bool store_t::acquire_sindex_superblock_for_read(
         const sindex_name_t &name,
         const std::string &table_name,
         real_superblock_lock *superblock,
-        std::vector<char> *opaque_definition_out,
+        sindex_disk_info_t *definition_out,
         uuid_u *sindex_uuid_out)
     THROWS_ONLY(sindex_not_ready_exc_t) {
     assert_thread();
-    rassert(opaque_definition_out != NULL);
+    rassert(definition_out != nullptr);
     rassert(sindex_uuid_out != NULL);
 
     /* Acquire the sindex block. */
@@ -885,7 +873,7 @@ MUST_USE bool store_t::acquire_sindex_superblock_for_read(
         return false;
     }
 
-    *opaque_definition_out = sindex.opaque_definition;
+    *definition_out = sindex.definition;
     *sindex_uuid_out = sindex.id;
 
     if (!sindex.is_ready()) {

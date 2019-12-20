@@ -10,11 +10,22 @@
 #include "containers/archive/vector_stream.hpp"
 #include "containers/archive/versioned.hpp"
 #include "debug.hpp"
+#include "protocol_api.hpp"
 #include "rockstore/store.hpp"
 #include "utils.hpp"
 
+RDB_IMPL_SERIALIZABLE_3_SINCE_v2_4(
+        sindex_reql_version_info_t, original_reql_version, latest_compatible_reql_version, latest_checked_reql_version
+);
+
+// TODO: We'll have to be precise with sindex_create.
 RDB_IMPL_SERIALIZABLE_4_SINCE_v2_4(
-        secondary_index_t, opaque_definition,
+        sindex_disk_info_t, mapping, mapping_version_info, multi, geo);
+
+
+
+RDB_IMPL_SERIALIZABLE_4_SINCE_v2_4(
+        secondary_index_t, definition,
         needs_post_construction_range, being_deleted, id);
 
 RDB_IMPL_SERIALIZABLE_2_SINCE_v1_13(sindex_name_t, name, being_deleted);
