@@ -201,7 +201,7 @@ optional<obsolete_reql_version_t> deserialize_sindex_info(
 `sindex_status()`. `sindex_config_from_string()` parses that string when it's passed to
 `sindex_create()`. */
 
-const char *const sindex_blob_prefix = "$reql_index_function$";
+const char sindex_blob_prefix[] = "$reql_index_function$";
 
 datum_string_t sindex_config_to_string(const sindex_config_t &config) {
     sindex_reql_version_info_t version;
@@ -214,9 +214,10 @@ datum_string_t sindex_config_to_string(const sindex_config_t &config) {
     write_message_t wm;
     serialize_sindex_info(&wm, disk_info);
     string_stream_t stream;
-    int write_res = send_write_message(&stream, &wm);
-    guarantee(write_res == 0);
-    return datum_string_t(sindex_blob_prefix + stream.str());
+    UNUSED int64_t res = stream.write(sindex_blob_prefix, strlen(sindex_blob_prefix));
+    DEBUG_VAR int write_res = send_write_message(&stream, &wm);
+    rassert(write_res == 0);
+    return datum_string_t(std::move(stream.str()));
 }
 
 sindex_config_t sindex_config_from_string(
