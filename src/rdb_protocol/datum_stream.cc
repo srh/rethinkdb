@@ -359,9 +359,6 @@ raw_stream_t rget_response_reader_t::unshard(
             stream, readgen->original_keyrange(), opt_shard_ids,
             readgen->sindex_name() ? is_secondary_t::YES : is_secondary_t::NO));
         readgen->restrict_active_ranges(sorting, &*active_ranges);
-        reql_version.set(res.reql_version);
-    } else {
-        r_sanity_check(make_optional(res.reql_version) == reql_version);
     }
 
     raw_stream_t ret;
@@ -548,7 +545,6 @@ optional<active_state_t> rget_response_reader_t::get_active_state() {
     }
     return make_optional(active_state_t{
         std::move(shard_last_read_stamps),
-        reql_version,
         DEBUG_ONLY(readgen->sindex_name())});
 }
 

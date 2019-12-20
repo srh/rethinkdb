@@ -123,12 +123,10 @@ RDB_DECLARE_SERIALIZABLE_FOR_CLUSTER(changefeed_stamp_response_t);
 struct rget_read_response_t {
     optional<changefeed_stamp_response_t> stamp_response;
     ql::result_t result;
-    reql_version_t reql_version;
 
-    rget_read_response_t()
-        : reql_version(reql_version_t::EARLIEST) { }
+    rget_read_response_t() { }
     explicit rget_read_response_t(const ql::exc_t &ex)
-        : result(ex), reql_version(reql_version_t::EARLIEST) { }
+        : result(ex) { }
 };
 RDB_DECLARE_SERIALIZABLE_FOR_CLUSTER(rget_read_response_t);
 

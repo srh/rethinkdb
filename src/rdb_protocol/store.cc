@@ -182,9 +182,6 @@ void do_snap_read(
                     rget.sindex->id,
                     &sindex_info,
                     &sindex_uuid);
-            reql_version_t reql_version =
-                sindex_info.mapping_version_info.latest_compatible_reql_version;
-            res->reql_version = reql_version;
             if (rget.sindex->region.has_value()) {
                 sindex_range = *rget.sindex->region;
             } else {
@@ -276,9 +273,6 @@ void do_read_for_changefeed(rockshard rocksh,
                     &sindex_info,
                     &sindex_uuid);
             *sindex_id_out = make_optional(sindex_uuid);
-            reql_version_t reql_version =
-                sindex_info.mapping_version_info.latest_compatible_reql_version;
-            res->reql_version = reql_version;
             if (rget.sindex->region.has_value()) {
                 sindex_range = *rget.sindex->region;
             } else {
@@ -540,8 +534,6 @@ struct rdb_read_visitor_t : public boost::static_visitor<void> {
             res->result = e;
             return;
         }
-        res->reql_version =
-            sindex_info.mapping_version_info.latest_compatible_reql_version;
 
         if (sindex_info.geo != sindex_geo_bool_t::GEO) {
             res->result = ql::exc_t(

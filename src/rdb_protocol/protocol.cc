@@ -846,7 +846,6 @@ void rdb_r_unshard_visitor_t::unshard_range_batch(const query_t &q, sorting_t so
     // Initialize response.
     response_out->response = query_response_t();
     query_response_t *out = boost::get<query_response_t>(&response_out->response);
-    out->reql_version = reql_version_t::EARLIEST;
 
     // Fill in `truncated` and `last_key`, get responses, abort if there's an error.
     std::vector<ql::result_t *> results(count);
@@ -861,23 +860,6 @@ void rdb_r_unshard_visitor_t::unshard_range_batch(const query_t &q, sorting_t so
             return;
         }
 
-        if (i == 0) {
-            out->reql_version = resp->reql_version;
-        } else {
-#ifndef NDEBUG
-            guarantee(out->reql_version == resp->reql_version);
-#else
-            if (out->reql_version != resp->reql_version) {
-                out->result = ql::exc_t(
-                    ql::base_exc_t::INTERNAL,
-                    strprintf("Mismatched reql versions %d and %d.",
-                              static_cast<int>(out->reql_version),
-                              static_cast<int>(resp->reql_version)),
-                    ql::backtrace_id_t::empty());
-                return;
-            }
-#endif // NDEBUG
-        }
         results[i] = &resp->result;
         if (q.stamp) {
             guarantee(resp->stamp_response);
@@ -1334,8 +1316,8 @@ int write_t::expected_document_changes() const {
 }
 
 RDB_IMPL_SERIALIZABLE_1_FOR_CLUSTER(point_read_response_t, data);
-RDB_IMPL_SERIALIZABLE_3_FOR_CLUSTER(
-    rget_read_response_t, stamp_response, result, reql_version);
+RDB_IMPL_SERIALIZABLE_2_FOR_CLUSTER(
+    rget_read_response_t, stamp_response, result);
 RDB_IMPL_SERIALIZABLE_1_FOR_CLUSTER(nearest_geo_read_response_t, results_or_error);
 RDB_IMPL_SERIALIZABLE_2_FOR_CLUSTER(distribution_read_response_t, region, key_counts);
 RDB_IMPL_SERIALIZABLE_2_FOR_CLUSTER(

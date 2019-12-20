@@ -155,8 +155,6 @@ protected:
     bool started;
     const scoped_ptr_t<const readgen_t> readgen;
     optional<active_ranges_t> active_ranges;
-    // TODO: Why does rget_response_reader_t have a reql_version?
-    optional<reql_version_t> reql_version;
     std::map<uuid_u, shard_stamp_info_t> shard_stamp_infos;
 
     // We need this to handle the SINDEX_CONSTANT case.

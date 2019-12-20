@@ -43,7 +43,6 @@ inline feed_type_t union_of(feed_type_t a, feed_type_t b) {
 
 struct active_state_t {
     std::map<uuid_u, std::pair<key_range_t, uint64_t> > shard_last_read_stamps;
-    optional<reql_version_t> reql_version; // none for pkey
     DEBUG_ONLY(optional<std::string> sindex;)
 };
 

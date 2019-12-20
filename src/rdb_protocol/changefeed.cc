@@ -1068,8 +1068,6 @@ public:
                 n += 1;
             }
         }
-        reql_version_t reql_version =
-            ref.sindex_info->mapping_version_info.latest_compatible_reql_version;
         rdb_rget_secondary_slice(
             rocksh,
             ref.sindex_uuid,
@@ -3219,12 +3217,6 @@ private:
                 }
             }
         }
-    }
-
-    const reql_version_t &reql_version() const {
-        r_sanity_check(active_state);
-        r_sanity_check(active_state->reql_version);
-        return *(active_state->reql_version);
     }
 
     bool ready() {
