@@ -804,20 +804,9 @@ bool secondary_indexes_are_equivalent(const std::vector<char> &left,
             sindex_info_right.mapping_version_info.original_reql_version) {
         // Need to determine if the mapping function is the same, re-serialize them
         // and compare the vectors
-        bool res;
-        write_message_t wm_left;
-        vector_stream_t stream_left;
-        serialize_for_cluster(&wm_left, sindex_info_left.mapping);
-        res = send_write_message(&stream_left, &wm_left);
-        guarantee(res == 0);
-
-        write_message_t wm_right;
-        vector_stream_t stream_right;
-        serialize_for_cluster(&wm_right, sindex_info_right.mapping);
-        res = send_write_message(&stream_right, &wm_right);
-        guarantee(res == 0);
-
-        return stream_left.vector() == stream_right.vector();
+        std::vector<char> serialized_left = serialize_for_cluster_to_vector(sindex_info_left.mapping);
+        std::vector<char> serialized_right = serialize_for_cluster_to_vector(sindex_info_right.mapping);
+        return serialized_left == serialized_right;
     }
 
     return false;

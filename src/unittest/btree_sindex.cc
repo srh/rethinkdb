@@ -31,18 +31,6 @@ ql::map_wire_func_t generate_random_field_wire_func() {
     return ql::map_wire_func_t(func_term_term->eval_to_func(scope));
 }
 
-// TODO: Move this to a header and use this wherever it should be.
-template <class T>
-std::vector<char> serialize_for_cluster_to_vector(const T &x) {
-    write_message_t wm;
-    serialize_for_cluster(&wm, x);
-    vector_stream_t vs;
-    bool res = send_write_message(&vs, &wm);
-    guarantee(res == 0);
-    std::vector<char> ret = std::move(vs.vector());
-    return ret;
-}
-
 bool equivalent_definitions(const sindex_disk_info_t &x, const sindex_disk_info_t &y) {
     // Just check the random wirefuncs by serializing.
     return serialize_for_cluster_to_vector(x.mapping) == serialize_for_cluster_to_vector(y.mapping);

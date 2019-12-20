@@ -14,10 +14,6 @@ int64_t vector_stream_t::write(const void *p, int64_t n) {
     return n;
 }
 
-void vector_stream_t::swap(std::vector<char> *other) {
-    other->swap(vec_);
-}
-
 void vector_stream_t::reserve(size_t reserve_size) {
     vec_.reserve(reserve_size);
 }

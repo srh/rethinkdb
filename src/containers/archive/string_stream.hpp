@@ -22,7 +22,6 @@ private:
     DISABLE_COPYING(string_stream_t);
 };
 
-// TODO: Consider serialize_to_vector with vector_stream.
 template <cluster_version_t W, class T>
 std::string serialize_to_string(const T &value) {
     static_assert(W == cluster_version_t::LATEST_DISK,

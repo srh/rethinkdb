@@ -16,15 +16,7 @@ bool sindex_config_t::operator==(const sindex_config_t &o) const {
     }
     /* This is kind of a hack--we compare the functions by serializing them and comparing
     the serialized values. */
-    write_message_t wm1, wm2;
-    serialize<cluster_version_t::CLUSTER>(&wm1, func);
-    serialize<cluster_version_t::CLUSTER>(&wm2, o.func);
-    vector_stream_t stream1, stream2;
-    int res = send_write_message(&stream1, &wm1);
-    guarantee(res == 0);
-    res = send_write_message(&stream2, &wm2);
-    guarantee(res == 0);
-    return stream1.vector() == stream2.vector();
+    return serialize_for_cluster_to_vector(func) == serialize_for_cluster_to_vector(o.func);
 }
 
 RDB_IMPL_SERIALIZABLE_4_SINCE_v2_1(sindex_config_t,
@@ -36,15 +28,7 @@ bool write_hook_config_t::operator==(const write_hook_config_t &o) const {
     }
     /* This is kind of a hack--we compare the functions by serializing them and comparing
     the serialized values. */
-    write_message_t wm1, wm2;
-    serialize<cluster_version_t::CLUSTER>(&wm1, func);
-    serialize<cluster_version_t::CLUSTER>(&wm2, o.func);
-    vector_stream_t stream1, stream2;
-    int res = send_write_message(&stream1, &wm1);
-    guarantee(res == 0);
-    res = send_write_message(&stream2, &wm2);
-    guarantee(res == 0);
-    return stream1.vector() == stream2.vector();
+    return serialize_for_cluster_to_vector(func) == serialize_for_cluster_to_vector(o.func);
 }
 
 RDB_IMPL_SERIALIZABLE_2_SINCE_v2_4(write_hook_config_t,

@@ -99,9 +99,7 @@ private:
         stream.reserve(wm.size());
         int res = send_write_message(&stream, &wm);
         guarantee(res == 0);
-        std::vector<char> data;
-        stream.swap(&data);
-        vector_read_stream_t rstream(std::move(data));
+        vector_read_stream_t rstream(std::move(stream.vector()));
         T value;
         archive_result_t dres =
             deserialize<cluster_version_t::LATEST_OVERALL>(&rstream, &value);

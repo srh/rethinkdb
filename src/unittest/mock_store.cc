@@ -299,14 +299,7 @@ continue_bool_t mock_store_t::send_backfill_pre(
 }
 
 std::vector<char> datum_to_vector(const ql::datum_t &datum) {
-    write_message_t wm;
-    serialize<cluster_version_t::CLUSTER>(&wm, datum);
-    vector_stream_t vs;
-    int res = send_write_message(&vs, &wm);
-    guarantee(res == 0);
-    std::vector<char> vector;
-    vs.swap(&vector);
-    return vector;
+    return serialize_for_cluster_to_vector(datum);
 }
 
 ql::datum_t vector_to_datum(std::vector<char> &&vector) {

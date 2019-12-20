@@ -1517,11 +1517,9 @@ void connectivity_cluster_t::send_message(connection_t *connection,
 
     if (connection->is_loopback()) {
         // We could be on any thread here! Oh no!
-        std::vector<char> buffer_data;
-        buffer.swap(&buffer_data);
         rassert(message_handlers[tag], "No message handler for tag %" PRIu8, tag);
         message_handlers[tag]->on_local_message(connection, connection_keepalive,
-            std::move(buffer_data));
+            std::move(buffer.vector()));
     } else {
         on_thread_t threader(connection->conn->home_thread());
 

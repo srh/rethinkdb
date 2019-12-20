@@ -13,9 +13,8 @@ public:
 
     virtual MUST_USE int64_t write(const void *p, int64_t n);
 
+    // You may move from this.
     std::vector<char> &vector() { return vec_; }
-
-    void swap(std::vector<char> *other);
 
     void reserve(size_t reserve_size);
 
@@ -40,5 +39,16 @@ private:
 
     DISABLE_COPYING(vector_read_stream_t);
 };
+
+template <class T>
+std::vector<char> serialize_for_cluster_to_vector(const T &x) {
+    write_message_t wm;
+    serialize_for_cluster(&wm, x);
+    vector_stream_t vs;
+    bool res = send_write_message(&vs, &wm);
+    guarantee(res == 0);
+    std::vector<char> ret = std::move(vs.vector());
+    return ret;
+}
 
 #endif  // CONTAINERS_ARCHIVE_VECTOR_STREAM_HPP_
