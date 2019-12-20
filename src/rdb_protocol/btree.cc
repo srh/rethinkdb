@@ -520,8 +520,8 @@ public:
           multi(_multi) {
         datumspec.visit<void>(
             [&](const ql::datum_range_t &r) {
-                lbound_trunc_key = r.get_left_bound_trunc_key(func_reql_version);
-                rbound_trunc_key = r.get_right_bound_trunc_key(func_reql_version);
+                lbound_trunc_key = r.get_left_bound_trunc_key();
+                rbound_trunc_key = r.get_right_bound_trunc_key();
             },
             [](const std::map<ql::datum_t, uint64_t> &) { });
     }
@@ -1253,8 +1253,7 @@ void rdb_rget_secondary_snapshot_slice(
 
     direction_t direction = reversed(sorting) ? direction_t::backward : direction_t::forward;
     auto cb = [&](const std::pair<ql::datum_range_t, uint64_t> &pair, UNUSED bool is_last) {
-        key_range_t sindex_keyrange =
-            pair.first.to_sindex_keyrange(sindex_func_reql_version);
+        key_range_t sindex_keyrange = pair.first.to_sindex_keyrange();
         rocks_rget_secondary_cb_wrapper wrapper(
             &callback,
             pair.second,
@@ -1334,7 +1333,7 @@ void rdb_rget_secondary_slice(
     direction_t direction = reversed(sorting) ? direction_t::backward : direction_t::forward;
     auto cb = [&](const std::pair<ql::datum_range_t, uint64_t> &pair, bool is_last) {
         key_range_t sindex_keyrange =
-            pair.first.to_sindex_keyrange(sindex_func_reql_version);
+            pair.first.to_sindex_keyrange();
         rocks_rget_secondary_cb_wrapper wrapper(
             &callback,
             pair.second,
@@ -1768,7 +1767,7 @@ void compute_keys(const store_key_t &primary_key,
             } else {
                 try {
                     std::string store_key =
-                        skey.print_secondary(reql_version, primary_key,
+                        skey.print_secondary(primary_key,
                                              make_optional(i));
                     keys_out->push_back(
                         std::make_pair(store_key_t(store_key), skey));
@@ -1802,7 +1801,7 @@ void compute_keys(const store_key_t &primary_key,
             }
         } else {
             std::string store_key =
-                index.print_secondary(reql_version, primary_key, r_nullopt);
+                index.print_secondary(primary_key, r_nullopt);
             keys_out->push_back(
                 std::make_pair(store_key_t(store_key), index));
             if (cfeed_keys_out != nullptr) {

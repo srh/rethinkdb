@@ -189,8 +189,7 @@ void do_snap_read(
                 sindex_range = *rget.sindex->region;
             } else {
                 sindex_range =
-                    rget.sindex->datumspec.covering_range().to_sindex_keyrange(
-                        reql_version);
+                    rget.sindex->datumspec.covering_range().to_sindex_keyrange();
             }
             if (sindex_info.geo == sindex_geo_bool_t::GEO) {
                 res->result = ql::exc_t(
@@ -284,8 +283,7 @@ void do_read_for_changefeed(rockshard rocksh,
                 sindex_range = *rget.sindex->region;
             } else {
                 sindex_range =
-                    rget.sindex->datumspec.covering_range().to_sindex_keyrange(
-                        reql_version);
+                    rget.sindex->datumspec.covering_range().to_sindex_keyrange();
             }
             if (sindex_info.geo == sindex_geo_bool_t::GEO) {
                 res->result = ql::exc_t(

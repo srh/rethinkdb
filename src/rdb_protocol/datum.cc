@@ -729,48 +729,25 @@ void datum_t::bool_to_str_key(std::string *str_out) const {
 }
 
 void datum_t::extrema_to_str_key(
-        extrema_encoding_t extrema_encoding,
         extrema_ok_t extrema_ok,
         std::string *str_out) const {
     rcheck_datum(extrema_ok == extrema_ok_t::OK, base_exc_t::LOGIC,
                  "Cannot use `r.minval` or `r.maxval` in an index key.");
 
     if (get_type() == MINVAL) {
-        switch (extrema_encoding) {
-        case extrema_encoding_t::PRE_v2_3:
-            str_out->append(1, '\x00');
-            break;
-        case extrema_encoding_t::LATEST:
-            // We use a type prefix that's smaller than any "real" type prefix can be.
-            // The real prefixes will be letters.
-            // We also maintain the property that all of our prefixes start with 010 in
-            // their binary representations, which allows us to use these bits for
-            // flagging key formats in the future.
-            str_out->append(1, 'A' - 1);
-            break;
-        default: unreachable();
-        }
+        // We use a type prefix that's smaller than any "real" type prefix can be.
+        // The real prefixes will be letters.
+        // We also maintain the property that all of our prefixes start with 010 in
+        // their binary representations, which allows us to use these bits for
+        // flagging key formats in the future.
+        str_out->append(1, 'A' - 1);
     } else {
         r_sanity_check(get_type() == MAXVAL);
-        switch (extrema_encoding) {
-        case extrema_encoding_t::PRE_v2_3: {
-            // This is a hack to preserve the invariant that no keys have their top bit set
-            // which is used by another hack to solve some sindex version compatibilities.
-            // TODO: remove this hack post-2.0
-            std::string max_str = key_to_unescaped_str(store_key_t::max());
-            guarantee(max_str.size() > 0);
-            max_str[0] &= 0x7F;
-            str_out->append(max_str);
-        } break;
-        case extrema_encoding_t::LATEST:
-            // We use a type prefix that's larger than any "real" type prefix can be.
-            // The real prefixes will be letters.
-            // Also see the comment above for the MINVAL case regarding reserved bits in
-            // our prefixes.
-            str_out->append(1, 'Z' + 1);
-            break;
-        default: unreachable();
-        }
+        // We use a type prefix that's larger than any "real" type prefix can be.
+        // The real prefixes will be letters.
+        // Also see the comment above for the MINVAL case regarding reserved bits in
+        // our prefixes.
+        str_out->append(1, 'Z' + 1);
     }
 }
 
@@ -778,7 +755,6 @@ void datum_t::extrema_to_str_key(
 //  null character, with another null character at the end to signify the end of the
 //  array (this is necessary to prevent ambiguity when nested arrays are involved).
 void datum_t::array_to_str_key(
-        extrema_encoding_t extrema_encoding,
         extrema_ok_t extrema_ok,
         escape_nulls_t escape_nulls,
         std::string *str_out) const {
@@ -796,8 +772,7 @@ void datum_t::array_to_str_key(
             // Before version 2.3, `minval` and `maxval` were always allowed inside of
             // an array.
             item.extrema_to_str_key(
-                extrema_encoding,
-                extrema_encoding == extrema_encoding_t::PRE_v2_3
+                extrema_encoding_t::LATEST == extrema_encoding_t::PRE_v2_3
                 ? extrema_ok_t::OK
                 : extrema_ok,
                 str_out);
@@ -807,7 +782,7 @@ void datum_t::array_to_str_key(
         case R_BINARY: item.binary_to_str_key(str_out); break;
         case R_BOOL: item.bool_to_str_key(str_out); break;
         case R_ARRAY:
-            item.array_to_str_key(extrema_encoding, extrema_ok, escape_nulls, str_out);
+            item.array_to_str_key(extrema_ok, escape_nulls, str_out);
             break;
         case R_OBJECT:
             if (item.is_ptype()) {
@@ -1038,7 +1013,7 @@ std::string datum_t::print_primary_internal() const {
         // for a traversal boundary, e.g. from `.between(r.minval, r.maxval)`, and
         // that's fine. We can also always use the latest reql_version for the same
         // reason.
-        extrema_to_str_key(extrema_encoding_t::LATEST, extrema_ok_t::OK, &s);
+        extrema_to_str_key(extrema_ok_t::OK, &s);
         break;
     case R_NUM: num_to_str_key(&s); break;
     case R_STR: str_to_str_key(escape_nulls_t::NO, &s); break;
@@ -1047,7 +1022,7 @@ std::string datum_t::print_primary_internal() const {
     case R_ARRAY:
         // Extrema are always ok here for the same reason as described above.
         array_to_str_key(
-            extrema_encoding_t::LATEST, extrema_ok_t::OK, escape_nulls_t::NO, &s);
+            extrema_ok_t::OK, escape_nulls_t::NO, &s);
         break;
     case R_OBJECT:
         if (is_ptype()) {
@@ -1131,16 +1106,12 @@ std::string datum_t::compose_secondary(
         truncated_secondary_key, primary_key_string, tag_string);
 }
 
-std::string datum_t::print_secondary(reql_version_t reql_version,
-                                     const store_key_t &primary_key,
+std::string datum_t::print_secondary(const store_key_t &primary_key,
                                      optional<uint64_t> tag_num) const {
     std::string secondary_key_string;
 
     // Reserve max key size to reduce reallocations
     secondary_key_string.reserve(MAX_KEY_SIZE);
-
-    extrema_encoding_t extrema_encoding =
-        extrema_encoding_from_reql_version_for_sindex(reql_version);
 
     if (get_type() == R_NUM) {
         num_to_str_key(&secondary_key_string);
@@ -1154,8 +1125,7 @@ std::string datum_t::print_secondary(reql_version_t reql_version,
         // Before version 2.3, `minval` and `maxval` were always allowed inside of
         // an array. Now they are no longer allowed in this context.
         array_to_str_key(
-            extrema_encoding,
-            extrema_encoding == extrema_encoding_t::PRE_v2_3
+            extrema_encoding_t::LATEST == extrema_encoding_t::PRE_v2_3
             ? extrema_ok_t::OK
             : extrema_ok_t::NOT_OK,
             escape_nulls_t::YES,
@@ -1172,11 +1142,6 @@ std::string datum_t::print_secondary(reql_version_t reql_version,
     secondary_key_string.append(1, '\x00');
 
     return compose_secondary(secondary_key_string, primary_key, tag_num);
-}
-
-extrema_encoding_t extrema_encoding_from_reql_version_for_sindex(reql_version_t) {
-    // TODO: Always YES -- probably remove extrema_encoding_t.
-    return extrema_encoding_t::LATEST;
 }
 
 components_t parse_secondary(const std::string &key) THROWS_NOTHING {
@@ -1254,11 +1219,7 @@ optional<uint64_t> datum_t::extract_tag(const store_key_t &key) {
 // do not know how much was truncated, we have to truncate the maximum amount,
 // then return all matches and filter them out later.
 store_key_t datum_t::truncated_secondary(
-    reql_version_t reql_version,
     extrema_ok_t extrema_ok) const {
-
-    extrema_encoding_t extrema_encoding =
-        extrema_encoding_from_reql_version_for_sindex(reql_version);
 
     std::string s;
     if (get_type() == R_NUM) {
@@ -1270,11 +1231,11 @@ store_key_t datum_t::truncated_secondary(
     } else if (get_type() == R_BOOL) {
         bool_to_str_key(&s);
     } else if (get_type() == R_ARRAY) {
-        array_to_str_key(extrema_encoding, extrema_ok, escape_nulls_t::YES, &s);
+        array_to_str_key(extrema_ok, escape_nulls_t::YES, &s);
     } else if (get_type() == R_OBJECT && is_ptype()) {
         pt_to_str_key(&s);
     } else if (get_type() == MINVAL || get_type() == MAXVAL) {
-        extrema_to_str_key(extrema_encoding, extrema_ok, &s);
+        extrema_to_str_key(extrema_ok, &s);
     } else {
         type_error(strprintf(
             "Secondary keys must be a number, string, bool, pseudotype, "

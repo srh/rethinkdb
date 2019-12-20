@@ -68,7 +68,6 @@ enum class name_for_sorting_t { NO = 0, YES = 1 };
 // `r.minval` and `r.maxval` were encoded in keys differently before 2.3. Determines
 // which encoding should be used.
 enum class extrema_encoding_t { PRE_v2_3, LATEST };
-extrema_encoding_t extrema_encoding_from_reql_version_for_sindex(reql_version_t rv);
 
 // When constructing a secondary index key, extremas should not be used.  They
 // may be used when constructing secondary index ranges (i.e. for `between`).
@@ -226,8 +225,7 @@ public:
         const std::string &tag);
     static std::string encode_tag_num(uint64_t tag_num);
     // tag_num is used for multi-indexes.
-    std::string print_secondary(reql_version_t reql_version,
-                                const store_key_t &primary_key,
+    std::string print_secondary(const store_key_t &primary_key,
                                 optional<uint64_t> tag_num) const;
     /* An inverse to print_secondary. Returns the primary key. */
     static std::string extract_primary(const std::string &secondary_and_primary);
@@ -240,7 +238,6 @@ public:
     static optional<uint64_t> extract_tag(const store_key_t &key);
     static components_t extract_all(const std::string &secondary_and_primary);
     store_key_t truncated_secondary(
-        reql_version_t reql_version,
         extrema_ok_t extrema_ok = extrema_ok_t::NOT_OK) const;
     void check_type(type_t desired, const char *msg = NULL) const;
     NORETURN void type_error(const std::string &msg) const;
@@ -360,13 +357,11 @@ private:
     void str_to_str_key(escape_nulls_t escape_nulls, std::string *str_out) const;
     void bool_to_str_key(std::string *str_out) const;
     void array_to_str_key(
-        extrema_encoding_t extrema_encoding,
         extrema_ok_t extrema_ok,
         escape_nulls_t escape_nulls,
         std::string *str_out) const;
     void binary_to_str_key(std::string *str_out) const;
     void extrema_to_str_key(
-        extrema_encoding_t extrema_encoding,
         extrema_ok_t extrema_ok,
         std::string *str_out) const;
 

@@ -99,26 +99,24 @@ key_range_t datum_range_t::to_primary_keyrange() const {
                        right_bound_type, store_key_t(rb_str));
 }
 
-key_range_t datum_range_t::to_sindex_keyrange(reql_version_t reql_version) const {
+key_range_t datum_range_t::to_sindex_keyrange() const {
     r_sanity_check(left_bound.has() && right_bound.has());
     object_buffer_t<store_key_t> lb, rb;
     return rdb_protocol::sindex_key_range(
-        store_key_t(get_left_bound_trunc_key(reql_version)),
-        store_key_t(get_right_bound_trunc_key(reql_version)),
+        store_key_t(get_left_bound_trunc_key()),
+        store_key_t(get_right_bound_trunc_key()),
         right_bound_type);
 }
 
-std::string datum_range_t::get_left_bound_trunc_key(reql_version_t reql_ver) const {
+std::string datum_range_t::get_left_bound_trunc_key() const {
     guarantee(left_bound_type != key_range_t::bound_t::none);
     return key_to_unescaped_str(left_bound.truncated_secondary(
-        reql_ver,
         ql::extrema_ok_t::OK));
 }
 
-std::string datum_range_t::get_right_bound_trunc_key(reql_version_t reql_ver) const {
+std::string datum_range_t::get_right_bound_trunc_key() const {
     guarantee(right_bound_type != key_range_t::bound_t::none);
     return key_to_unescaped_str(right_bound.truncated_secondary(
-        reql_ver,
         ql::extrema_ok_t::OK));
 }
 
@@ -133,14 +131,14 @@ datum_range_t datum_range_t::with_right_bound(datum_t d, key_range_t::bound_t ty
 }
 
 datumspec_t datumspec_t::trim_secondary(
-    const key_range_t &rng, reql_version_t ver) const {
+    const key_range_t &rng) const {
     return visit<datumspec_t>(
         [](const datum_range_t &dr) { return datumspec_t(dr); },
-        [&rng, &ver](const std::map<datum_t, uint64_t> &m) {
+        [&rng](const std::map<datum_t, uint64_t> &m) {
             std::map<datum_t, uint64_t> ret;
             for (const auto &pair : m) {
                 if (rng.overlaps(
-                        datum_range_t(pair.first).to_sindex_keyrange(ver))) {
+                        datum_range_t(pair.first).to_sindex_keyrange())) {
                     ret.insert(pair);
                 }
             }

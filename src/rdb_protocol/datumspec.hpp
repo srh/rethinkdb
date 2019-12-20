@@ -34,12 +34,12 @@ public:
     // Make sure you know what you're doing if you call these, and think about
     // truncated sindexes.
     key_range_t to_primary_keyrange() const;
-    key_range_t to_sindex_keyrange(reql_version_t reql_version) const;
+    key_range_t to_sindex_keyrange() const;
 
     // Computes the truncated keys corresponding to `left_bound`/`right_bound`
     // respectively.
-    std::string get_left_bound_trunc_key(reql_version_t ver) const;
-    std::string get_right_bound_trunc_key(reql_version_t ver) const;
+    std::string get_left_bound_trunc_key() const;
+    std::string get_right_bound_trunc_key() const;
 
     datum_range_t with_left_bound(datum_t d, key_range_t::bound_t type);
     datum_range_t with_right_bound(datum_t d, key_range_t::bound_t type);
@@ -124,7 +124,7 @@ public:
             spec);
     }
 
-    datumspec_t trim_secondary(const key_range_t &rng, reql_version_t ver) const;
+    datumspec_t trim_secondary(const key_range_t &rng) const;
     bool is_universe() const;
     bool is_empty() const;
     // Try to only call this once since it does work to compute it.

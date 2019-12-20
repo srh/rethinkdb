@@ -157,7 +157,7 @@ ql::grouped_t<ql::stream_t> read_row_via_sindex(
         store->get_sindex_slice(sindex_uuid),
         region_t(),
         ql::datumspec_t(datum_range),
-        datum_range.to_sindex_keyrange(reql_version_t::LATEST),
+        datum_range.to_sindex_keyrange(),
         superblock.get(),
         &dummy_env, // env_t
         ql::batchspec_t::default_for(ql::batch_type_t::NORMAL),

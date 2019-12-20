@@ -1076,7 +1076,7 @@ public:
             ref.btree,
             region_t(),
             ql::datumspec_t(srange),
-            srange.to_sindex_keyrange(reql_version),
+            srange.to_sindex_keyrange(),
             ref.superblock,
             env,
             batchspec_t::all(), // Terminal takes care of early termination
