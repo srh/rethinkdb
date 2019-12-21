@@ -13,6 +13,7 @@
 #include <boost/variant.hpp>
 
 #include "btree/key_edges.hpp"
+#include "btree/key_or_max.hpp"
 #include "rdb_protocol/secondary_operations.hpp"
 #include "clustering/administration/auth/user_context.hpp"
 #include "concurrency/cond_var.hpp"

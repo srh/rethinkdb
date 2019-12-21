@@ -27,12 +27,7 @@ void store_t::note_reshard(const region_t &shard_region) {
     {
         rwlock_acq_t acq(&changefeed_servers_lock, access_t::write);
         ASSERT_NO_CORO_WAITING;
-        // Shards use unbounded right boundaries, while changefeed queries use MAX_KEY.
-        // We must convert the boundary here so it matches.
-        region_t modified_region = shard_region;
-        modified_region.right =
-            key_range_t::right_bound_t(modified_region.right_or_max());
-        auto it = changefeed_servers.find(modified_region);
+        auto it = changefeed_servers.find(shard_region);
         if (it != changefeed_servers.end()) {
             to_destruct = std::move(it->second);
             changefeed_servers.erase(it);
@@ -353,9 +348,9 @@ struct rdb_read_visitor_t : public boost::static_visitor<void> {
                     is_primary_t::NO,
                     s.spec.limit,
                     s.region,
-                    ql::limit_read_last_key(!reversed(s.spec.range.sorting)
-                        ? store_key_t::min()
-                        : store_key_t::max()),
+                    !reversed(s.spec.range.sorting)
+                        ? ql::limit_read_last_key::min()
+                        : ql::limit_read_last_key::infinity(),
                     s.spec.range.sorting,
                     &ops});
                 rget.sindex.set(sindex_rangespec_t(
@@ -367,9 +362,9 @@ struct rdb_read_visitor_t : public boost::static_visitor<void> {
                     is_primary_t::YES,
                     s.spec.limit,
                     s.region,
-                    ql::limit_read_last_key(!reversed(s.spec.range.sorting)
-                        ? store_key_t::min()
-                        : store_key_t::max()),
+                    !reversed(s.spec.range.sorting)
+                        ? ql::limit_read_last_key::min()
+                        : ql::limit_read_last_key::infinity(),
                     s.spec.range.sorting,
                     &ops});
             }
@@ -1131,9 +1126,6 @@ std::pair<ql::changefeed::server_t *, auto_drainer_t::lock_t> store_t::changefee
 std::pair<ql::changefeed::server_t *, auto_drainer_t::lock_t>
         store_t::get_or_make_changefeed_server(const region_t &_region) {
     rwlock_acq_t acq(&changefeed_servers_lock, access_t::write);
-    // We assume that changefeeds use MAX_KEY instead of `unbounded` right bounds.
-    // If this ever changes, `note_reshard` will need to be updated.
-    guarantee(!_region.right.unbounded);
     guarantee(ctx != nullptr);
     guarantee(ctx->manager != nullptr);
     auto existing = changefeed_server(_region, &acq);
@@ -1145,7 +1137,7 @@ std::pair<ql::changefeed::server_t *, auto_drainer_t::lock_t>
     }
     auto it = changefeed_servers.insert(
         std::make_pair(
-            region_t(_region),
+            _region,
             make_scoped<ql::changefeed::server_t>(ctx->manager, this))).first;
     return std::make_pair(it->second.get(), it->second->get_keepalive());
 }

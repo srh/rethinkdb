@@ -7,6 +7,50 @@
 #include "math.hpp"
 #include "utils.hpp"
 
+bool store_key_t::increment() {
+    if (str_.size() < MAX_KEY_SIZE) {
+        str_.push_back(0);
+        return true;
+    }
+    while (str_.size() > 0 && static_cast<uint8_t>(str_.back()) == 255) {
+        str_.pop_back();
+    }
+    if (str_.empty()) {
+        /* We were the largest possible key. Oops. Restore our previous
+        state and return `false`. */
+        str_.resize(MAX_KEY_SIZE, char(255));
+        return false;
+    }
+    str_.back() = 1 + static_cast<uint8_t>(str_.back());
+    return true;
+}
+
+// The wire format of serialize_for_metainfo must not change.
+void store_key_t::serialize_for_metainfo(write_message_t *wm) const {
+    uint8_t sz = size();
+    serialize_universal(wm, sz);
+    wm->append(data(), sz);
+}
+
+archive_result_t store_key_t::deserialize_for_metainfo(read_stream_t *s) {
+    uint8_t sz;
+    archive_result_t res = deserialize_universal(s, &sz);
+    if (bad(res)) { return res; }
+    std::string buf;
+    buf.resize(sz);
+    int64_t num_read = force_read(s, &buf[0], sz);
+    if (num_read == -1) {
+        return archive_result_t::SOCK_ERROR;
+    }
+    if (num_read < sz) {
+        return archive_result_t::SOCK_EOF;
+    }
+    rassert(num_read == sz);
+    str_ = std::move(buf);
+    return archive_result_t::SUCCESS;
+}
+
+
 std::string key_range_t::print() const {
     printf_buffer_t buf;
     debug_print(&buf, *this);
@@ -141,11 +185,7 @@ key_range_t key_range_t::intersection(const key_range_t &other) const {
 }
 
 void debug_print(printf_buffer_t *buf, const store_key_t &k) {
-    if (k == store_key_max) {
-        buf->appendf("MAX_KEY");
-    } else {
-        debug_print_quoted_string(buf, k.data(), k.size());
-    }
+    debug_print_quoted_string(buf, k.data(), k.size());
 }
 
 void debug_print(printf_buffer_t *buf, const key_range_t::right_bound_t &rb) {

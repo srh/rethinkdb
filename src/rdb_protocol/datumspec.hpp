@@ -5,6 +5,7 @@
 #include "errors.hpp"
 #include <boost/variant.hpp>
 
+#include "btree/key_or_max.hpp"
 #include "btree/keys.hpp"
 #include "btree/types.hpp"
 #include "containers/optional.hpp"

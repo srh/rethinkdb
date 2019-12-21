@@ -868,7 +868,7 @@ continue_bool_t rocks_rget_secondary_cb::handle_pair(
                 sindex_data.active_region_range_inout->left.increment();
             }
         } else {
-            if (key < sindex_data.active_region_range_inout->right.key_or_max()) {
+            if (sindex_data.active_region_range_inout->right.right_of_key(key)) {
                 sindex_data.active_region_range_inout->right =
                     key_range_t::right_bound_t(key);
             }
@@ -1060,9 +1060,9 @@ void rdb_rget_snapshot_slice(
                    transforms,
                    terminal,
                    shard,
-                   ql::limit_read_last_key(!reversed(sorting)
-                       ? range.left
-                       : range.right.key_or_max()),
+                   !reversed(sorting)
+                       ? ql::limit_read_last_key(range.left)
+                       : ql::limit_read_last_key(key_or_max::from_right_bound(range.right)),
                    sorting,
                    require_sindexes_t::NO));
 
@@ -1138,9 +1138,9 @@ void rdb_rget_slice(
                    transforms,
                    terminal,
                    shard,
-                   ql::limit_read_last_key(!reversed(sorting)
-                       ? range.left
-                       : range.right.key_or_max()),
+                   !reversed(sorting)
+                       ? ql::limit_read_last_key(range.left)
+                       : ql::limit_read_last_key(key_or_max::from_right_bound(range.right)),
                    sorting,
                    require_sindexes_t::NO));
 
@@ -1235,9 +1235,9 @@ void rdb_rget_secondary_snapshot_slice(
                    transforms,
                    terminal,
                    shard,
-                   ql::limit_read_last_key(!reversed(sorting)
-                       ? sindex_region_range.left
-                       : sindex_region_range.right.key_or_max()),
+                   !reversed(sorting)
+                       ? ql::limit_read_last_key(sindex_region_range.left)
+                       : ql::limit_read_last_key(key_or_max::from_right_bound(sindex_region_range.right)),
                    sorting,
                    require_sindex_val),
         rget_sindex_data_t(
@@ -1311,9 +1311,9 @@ void rdb_rget_secondary_slice(
                    transforms,
                    terminal,
                    shard,
-                   ql::limit_read_last_key(!reversed(sorting)
-                       ? sindex_region_range.left
-                       : sindex_region_range.right.key_or_max()),
+                   !reversed(sorting)
+                       ? ql::limit_read_last_key(sindex_region_range.left)
+                       : ql::limit_read_last_key(key_or_max::from_right_bound(sindex_region_range.right)),
                    sorting,
                    require_sindex_val),
         rget_sindex_data_t(

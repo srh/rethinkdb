@@ -55,6 +55,27 @@ public:
         ret.key = key;
         return ret;
     }
+
+    static key_or_max from_right_bound(const key_range_t::right_bound_t &rb) {
+        key_or_max ret;
+        ret.infinite = rb.unbounded;
+        ret.key = rb.internal_key;
+        return ret;
+    }
+
+    static key_or_max from_lower_bound(const lower_key_bound &kb) {
+        key_or_max ret;
+        ret.infinite = kb.infinite;
+        ret.key = kb.key;
+        return ret;
+    }
+
+    key_range_t::right_bound_t to_right_bound() && {
+        key_range_t::right_bound_t ret;
+        ret.unbounded = infinite;
+        ret.internal_key = std::move(key);
+        return ret;
+    }
 };
 
 RDB_DECLARE_SERIALIZABLE_FOR_CLUSTER(key_or_max);
@@ -63,5 +84,13 @@ static const key_or_max key_or_max_min = key_or_max::min();
 static const key_or_max key_or_max_infinity = key_or_max::infinity();
 
 void debug_print(printf_buffer_t *buf, const key_or_max &km);
+
+inline key_range_t half_open(store_key_t left, key_or_max right) {
+    key_range_t ret;
+    ret.left = std::move(left);
+    ret.right = std::move(right).to_right_bound();
+    return ret;
+}
+
 
 #endif  // BTREE_KEY_OR_MAX_HPP_

@@ -27,7 +27,7 @@ void replica_t::do_read(
         read_response_t *response_out) {
     assert_thread();
     rassert(region_is_superset(store->get_region(), read.get_region()));
-    rassert(!region_is_empty(read.get_region()));
+    rassert(!read.get_region().is_empty());
 
     if (boost::get<dummy_read_t>(&read.read) != nullptr) {
         read_response_t response;

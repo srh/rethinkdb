@@ -359,10 +359,8 @@ public:
 
 private:
     rdb_context_t *ctx;
-    // We store regions here even though we only really need the key ranges
-    // because it's nice to have a unique identifier across `store_t`s.  In the
-    // future we may use these `region_t`s instead of the `uuid_u`s in the
-    // changefeed server.
+    // In the future we may use these `region_t`s instead of the `uuid_u`s in
+    // the changefeed server.
     std::map<region_t, scoped_ptr_t<ql::changefeed::server_t> > changefeed_servers;
     rwlock_t changefeed_servers_lock;
 

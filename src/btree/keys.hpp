@@ -60,11 +60,6 @@ public:
         rassert(str_.size() <= MAX_KEY_SIZE);
     }
 
-    // TODO: Any callers?
-    void set_size(int s) {
-        rassert(s <= MAX_KEY_SIZE);
-        str_.resize(s);
-    }
     int size() const { return str_.size(); }
     const uint8_t *data() const { return reinterpret_cast<const uint8_t *>(str_.data()); }
 
@@ -88,60 +83,16 @@ public:
     std::string &str() { return str_; }
     const std::string &str() const { return str_; }
 
-    static store_key_t max() {
-        uint8_t buf[MAX_KEY_SIZE];
-        for (int i = 0; i < MAX_KEY_SIZE; i++) {
-            buf[i] = 255;
-        }
-        return store_key_t(MAX_KEY_SIZE, buf);
-    }
-
-    bool increment() {
-        if (str_.size() < MAX_KEY_SIZE) {
-            str_.push_back(0);
-            return true;
-        }
-        while (str_.size() > 0 && static_cast<uint8_t>(str_.back()) == 255) {
-            str_.pop_back();
-        }
-        if (str_.empty()) {
-            /* We were the largest possible key. Oops. Restore our previous
-            state and return `false`. */
-            *this = store_key_t::max();
-            return false;
-        }
-        str_.back() = 1 + static_cast<uint8_t>(str_.back());
-        return true;
-    }
+    bool increment();
 
     int compare(const store_key_t& k) const {
         return sized_strcmp(data(), size(), k.data(), k.size());
     }
 
     // The wire format of serialize_for_metainfo must not change.
-    void serialize_for_metainfo(write_message_t *wm) const {
-        uint8_t sz = size();
-        serialize_universal(wm, sz);
-        wm->append(data(), sz);
-    }
+    void serialize_for_metainfo(write_message_t *wm) const;
 
-    archive_result_t deserialize_for_metainfo(read_stream_t *s) {
-        uint8_t sz;
-        archive_result_t res = deserialize_universal(s, &sz);
-        if (bad(res)) { return res; }
-        std::string buf;
-        buf.resize(sz);
-        int64_t num_read = force_read(s, &buf[0], sz);
-        if (num_read == -1) {
-            return archive_result_t::SOCK_ERROR;
-        }
-        if (num_read < sz) {
-            return archive_result_t::SOCK_EOF;
-        }
-        rassert(num_read == sz);
-        str_ = std::move(buf);
-        return archive_result_t::SUCCESS;
-    }
+    archive_result_t deserialize_for_metainfo(read_stream_t *s);
 
     template <cluster_version_t W>
     friend void serialize(write_message_t *wm, const store_key_t &sk) {
@@ -156,9 +107,6 @@ public:
 private:
     std::string str_;
 };
-
-static const store_key_t store_key_max = store_key_t::max();
-static const store_key_t store_key_min = store_key_t::min();
 
 inline bool operator==(const store_key_t &k1, const store_key_t &k2) {
     return k1.size() == k2.size() && memcmp(k1.data(), k2.data(), k1.size()) == 0;
@@ -215,6 +163,10 @@ public:
             }
         }
 
+        bool right_of_key(const store_key_t &k) const {
+            return unbounded || k < internal_key;
+        }
+
         store_key_t &key() {
             rassert(!unbounded);
             return internal_key;
@@ -223,9 +175,6 @@ public:
             rassert(!unbounded);
             return internal_key;
         }
-        const store_key_t &key_or_max() const {
-            return unbounded ? store_key_max : internal_key;
-        }
 
         bool unbounded;
 
@@ -233,10 +182,6 @@ public:
         instead of accessing this directly. */
         store_key_t internal_key;
     };
-
-    const store_key_t &right_or_max() const {
-        return right.key_or_max();
-    }
 
     // This enum class / static constexpr stuff is to silence a warning that "open"
     // shadows a global variable named open.  This used to be "enum bound_t".  Removing
@@ -282,7 +227,7 @@ public:
 
     bool contains_key(const store_key_t& key) const {
         bool left_ok = left <= key;
-        bool right_ok = right.unbounded || key < right.key();
+        bool right_ok = right.right_of_key(key);
         return left_ok && right_ok;
     }
 

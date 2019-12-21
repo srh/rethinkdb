@@ -52,11 +52,6 @@ read_mode_t up_to_date_read_mode(read_mode_t in) {
     }
 }
 
-key_range_t safe_universe() {
-    return key_range_t(key_range_t::closed, store_key_t::min(),
-                       key_range_t::open, store_key_t::max());
-}
-
 void debug_print(printf_buffer_t *buf, const range_state_t &rs) {
     const char *s;
     switch (rs) {
@@ -229,6 +224,8 @@ indirect_lower_key_bound to_indirect(const lower_key_bound *kb) {
     return indirect_lower_key_bound{&kb->key, kb->infinite};
 }
 
+static const store_key_t store_key_min = store_key_t::min();
+
 class pseudoshard_t {
 public:
     pseudoshard_t(sorting_t _sorting,
@@ -329,6 +326,8 @@ private:
     size_t fresh_index;
     bool finished;
 };
+
+
 
 changefeed::keyspec_t empty_reader_t::get_changespec() const {
     return changefeed::keyspec_t(
@@ -1247,7 +1246,7 @@ intersecting_geo_read_t intersecting_readgen_t::next_read_impl(
     // TODO: Maybe make region a lower_bound_key_range.
     region_t region = active_ranges
         ? to_key_range(active_ranges_to_range(*active_ranges))
-        : region_t(safe_universe());
+        : key_range_t::universe();
     // For stamped reads, we disable batching. This is a temporary work-around for the
     // problem that the keys associated with geospatial change events don't match
     // up with the traversal ranges of an initial intersecting read (which in turn

@@ -366,7 +366,7 @@ key_range_t sindex_key_range(const store_key_t &start,
     // If `end` is not truncated and right bound is open, we don't increment the right
     // bound.
     guarantee(static_cast<size_t>(end.size()) <= max_trunc_size);
-    store_key_t end_key;
+    key_or_max end_key;
     const bool end_is_truncated = static_cast<size_t>(end.size()) == max_trunc_size;
     // The key range we generate must be open on the right end because the keys in the
     // btree have extra data appended to the secondary key part.
@@ -380,24 +380,24 @@ key_range_t sindex_key_range(const store_key_t &start,
         }
 
         if (end_key_str.length() == 0) {
-            end_key = store_key_t::max();
+            end_key = key_or_max::infinity();
         } else {
             ++end_key_str[end_key_str.length() - 1];
-            end_key = store_key_t(end_key_str);
+            end_key = key_or_max(store_key_t(end_key_str));
         }
     } else if (end_type == key_range_t::bound_t::closed) {
         // `end` is not truncated, but the range is closed. We know that `end` is
         // currently terminated by a null byte. We can replace that by a '\1' to ensure
         // that any key in the btree with that exact secondary index value will be
         // included in the range.
-        end_key = end;
-        guarantee(end_key.size() > 0);
-        guarantee(end_key.str().back() == 0);
-        end_key.str().back() = 1;
+        end_key = key_or_max(end);
+        guarantee(end_key.key.size() > 0);
+        guarantee(end_key.key.str().back() == 0);
+        end_key.key.str().back() = 1;
     } else {
-        end_key = end;
+        end_key = key_or_max(end);
     }
-    return key_range_t(key_range_t::closed, start, key_range_t::open, std::move(end_key));
+    return half_open(start, std::move(end_key));
 }
 
 }  // namespace rdb_protocol
@@ -450,20 +450,16 @@ region_t read_t::get_region() const THROWS_NOTHING {
 }
 
 struct rdb_r_shard_visitor_t : public boost::static_visitor<bool> {
+    // TODO: For the love of all that is holy, pass _region by reference.
     explicit rdb_r_shard_visitor_t(const key_range_t *_region,
                                    read_t::variant_t *_payload_out)
         : region(*_region), payload_out(_payload_out) {
-        // One day we'll get rid of unbounded right bounds, but until then
-        // we canonicalize them here because otherwise life sucks.
-        if (region.right.unbounded) {
-            region.right = key_range_t::right_bound_t(store_key_t::max());
-        }
     }
 
     // The key was somehow already extracted from the arg.
     template <class T>
     bool keyed_read(const T &arg, const store_key_t &key) const {
-        if (region_contains_key(region, key)) {
+        if (region.contains_key(key)) {
             *payload_out = arg;
             return true;
         } else {
@@ -479,7 +475,7 @@ struct rdb_r_shard_visitor_t : public boost::static_visitor<bool> {
     bool rangey_read(const T &arg) const {
         const region_t intersection
             = region_intersection(region, arg.region);
-        if (!region_is_empty(intersection)) {
+        if (!intersection.is_empty()) {
             T tmp = arg;
             tmp.region = intersection;
             *payload_out = std::move(tmp);
@@ -556,7 +552,6 @@ struct rdb_r_shard_visitor_t : public boost::static_visitor<bool> {
         }
         if (do_read) {
             auto *rg_out = boost::get<rget_read_t>(payload_out);
-            guarantee(!region.right.unbounded);
             rg_out->current_shard.set(region);
             rg_out->batchspec = rg_out->batchspec.scale_down(
                 rg.hints.has_value() ? rg.hints->size() : 1);
@@ -564,7 +559,7 @@ struct rdb_r_shard_visitor_t : public boost::static_visitor<bool> {
                 for (auto it = rg_out->primary_keys->begin();
                      it != rg_out->primary_keys->end();) {
                     auto cur_it = it++;
-                    if (!region_contains_key(rg_out->region, cur_it->first)) {
+                    if (!rg_out->region.contains_key(cur_it->first)) {
                         rg_out->primary_keys->erase(cur_it);
                     }
                 }

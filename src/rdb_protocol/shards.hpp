@@ -100,6 +100,10 @@ struct limit_read_last_key {
     limit_read_last_key() = default;
     explicit limit_read_last_key(const store_key_t &k) : is_decremented(false), raw_key(k) {}
     explicit limit_read_last_key(store_key_t &&k) : is_decremented(false), raw_key(std::move(k)) {}
+    explicit limit_read_last_key(key_or_max &&k) : is_decremented(false), raw_key(std::move(k)) {}
+    static limit_read_last_key min() {
+        return limit_read_last_key();
+    }
     static limit_read_last_key infinity() {
         limit_read_last_key ret;
         ret.is_decremented = false;

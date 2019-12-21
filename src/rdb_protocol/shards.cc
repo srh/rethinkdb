@@ -166,9 +166,9 @@ protected:
         // If we never aborted then we've read the whole range, so update the
         // `keyed_stream_t`s to reflect that.
         if (last_cb == continue_bool_t::CONTINUE) {
-            stop_at_boundary(limit_read_last_key(!reversed(sorting)
-                                 ? store_key_t::max()
-                                 : store_key_t::min()));
+            stop_at_boundary(!reversed(sorting)
+                                 ? limit_read_last_key::infinity()
+                                 : limit_read_last_key::min());
         }
         grouped_acc_t::finish_impl(last_cb, out);
     }

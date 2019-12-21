@@ -4,6 +4,18 @@
 #include "math.hpp"   /* for `clamp()` */
 #include "rdb_protocol/real_table.hpp"
 
+
+store_key_t max_store_key() {
+    uint8_t buf[MAX_KEY_SIZE];
+    for (int i = 0; i < MAX_KEY_SIZE; i++) {
+        buf[i] = 255;
+    }
+    return store_key_t(MAX_KEY_SIZE, buf);
+}
+
+static const store_key_t store_key_max = max_store_key();
+
+
 /* `interpolate_key()` produces a `store_key_t` that is interpolated between `in1` and
 `in2`. For example, if `fraction` is 0.50, the return value will be halfway between `in1`
 and `in2`; if it's 0.25, the return value will be closer to `in1`; and so on. This
