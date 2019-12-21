@@ -203,8 +203,8 @@ protected:
         keyed_stream->stream.push_back(
             rget_item_t(store_key_t(key), rget_sindex_val, el));
         // Update the last considered key.
-        if ((keyed_stream->last_key < key && !reversed(sorting))
-            || (keyed_stream->last_key > key && reversed(sorting))) {
+        if ((keyed_stream->last_key.less_than_key(key) && !reversed(sorting))
+            || (keyed_stream->last_key.greater_than_key(key) && reversed(sorting))) {
             keyed_stream->last_key.set_to_key(key);
         }
         return true;

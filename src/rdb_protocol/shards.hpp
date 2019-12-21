@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "arch/runtime/coroutines.hpp"
+#include "btree/key_or_max.hpp"
 #include "btree/keys.hpp"
 #include "btree/types.hpp"
 #include "containers/archive/stl_types.hpp"
@@ -99,41 +100,50 @@ struct limit_read_last_key {
     limit_read_last_key() = default;
     explicit limit_read_last_key(const store_key_t &k) : is_decremented(false), raw_key(k) {}
     explicit limit_read_last_key(store_key_t &&k) : is_decremented(false), raw_key(std::move(k)) {}
+    static limit_read_last_key infinity() {
+        limit_read_last_key ret;
+        ret.is_decremented = false;
+        ret.raw_key = key_or_max::infinity();
+        return ret;
+    }
+    // It's disallowed to have is_decremented && raw_key.infinite.
     bool is_decremented = false;
-    store_key_t raw_key;
+    key_or_max raw_key;
 
     void set_to_key(const store_key_t &key) {
         is_decremented = false;
-        raw_key = key;
+        raw_key = key_or_max(key);
     }
 
     bool is_max_key() const {
-        return !is_decremented && raw_key == store_key_max;
+        return !is_decremented && raw_key.infinite;
     }
 
     bool is_min_key() const {
         // This is just saying get_key() == "", we have this complication just
         // to obliviously maintain identical behavior (for now).
-        return raw_key == store_key_min ||
-            (is_decremented && raw_key.str().length() == 1 && raw_key.str()[0] == '\0');
+        return !raw_key.infinite && (raw_key.key.size() == 0 ||
+            (is_decremented && raw_key.key.str().length() == 1 && raw_key.key.str()[0] == '\0'));
     }
 
-    bool operator<(const store_key_t &rhs) const {
-        return is_decremented ? (raw_key <= rhs) : raw_key < rhs;
+    // TODO: Check param can't be store_key_t::max.
+    bool less_than_key(const store_key_t &rhs) const {
+        return is_decremented ? (raw_key.lequal_to_key(rhs)) : raw_key.less_than_key(rhs);
     }
 
-    bool operator>(const store_key_t &rhs) const {
+    // TODO: Check param can't be store_key_t::max.
+    bool greater_than_key(const store_key_t &rhs) const {
         if (!is_decremented) {
-            return raw_key > rhs;
+            return raw_key.greater_than_key(rhs);
         }
-        if (raw_key <= rhs) {
+        if (raw_key.lequal_to_key(rhs)) {
             return false;
         }
         // TODO: Performance.
         store_key_t tmp = rhs;
         // OK if rhs is max key -- we return false correctly.
         tmp.increment();
-        return raw_key > tmp;
+        return raw_key.greater_than_key(tmp);
     }
 };
 RDB_DECLARE_SERIALIZABLE(limit_read_last_key);
