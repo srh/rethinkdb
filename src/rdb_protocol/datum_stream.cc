@@ -388,7 +388,6 @@ raw_stream_t rget_response_reader_t::unshard(
                 // TODO: Maybe new_bound should be a lower_key_bound?? Eh... maybe.
                 if (new_bound != nullptr && !new_bound->is_max_key()) {
                     // TODO: raw_key usage -- make this a method in shards.hpp.
-                    // TODO: Maybe lower_key_bound isn't the best choice for the types here.  But it's okay.  Update: Or maybe it is.
                     pair.second.key_range.left = lower_key_bound(new_bound->raw_key.key);
                     if (!new_bound->is_decremented) {
                         bool incremented = pair.second.key_range.left.key.increment();

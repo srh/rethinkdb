@@ -130,12 +130,10 @@ struct limit_read_last_key {
             (is_decremented && raw_key.key.str().length() == 1 && raw_key.key.str()[0] == '\0'));
     }
 
-    // TODO: Check param can't be store_key_t::max.
     bool less_than_key(const store_key_t &rhs) const {
         return is_decremented ? (raw_key.lequal_to_key(rhs)) : raw_key.less_than_key(rhs);
     }
 
-    // TODO: Check param can't be store_key_t::max.
     bool greater_than_key(const store_key_t &rhs) const {
         if (!is_decremented) {
             return raw_key.greater_than_key(rhs);
