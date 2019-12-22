@@ -18,7 +18,6 @@ RDB_IMPL_SERIALIZABLE_3_SINCE_v2_4(
         sindex_reql_version_info_t, original_reql_version, latest_compatible_reql_version, latest_checked_reql_version
 );
 
-// TODO: We'll have to be precise with sindex_create.
 RDB_IMPL_SERIALIZABLE_4_SINCE_v2_4(
         sindex_disk_info_t, mapping, mapping_version_info, multi, geo);
 

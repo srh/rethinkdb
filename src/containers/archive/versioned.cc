@@ -11,7 +11,6 @@ cluster_version_result_t deserialize_cluster_version(
     int8_t raw;
     archive_result_t res = deserialize_universal(s, &raw);
     if (bad(res)) {
-        // TODO: A nasty cast.
         return static_cast<cluster_version_result_t>(res);
     }
     if (raw == static_cast<int8_t>(obsolete_cluster_version_t::v1_13)

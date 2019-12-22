@@ -93,11 +93,11 @@ public:
     }
 };
 
-key_range_t::right_bound_t to_right_bound(const lower_key_bound &kb);
-key_range_t half_open_key_range(const store_key_t &left, const lower_key_bound &right);
+key_range_t::right_bound_t to_right_bound(lower_key_bound kb);
+key_range_t half_open_key_range(store_key_t left, lower_key_bound right);
 
 // May convert empty key ranges to any empty key range.
-key_range_t to_key_range(const lower_key_bound_range &kr);
+key_range_t to_key_range(lower_key_bound_range kr);
 
 void debug_print(printf_buffer_t *buf, const lower_key_bound_range &kr);
 

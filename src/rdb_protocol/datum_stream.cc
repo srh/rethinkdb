@@ -385,7 +385,6 @@ raw_stream_t rget_response_reader_t::unshard(
                 new_bound = &it->second.last_key;
             }
             if (!reversed(sorting)) {
-                // TODO: Maybe new_bound should be a lower_key_bound?? Eh... maybe.
                 if (new_bound != nullptr && !new_bound->is_max_key()) {
                     pair.second.key_range.left = lower_key_bound(new_bound->successor_key());
                 } else {
@@ -1127,7 +1126,6 @@ rget_read_t sindex_readgen_t::next_read_impl(
     optional<region_t> region;
     datumspec_t ds;
     if (active_ranges) {
-        // TODO: Maybe make region a lower_key_bound_range.
         region.set(to_key_range(active_ranges_to_range(*active_ranges)));
         ds = datumspec.trim_secondary(*region);
     } else {
@@ -1239,7 +1237,6 @@ intersecting_geo_read_t intersecting_readgen_t::next_read_impl(
     optional<changefeed_stamp_t> stamp,
     std::vector<transform_variant_t> transforms,
     const batchspec_t &batchspec) const {
-    // TODO: Maybe make region a lower_bound_key_range.
     region_t region = active_ranges
         ? to_key_range(active_ranges_to_range(*active_ranges))
         : key_range_t::universe();
