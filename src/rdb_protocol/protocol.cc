@@ -450,10 +450,9 @@ region_t read_t::get_region() const THROWS_NOTHING {
 }
 
 struct rdb_r_shard_visitor_t : public boost::static_visitor<bool> {
-    // TODO: For the love of all that is holy, pass _region by reference.
-    explicit rdb_r_shard_visitor_t(const key_range_t *_region,
+    explicit rdb_r_shard_visitor_t(const key_range_t &_region,
                                    read_t::variant_t *_payload_out)
-        : region(*_region), payload_out(_payload_out) {
+        : region(_region), payload_out(_payload_out) {
     }
 
     // The key was somehow already extracted from the arg.
@@ -606,7 +605,7 @@ struct rdb_r_shard_visitor_t : public boost::static_visitor<bool> {
 bool read_t::shard(const region_t &region,
                    read_t *read_out) const THROWS_NOTHING {
     read_t::variant_t payload;
-    bool result = boost::apply_visitor(rdb_r_shard_visitor_t(&region, &payload), read);
+    bool result = boost::apply_visitor(rdb_r_shard_visitor_t(region, &payload), read);
     *read_out = read_t(payload, profile, read_mode);
     return result;
 }
