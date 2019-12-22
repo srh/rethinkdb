@@ -533,10 +533,13 @@ optional<active_state_t> rget_response_reader_t::get_active_state() {
         const auto stamp_it = shard_stamp_infos.find(range_pair.second.cfeed_shard_id);
         r_sanity_check(stamp_it != shard_stamp_infos.end());
 
-        key_range_t last_read_range = half_open_key_range(
-            stamp_it->second.last_read_start,
-            std::max(lower_key_bound(stamp_it->second.last_read_start) /* TODO: Performance, and maybe last_read_start should be a lower_key_bound. */,
-                     range_pair.second.key_range.left));
+        key_range_t last_read_range;
+        last_read_range.left = stamp_it->second.last_read_start;
+        if (left_of_bound(stamp_it->second.last_read_start, range_pair.second.key_range.left)) {
+            last_read_range.right = to_right_bound(range_pair.second.key_range.left);
+        } else {
+            last_read_range.right = key_range_t::right_bound_t(stamp_it->second.last_read_start);
+        }
         shard_last_read_stamps.insert(std::make_pair(
             stamp_it->first,
             std::make_pair(last_read_range, stamp_it->second.stamp)));
