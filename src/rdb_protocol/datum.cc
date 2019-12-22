@@ -772,9 +772,7 @@ void datum_t::array_to_str_key(
             // Before version 2.3, `minval` and `maxval` were always allowed inside of
             // an array.
             item.extrema_to_str_key(
-                extrema_encoding_t::LATEST == extrema_encoding_t::PRE_v2_3
-                ? extrema_ok_t::OK
-                : extrema_ok,
+                extrema_ok,
                 str_out);
             break;
         case R_NUM: item.num_to_str_key(str_out); break;
@@ -1125,9 +1123,7 @@ std::string datum_t::print_secondary(const store_key_t &primary_key,
         // Before version 2.3, `minval` and `maxval` were always allowed inside of
         // an array. Now they are no longer allowed in this context.
         array_to_str_key(
-            extrema_encoding_t::LATEST == extrema_encoding_t::PRE_v2_3
-            ? extrema_ok_t::OK
-            : extrema_ok_t::NOT_OK,
+            extrema_ok_t::NOT_OK,
             escape_nulls_t::YES,
             &secondary_key_string);
     } else if (get_type() == R_OBJECT && is_ptype()) {

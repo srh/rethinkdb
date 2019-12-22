@@ -1027,7 +1027,6 @@ rget_read_t primary_readgen_t::next_read_impl(
     optional<changefeed_stamp_t> stamp,
     std::vector<transform_variant_t> transforms,
     const batchspec_t &batchspec) const {
-    // TODO: Make this region a lower_key_bound_range?
     region_t region = active_ranges
         ? to_key_range(active_ranges_to_range(*active_ranges))
         : datumspec.covering_range().to_primary_keyrange();
