@@ -31,7 +31,7 @@ public:
             UNUSED std::pair<const char *, size_t> value) override {
         guarantee(!aborted_);
         store_key_t skey(key.second, reinterpret_cast<const uint8_t *>(key.first));
-        guarantee(key_range_.contains_key(skey.data(), skey.size()));
+        guarantee(key_range_.contains_key(skey));
         collected_keys_.push_back(skey);
         if (collected_keys_.size() == max_keys_to_collect_ ||
                 interruptor_->is_pulsed()) {

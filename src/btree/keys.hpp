@@ -231,14 +231,6 @@ public:
         return left_ok && right_ok;
     }
 
-    // TODO: uint8_t size.
-    bool contains_key(const uint8_t *key, uint8_t size) const {
-        bool left_ok = sized_strcmp(left.data(), left.size(), key, size) <= 0;
-        bool right_ok = right.unbounded ||
-            sized_strcmp(key, size, right.key().data(), right.key().size()) < 0;
-        return left_ok && right_ok;
-    }
-
     std::string print() const;
     bool is_superset(const key_range_t &other) const;
     bool overlaps(const key_range_t &other) const;
