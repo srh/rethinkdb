@@ -37,7 +37,7 @@ bool is_better(const T &a, const T &b, sorting_t sorting) {
 }
 
 // Fast string compare
-int sized_strcmp(const uint8_t *str1, int len1, const uint8_t *str2, int len2);
+int sized_strcmp(const uint8_t *str1, size_t len1, const uint8_t *str2, size_t len2);
 
 struct store_key_t {
 public:
@@ -231,6 +231,7 @@ public:
         return left_ok && right_ok;
     }
 
+    // TODO: uint8_t size.
     bool contains_key(const uint8_t *key, uint8_t size) const {
         bool left_ok = sized_strcmp(left.data(), left.size(), key, size) <= 0;
         bool right_ok = right.unbounded ||
