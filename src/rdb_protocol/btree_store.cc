@@ -352,8 +352,7 @@ void store_t::sindex_create(
     */
     sindex_reql_version_info_t version_info;
     version_info.original_reql_version = config.func_version;
-    // TODO: func_version should _always_ be LATEST.  Right?
-    version_info.latest_compatible_reql_version = static_cast<reql_version_t>(config.func_version);
+    version_info.latest_compatible_reql_version = config.func_version;
     version_info.latest_checked_reql_version = reql_version_t::LATEST;
     sindex_disk_info_t info(config.func, version_info, config.multi, config.geo);
 
