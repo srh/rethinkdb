@@ -4,6 +4,15 @@
 #include "btree/key_edges.hpp"
 #include "btree/keys.hpp"
 
+// Key or max extends the keyspace with the value +infinity.  This is used in
+// place of code which previously used "\xFF\xFF..." in places.  The purpose of
+// this type is (or was) to replace such uses of store_key_t and the max key
+// value in a type safe manner.  See also lower_key_bound, which replaces
+// another set of uses of the max store key values -- and these types do
+// interact slightly -- but key_or_max does not specifically represent a key
+// boundary.  (In its usage in limit_read_last_key, it might represent a
+// boundary either on the low or high side of the key, depending on which way we
+// are traversing.)
 class key_or_max {
 public:
     bool infinite = false;

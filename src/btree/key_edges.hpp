@@ -3,10 +3,14 @@
 
 #include "btree/keys.hpp"
 
-// Describes a closed left bound or an open right bound.  A partition of the
-// key space into "< k" and ">= k" for some k (which might be +infinity).
-// Corresponds to a "lower_bound()" key boundary as used in the STL, hence
-// the name lower_key_bound.  Equivalent to a key_range_t::right_bound_t.
+// Describes a closed left bound or an open right bound.  A partition of the key
+// space into "< k" and ">= k" for some k (which might be +infinity).
+// Corresponds to a "lower_bound()" key boundary as used in the STL, hence the
+// name lower_key_bound.  Equivalent to a key_range_t::right_bound_t.
+//
+// This and lower_key_bound_range were added in place of some uses of the max
+// store key value "\xFF\xFF...", which were malperformant and fragile.  See
+// also key_or_max.
 class lower_key_bound {
 public:
     bool infinite = false;
