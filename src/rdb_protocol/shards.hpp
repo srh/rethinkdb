@@ -114,13 +114,23 @@ struct limit_read_last_key {
     bool is_decremented = false;
     key_or_max raw_key;
 
+    // Has precondition that raw_key not be infinite, i.e. is_max_key() is false.
+    store_key_t successor_key() const {
+        rassert(!raw_key.infinite);
+        store_key_t ret = raw_key.key;
+        if (!is_decremented) {
+            ret.increment();
+        }
+        return ret;
+    }
+
     void set_to_key(const store_key_t &key) {
         is_decremented = false;
         raw_key = key_or_max(key);
     }
 
     bool is_max_key() const {
-        return !is_decremented && raw_key.infinite;
+        return raw_key.infinite;
     }
 
     bool is_min_key() const {

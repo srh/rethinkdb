@@ -387,12 +387,7 @@ raw_stream_t rget_response_reader_t::unshard(
             if (!reversed(sorting)) {
                 // TODO: Maybe new_bound should be a lower_key_bound?? Eh... maybe.
                 if (new_bound != nullptr && !new_bound->is_max_key()) {
-                    // TODO: raw_key usage -- make this a method in shards.hpp.
-                    pair.second.key_range.left = lower_key_bound(new_bound->raw_key.key);
-                    if (!new_bound->is_decremented) {
-                        bool incremented = pair.second.key_range.left.key.increment();
-                        r_sanity_check(incremented); // not max key
-                    }
+                    pair.second.key_range.left = lower_key_bound(new_bound->successor_key());
                 } else {
                     pair.second.key_range.left =
                         pair.second.key_range.right;
