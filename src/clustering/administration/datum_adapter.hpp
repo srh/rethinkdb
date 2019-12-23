@@ -111,9 +111,9 @@ ql::datum_t convert_port_to_datum(
 ql::datum_t convert_microtime_to_datum(
         microtime_t value);
 
-template<class T>
+template<class T, class Callable>
 ql::datum_t convert_vector_to_datum(
-        const std::function<ql::datum_t(const T&)> &conv,
+        const Callable &conv  /* datum_t(const T&) */,
         const std::vector<T> &vector) {
     ql::datum_array_builder_t builder((ql::configured_limits_t::unlimited));
     builder.reserve(vector.size());
