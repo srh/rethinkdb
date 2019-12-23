@@ -210,18 +210,18 @@ active_ranges_t new_active_ranges(
 }
 
 // This type saves us from copying the store_key_t.
-struct indirect_lower_key_bound {
+struct indirect_key_or_max {
     // Never null.
     const store_key_t *key;
     bool infinite;
 
-    bool operator<(const indirect_lower_key_bound &rhs) const {
+    bool operator<(const indirect_key_or_max &rhs) const {
         return infinite ? false : rhs.infinite ? true : *key < *rhs.key;
     }
 };
 
-indirect_lower_key_bound to_indirect(const lower_key_bound *kb) {
-    return indirect_lower_key_bound{&kb->key, kb->infinite};
+indirect_key_or_max to_indirect(const key_or_max *kb) {
+    return indirect_key_or_max{&kb->key, kb->infinite};
 }
 
 static const store_key_t store_key_min = store_key_t::min();
@@ -286,21 +286,21 @@ public:
         finished = true;
     }
 
-    indirect_lower_key_bound best_unpopped_key() const {
+    indirect_key_or_max best_unpopped_key() const {
         r_sanity_check(!finished);
         if (cached_index < cached->cache.size()) {
-            return indirect_lower_key_bound{&cached->cache[cached_index].key, false};
+            return indirect_key_or_max{&cached->cache[cached_index].key, false};
         } else if (fresh != nullptr && fresh_index < fresh->stream.size()) {
-            return indirect_lower_key_bound{&fresh->stream[fresh_index].key, false};
+            return indirect_key_or_max{&fresh->stream[fresh_index].key, false};
         } else {
             if (!reversed(sorting)) {
                 // Thus left is not infinite.
                 return cached->key_range.is_empty()
-                    ? indirect_lower_key_bound{nullptr /* unused */, true}
+                    ? indirect_key_or_max{nullptr /* unused */, true}
                     : to_indirect(&cached->key_range.left);
             } else {
                 return cached->key_range.is_empty()
-                    ? indirect_lower_key_bound{&store_key_min, false}
+                    ? indirect_key_or_max{&store_key_min, false}
                     : to_indirect(&cached->key_range.right);
             }
         }
@@ -398,7 +398,7 @@ raw_stream_t rget_response_reader_t::unshard(
                     // decremented key is outside the truncated secondary keyspace (since
                     // it is 250 bytes long and the secondary keyspace is 125 or so),
                     // which means we can get away with using raw_key.
-                    pair.second.key_range.right = new_bound->raw_key.make_lower_bound();
+                    pair.second.key_range.right = new_bound->raw_key;
                 } else {
                     pair.second.key_range.right = pair.second.key_range.left;
                 }
@@ -436,10 +436,10 @@ raw_stream_t rget_response_reader_t::unshard(
                 coro_t::yield();
             }
             pseudoshard_t *best_shard = &pseudoshards[0];
-            indirect_lower_key_bound best_key = best_shard->best_unpopped_key();
+            indirect_key_or_max best_key = best_shard->best_unpopped_key();
             for (size_t i = 1; i < pseudoshards.size(); ++i) {
                 pseudoshard_t *cur_shard = &pseudoshards[i];
-                indirect_lower_key_bound cur_key = cur_shard->best_unpopped_key();
+                indirect_key_or_max cur_key = cur_shard->best_unpopped_key();
                 if (is_better(cur_key, best_key, sorting)) {
                     best_shard = cur_shard;
                     best_key = cur_key;
@@ -530,7 +530,7 @@ optional<active_state_t> rget_response_reader_t::get_active_state() {
         key_range_t last_read_range;
         last_read_range.left = stamp_it->second.last_read_start;
         if (left_of_bound(stamp_it->second.last_read_start, range_pair.second.key_range.left)) {
-            last_read_range.right = to_right_bound(range_pair.second.key_range.left);
+            last_read_range.right = key_or_max(range_pair.second.key_range.left).to_right_bound();
         } else {
             last_read_range.right = key_range_t::right_bound_t(stamp_it->second.last_read_start);
         }

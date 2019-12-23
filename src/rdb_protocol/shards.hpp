@@ -9,7 +9,7 @@
 #include <vector>
 
 #include "arch/runtime/coroutines.hpp"
-#include "btree/key_or_max.hpp"
+#include "btree/key_edges.hpp"
 #include "btree/keys.hpp"
 #include "btree/types.hpp"
 #include "containers/archive/stl_types.hpp"

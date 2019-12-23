@@ -397,7 +397,7 @@ key_range_t sindex_key_range(const store_key_t &start,
     } else {
         end_key = key_or_max(end);
     }
-    return half_open(start, std::move(end_key));
+    return half_open_key_range(start, std::move(end_key));
 }
 
 }  // namespace rdb_protocol
@@ -526,7 +526,7 @@ struct rdb_r_shard_visitor_t : public boost::static_visitor<bool> {
                             r_sanity_check(!it->second.infinite);  // See is_empty check below.
                             rr->region.left = it->second.key;
                         } else {
-                            key_range_t::right_bound_t rb = to_right_bound(it->second);
+                            key_range_t::right_bound_t rb = key_or_max(it->second).to_right_bound();
                             guarantee(rb <= rr->region.right);
                             rr->region.right = std::move(rb);
                         }
@@ -538,7 +538,7 @@ struct rdb_r_shard_visitor_t : public boost::static_visitor<bool> {
                             r_sanity_check(!it->second.infinite);  // See is_empty check below.
                             rr->sindex->region->left = it->second.key;
                         } else {
-                            rr->sindex->region->right = to_right_bound(it->second);
+                            rr->sindex->region->right = key_or_max(it->second).to_right_bound();
                         }
                         r_sanity_check(!rr->sindex->region->is_empty());
                     }
