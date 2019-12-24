@@ -51,11 +51,7 @@ void run_with_namespace_interface(
     nsi_shards.push_back(region_t(key_range_t(key_range_t::none,   store_key_t(),  key_range_t::open, store_key_t("n"))));
     nsi_shards.push_back(region_t(key_range_t(key_range_t::closed, store_key_t("n"), key_range_t::none, store_key_t() )));
 
-    // TODO: No temp_files, sorry.
-    std::vector<scoped_ptr_t<temp_file_t> > temp_files;
-    for (size_t i = 0; i < store_shards.size(); ++i) {
-        temp_files.push_back(make_scoped<temp_file_t>());
-    }
+    temp_file_t temp_file;
 
     temp_rockstore temp_rocks;
     io_backender_t io_backender(temp_rocks.rocks(), file_direct_io_mode_t::buffered_desired);
@@ -69,7 +65,7 @@ void run_with_namespace_interface(
         const bool do_create = rep == 0;
         scoped_ptr_t<store_t> underlying_store =
                 make_scoped<store_t>(io_backender.rocks(),
-                    temp_files[0]->name().permanent_path().c_str(), do_create,
+                    temp_file.name().permanent_path().c_str(), do_create,
                     version_t::zero(),
                     &get_global_perfmon_collection(), &ctx, &io_backender,
                     base_path_t("."), table_id, update_sindexes_t::UPDATE);
