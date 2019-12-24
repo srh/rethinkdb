@@ -175,7 +175,6 @@ void post_construct_and_drain_queue(
         scoped_ptr_t<disk_backed_queue_wrapper_t<rdb_modification_report_t> >
             &&mod_queue)
     THROWS_NOTHING {
-    // TODO: rockstore reading in this function
 
     // `post_construct_secondary_index_range` can post-construct multiple secondary
     // indexes at the same time. We don't currently make use of that functionality
