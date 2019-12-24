@@ -71,9 +71,6 @@ public:
 
 RDB_DECLARE_SERIALIZABLE_FOR_CLUSTER(key_or_max);
 
-static const key_or_max key_or_max_min = key_or_max::min();
-static const key_or_max key_or_max_infinity = key_or_max::infinity();
-
 void debug_print(printf_buffer_t *buf, const key_or_max &km);
 
 // Describes a closed left bound or an open right bound.  A partition of the key
