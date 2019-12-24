@@ -1,5 +1,3 @@
-TODO: Update this file for rocksdb.
-
 ## Overview
 
 ### Basic primitives
@@ -22,7 +20,7 @@ The `ql::val_t` type (defined in `rdb_protocol/val.hpp`) is the basic type of a 
 
 Most queries will need to perform operations on one or more tables. An operation on a table is represented as a `read_t` or `write_t` object (defined in `rdb_protocol/protocol.hpp`); the result of the operation is represented as a `read_response_t` or `write_response_t` object. The ReQL evaluation code passes the `read_t` and `write_t` objects to the `table_query_client_t` (see `clustering/query_routing/table_query_client.hpp`). The `table_query_client_t` finds the relevant `primary_query_server_t` by looking for its business card in the directory, and sends the query to the mailbox listed on the business card. (If the query affects multiple keys, there may be multiple relevant `primary_query_server_t`s; the `read_t` or `write_t` will be broken into several sub-`read_t`s or sub-`write_t`s, which will each be sent to a different `primary_query_server_t`.) The queries pass from the `primary_query_server_t` via a series of types defined in `clustering/immediate_consistency/` until they eventually reach the `store_t`. If `read_mode` is `"outdated"`, read queries will reach the `store_t` through the `direct_query_server_t` instead of the `primary_query_server_t`.
 
-`store_t` (defined in `rdb_protocol/store.hpp`) is responsible for executing the `read_t` and `write_t` operations on the RethinkDB storage engine and collecting the results. Every RethinkDB table is represented as a B-tree. The blocks of the B-tree are stored in RethinkDB's custom page cache, `page_cache_t` (defined in `buffer_cache/page_cache.hpp`). The `btree/` directory contains functions for executing insertion, deletion, lookup, traversal, etc. operations against the B-tree stored in the page cache. Modified pages are eventually flushed to disk via RethinkDB's log-structured serializer, `log_serializer_t` (defined in `serializer/log/log_serializer.hpp`).
+`store_t` (defined in `rdb_protocol/store.hpp`) is responsible for executing the `read_t` and `write_t` operations on the RethinkDB storage engine and collecting the results.  Every RethinkDB table and its metadata is stored under a key prefix defined by `table_prefix` (declared in `rockstore/store.hpp`).  The actual data is stored using RocksDB.  Much of the code and types traces back to the previous home-grown storage engine.
 
 When the `store_t` finishes executing the `read_t` or `write_t` against the B-tree, it returns a `read_response_t` or `write_response_t`, which is passed back via the same way the `read_t` or `write_t` arrived until it gets back to the `ql::term_t` that initiated the request. When the `eval()` method on the root term finishes executing, the response is sent back over the TCP connection to the client driver that initiated the request.
 
