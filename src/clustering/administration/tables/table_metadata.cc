@@ -32,9 +32,9 @@ key_range_t table_shard_scheme_t::get_shard_range(size_t i) const {
     }
 }
 
-size_t table_shard_scheme_t::find_shard_for_key(const virtual_key &key) const {
+size_t table_shard_scheme_t::find_shard_for_key(const virtual_key_ptr &key) const {
     size_t ix = 0;
-    while (ix < split_points.size() && key >= split_points[ix]) {
+    while (ix < split_points.size() && key.grequal_to(split_points[ix])) {
         ++ix;
     }
     return ix;

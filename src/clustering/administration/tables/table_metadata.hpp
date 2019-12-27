@@ -8,7 +8,6 @@
 #include <utility>
 #include <vector>
 
-#include "btree/virtual_key.hpp"
 #include "buffer_cache/types.hpp"   // for `write_durability_t`
 #include "clustering/administration/servers/server_metadata.hpp"
 #include "clustering/generic/nonoverlapping_regions.hpp"
@@ -72,6 +71,28 @@ RDB_DECLARE_EQUALITY_COMPARABLE(table_config_t);
 RDB_DECLARE_SERIALIZABLE(table_config_t::shard_t);
 RDB_DECLARE_EQUALITY_COMPARABLE(table_config_t::shard_t);
 
+// Represents a store_key_t.
+struct virtual_key_ptr {
+    bool is_decremented = false;
+    const store_key_t *key;
+
+    virtual_key_ptr(bool _is_decremented, const store_key_t *_key)
+        : is_decremented(_is_decremented), key(_key) {}
+    explicit virtual_key_ptr(const store_key_t *k) : is_decremented(false), key(k) {}
+    static virtual_key_ptr decremented(const store_key_t *k) {
+        return virtual_key_ptr(true, k);
+    }
+
+    static virtual_key_ptr guarantee_decremented(const store_key_t *k) {
+        guarantee(k->size() != 0, "guarantee_decremented sees empty key");
+        return virtual_key_ptr(true, k);
+    }
+
+    bool grequal_to(const store_key_t &rhs) const {
+        return is_decremented ? *key > rhs : *key >= rhs;
+    }
+};
+
 class table_shard_scheme_t {
 public:
     std::vector<store_key_t> split_points;
@@ -85,7 +106,7 @@ public:
     }
 
     key_range_t get_shard_range(size_t i) const;
-    size_t find_shard_for_key(const virtual_key &key) const;
+    size_t find_shard_for_key(const virtual_key_ptr &key) const;
 };
 
 RDB_DECLARE_SERIALIZABLE(table_shard_scheme_t);

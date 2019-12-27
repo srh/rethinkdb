@@ -515,17 +515,15 @@ bool real_reql_cluster_interface_t::table_estimate_doc_counts(
         *doc_counts_out = std::vector<int64_t>(config.shard_scheme.num_shards(), 0);
         for (auto it = counts.begin(); it != counts.end(); ++it) {
             /* Calculate the range of shards that this key-range overlaps with */
-            // TODO: A needless string copy with this virtual_key.
-            size_t left_shard = config.shard_scheme.find_shard_for_key(virtual_key(store_key_t(it->first)));
+            size_t left_shard = config.shard_scheme.find_shard_for_key(virtual_key_ptr(&it->first));
             auto jt = it;
             ++jt;
             size_t right_shard;
             if (jt == counts.end()) {
                 right_shard = config.shard_scheme.num_shards() - 1;
             } else {
-                store_key_t right_key = jt->first;
                 right_shard = config.shard_scheme.find_shard_for_key(
-                    virtual_key::guarantee_decremented(std::move(right_key)));
+                    virtual_key_ptr::guarantee_decremented(&jt->first));
             }
             /* We assume that every shard that this key-range overlaps with has an equal
             share of the keys in the key-range. This is shitty but oh well. */
