@@ -7,6 +7,7 @@
 #include "btree/concurrent_traversal.hpp"
 #include "btree/operations.hpp"
 #include "btree/reql_specific.hpp"
+#include "buffer_cache/page_cache.hpp"
 #include "rdb_protocol/secondary_operations.hpp"
 #include "buffer_cache/alt.hpp"
 #include "clustering/administration/issues/outdated_index.hpp"

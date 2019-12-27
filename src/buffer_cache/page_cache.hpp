@@ -9,17 +9,7 @@
 #include <utility>
 #include <vector>
 
-#include "buffer_cache/block_version.hpp"
-#include "buffer_cache/cache_account.hpp"
-#include "buffer_cache/types.hpp"
-#include "concurrency/access.hpp"
-#include "concurrency/auto_drainer.hpp"
-#include "concurrency/cond_var.hpp"
-#include "concurrency/fifo_enforcer.hpp"
 #include "concurrency/new_semaphore.hpp"
-#include "containers/intrusive_list.hpp"
-#include "containers/segmented_vector.hpp"
-#include "repli_timestamp.hpp"
 
 class alt_txn_throttler_t;
 class cache_t;

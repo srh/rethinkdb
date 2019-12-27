@@ -7,6 +7,7 @@
 #include "arch/runtime/thread_pool.hpp"
 #include "btree/backfill_debug.hpp"
 #include "btree/reql_specific.hpp"
+#include "concurrency/auto_drainer.hpp"
 #include "concurrency/pmap.hpp"
 #include "containers/archive/optional.hpp"
 #include "containers/archive/stl_types.hpp"

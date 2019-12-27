@@ -9,17 +9,15 @@
 
 #include "rocksdb/utilities/write_batch_with_index.h"
 
-// TODO: Remove unused includes.
-#include "buffer_cache/page_cache.hpp"
 #include "buffer_cache/types.hpp"
 #include "concurrency/rwlock.hpp"
 #include "concurrency/new_semaphore.hpp"
 #include "concurrency/new_mutex.hpp"
 #include "containers/scoped.hpp"
-#include "containers/two_level_array.hpp"
-#include "containers/uuid.hpp"
-#include "repli_timestamp.hpp"
 
+namespace alt { class throttler_acq_t; }
+class cache_account_t;
+class cache_conn_t;
 class perfmon_collection_t;
 namespace rockstore { class store; }
 class real_superblock_lock;

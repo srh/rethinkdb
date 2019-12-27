@@ -4,13 +4,15 @@
 
 #include "arch/types.hpp"
 #include "arch/runtime/coroutines.hpp"
+#include "buffer_cache/block_version.hpp"
+#include "buffer_cache/cache_account.hpp"
+#include "buffer_cache/page_cache.hpp"
 #include "concurrency/auto_drainer.hpp"
 #include "rockstore/store.hpp"
 #include "utils.hpp"
 
 #define ALT_DEBUG 0
 
-using alt::block_version_t;
 using alt::throttler_acq_t;
 
 const int64_t MINIMUM_SOFT_UNWRITTEN_CHANGES_LIMIT = 1;

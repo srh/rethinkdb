@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "rdb_protocol/secondary_operations.hpp"
+#include "buffer_cache/cache_account.hpp"
 #include "buffer_cache/types.hpp"
 #include "concurrency/auto_drainer.hpp"
 #include "concurrency/queue/disk_backed_queue_wrapper.hpp"
