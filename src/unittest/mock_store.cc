@@ -521,7 +521,6 @@ bool mock_store_t::check_ok_to_receive_backfill() THROWS_NOTHING {
 }
 
 void mock_store_t::reset_data(
-        const version_t &zero_version,
         const region_t &subregion,
         UNUSED write_durability_t durability,
         signal_t *interruptor) THROWS_ONLY(interrupted_exc_t) {
@@ -547,7 +546,7 @@ void mock_store_t::reset_data(
         }
     }
 
-    metainfo_.update(subregion, zero_version);
+    metainfo_.update(subregion, version_t::zero());
 }
 
 std::string mock_store_t::values(std::string key) {

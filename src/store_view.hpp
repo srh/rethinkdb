@@ -243,9 +243,8 @@ public:
     virtual bool check_ok_to_receive_backfill() THROWS_NOTHING = 0;
 
     /* Deletes every key in the region, and sets the metainfo for that region to
-    `zero_version`. */
+    version_t::zero(). */
     virtual void reset_data(
-            const version_t &zero_version,
             const region_t &subregion,
             write_durability_t durability,
             signal_t *interruptor)

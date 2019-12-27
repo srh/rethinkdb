@@ -83,7 +83,6 @@ sindex_not_ready_exc_t::~sindex_not_ready_exc_t() throw() { }
 store_t::store_t(rockstore::store *_rocks,
                  const char *perfmon_prefix,
                  bool create,
-                 version_t zero_version,
                  perfmon_collection_t *parent_perfmon_collection,
                  rdb_context_t *_ctx,
                  io_backender_t *io_backender,
@@ -123,7 +122,7 @@ store_t::store_t(rockstore::store *_rocks,
         // lock ordering logic, when we go rocks-only.
         // TODO: Not to mention... file existence logic.
         btree_slice_t::init_real_superblock(
-            superblock.get(), rocksh(), key.vector(), zero_version);
+            superblock.get(), rocksh(), key.vector(), version_t::zero());
         txn.commit(rocks, std::move(superblock));
     }
 
@@ -231,7 +230,6 @@ void store_t::write(
 }
 
 void store_t::reset_data(
-        const version_t &zero_metainfo,
         const region_t &subregion,
         const write_durability_t durability,
         signal_t *interruptor)
@@ -275,7 +273,7 @@ void store_t::reset_data(
 
         metainfo->update(superblock.get(),
                          rocksh(),
-                         region_map_t<version_t>(deleted_region, zero_metainfo));
+                         region_map_t<version_t>(deleted_region, version_t::zero()));
 
         if (!mod_reports.empty()) {
             // TODO: Pass along the transactionality from rdb_erase_small_range for rocksdb.

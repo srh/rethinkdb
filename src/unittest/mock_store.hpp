@@ -91,7 +91,6 @@ public:
     bool check_ok_to_receive_backfill() THROWS_NOTHING;
 
     void reset_data(
-            const version_t &zero_version,
             const region_t &subregion,
             write_durability_t durability,
             signal_t *interruptor)

@@ -174,14 +174,13 @@ public:
     }
 
     void reset_data(
-            const version_t &zero_version,
             const region_t &subregion,
             write_durability_t durability,
             signal_t *interruptor)
             THROWS_ONLY(interrupted_exc_t) {
         home_thread_mixin_t::assert_thread();
         rassert(region_is_superset(get_region(), subregion));
-        store_view->reset_data(zero_version, subregion, durability, interruptor);
+        store_view->reset_data(subregion, durability, interruptor);
     }
 
 private:

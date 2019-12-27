@@ -65,7 +65,6 @@ public:
     store_t(rockstore::store *rocks,
             const char *perfmon_prefix,
             bool create,
-            version_t zero_version,  // If create is true, used to initialize metainfo.
             perfmon_collection_t *parent_perfmon_collection,
             rdb_context_t *_ctx,
             io_backender_t *io_backender,
@@ -140,7 +139,6 @@ public:
     bool check_ok_to_receive_backfill() THROWS_NOTHING;
 
     void reset_data(
-            const version_t &zero_version,
             const region_t &subregion,
             write_durability_t durability,
             signal_t *interruptor)

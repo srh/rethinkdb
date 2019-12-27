@@ -47,7 +47,6 @@ public:
     test_store_t(io_backender_t *io_backender, order_source_t *order_source, rdb_context_t *ctx) :
             store(io_backender->rocks(),
                 temp_file.name().permanent_path().c_str(), true,
-                version_t::zero(),
                 &get_global_perfmon_collection(), ctx, io_backender, base_path_t("."),
                 generate_uuid(), update_sindexes_t::UPDATE) {
         /* Initialize store metadata */

@@ -66,7 +66,6 @@ void run_with_namespace_interface(
         scoped_ptr_t<store_t> underlying_store =
                 make_scoped<store_t>(io_backender.rocks(),
                     temp_file.name().permanent_path().c_str(), do_create,
-                    version_t::zero(),
                     &get_global_perfmon_collection(), &ctx, &io_backender,
                     base_path_t("."), table_id, update_sindexes_t::UPDATE);
 

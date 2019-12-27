@@ -56,7 +56,6 @@ public:
                 rocks,
                 "shard",
                 create,
-                version_t::zero(),
                 perfmon_collection_serializers,
                 rdb_context,
                 io_backender,
