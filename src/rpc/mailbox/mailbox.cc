@@ -104,7 +104,7 @@ mailbox_manager_t::mailbox_table_t::~mailbox_table_t() {
 }
 
 raw_mailbox_t *mailbox_manager_t::mailbox_table_t::find_mailbox(raw_mailbox_t::id_t id) {
-    std::map<raw_mailbox_t::id_t, raw_mailbox_t *>::iterator it = mailboxes.find(id);
+    auto it = mailboxes.find(id);
     if (it == mailboxes.end()) {
         return nullptr;
     } else {
@@ -240,10 +240,8 @@ raw_mailbox_t::id_t mailbox_manager_t::generate_mailbox_id() {
 
 raw_mailbox_t::id_t mailbox_manager_t::register_mailbox(raw_mailbox_t *mb) {
     raw_mailbox_t::id_t id = generate_mailbox_id();
-    std::map<raw_mailbox_t::id_t, raw_mailbox_t *> *mailboxes =
-        &mailbox_tables.get()->mailboxes;
-    std::pair<std::map<raw_mailbox_t::id_t, raw_mailbox_t *>::iterator, bool> res
-        = mailboxes->insert(std::make_pair(id, mb));
+    std::pair<std::unordered_map<raw_mailbox_t::id_t, raw_mailbox_t *>::iterator, bool> res
+        = mailbox_tables.get()->mailboxes.emplace(id, mb);
     guarantee(res.second);  // Assert a new element was inserted.
     return id;
 }

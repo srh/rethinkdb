@@ -2,7 +2,7 @@
 #ifndef RPC_MAILBOX_MAILBOX_HPP_
 #define RPC_MAILBOX_MAILBOX_HPP_
 
-#include <map>
+#include <unordered_map>
 #include <string>
 #include <vector>
 
@@ -41,7 +41,7 @@ private:
         ~mailbox_table_t();
         raw_mailbox_t::id_t next_mailbox_id;
         // TODO: use a buffered structure to reduce dynamic allocation
-        std::map<raw_mailbox_t::id_t, raw_mailbox_t *> mailboxes;
+        std::unordered_map<raw_mailbox_t::id_t, raw_mailbox_t *> mailboxes;
         raw_mailbox_t *find_mailbox(raw_mailbox_t::id_t);
     };
     one_per_thread_t<mailbox_table_t> mailbox_tables;
