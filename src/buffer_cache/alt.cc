@@ -141,7 +141,6 @@ txn_t::~txn_t() {
 
 void txn_t::commit(rockstore::store *rocks, scoped_ptr_t<real_superblock_lock> superblock) {
     cache_->assert_thread();
-    (void)durability_;  // TODO: Use this field (for rocksdb writing in txn commit)
 
     guarantee(!is_committed_);
     guarantee(access_ == access_t::write);
