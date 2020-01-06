@@ -52,8 +52,7 @@ TPTEST(BtreeMetainfo, MetainfoTest) {
         btree_slice_t::init_real_superblock(
             sb_lock.get(),
             rocksh,
-            std::vector<char>(),
-            version_t::zero());
+            std::vector<char>());
 
         txn.commit(rocksh.rocks, std::move(sb_lock));
     }

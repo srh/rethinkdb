@@ -46,8 +46,7 @@ public:
     static void init_real_superblock(
             real_superblock_lock *superblock,
             rockshard rocksh,
-            const std::vector<char> &metainfo_key,
-            const version_t &metainfo_value);
+            const std::vector<char> &metainfo_key);
 
     btree_slice_t(cache_t *cache,
                   perfmon_collection_t *parent,

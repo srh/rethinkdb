@@ -54,7 +54,7 @@ TPTEST(BTreeSindex, LowLevelOps) {
         auto sb_lock = make_scoped<real_superblock_lock>(&txn, access_t::write, new_semaphore_in_line_t());
         btree_slice_t::init_real_superblock(
             sb_lock.get(), rockshard(io_backender.rocks(), table_id),
-            std::vector<char>(), version_t::zero());
+            std::vector<char>());
 
         txn.commit(rocksh.rocks, std::move(sb_lock));
     }

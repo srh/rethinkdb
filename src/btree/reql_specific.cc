@@ -10,10 +10,9 @@
 
 void btree_slice_t::init_real_superblock(real_superblock_lock *superblock,
                                          rockshard rocksh,
-                                         const std::vector<char> &metainfo_key,
-                                         const version_t &metainfo_value) {
+                                         const std::vector<char> &metainfo_key) {
     superblock->write_acq_signal()->wait_lazily_ordered();
-    set_superblock_metainfo(superblock, rocksh, metainfo_key, metainfo_value);
+    set_superblock_metainfo(superblock, rocksh, metainfo_key, version_t::zero());
     initialize_secondary_indexes(rocksh, superblock);
 }
 

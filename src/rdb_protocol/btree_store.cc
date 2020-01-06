@@ -122,7 +122,7 @@ store_t::store_t(rockstore::store *_rocks,
         // lock ordering logic, when we go rocks-only.
         // TODO: Not to mention... file existence logic.
         btree_slice_t::init_real_superblock(
-            superblock.get(), rocksh(), key.vector(), version_t::zero());
+            superblock.get(), rocksh(), key.vector());
         txn.commit(rocks, std::move(superblock));
     }
 
