@@ -245,7 +245,7 @@ void real_table_persistence_interface_t::destroy_multistore(
     multistore_ptr_in->reset();
 
     std::string prefix = rockstore::table_prefix(table_id);
-    std::string end_prefix = rockstore::prefix_end(end_prefix);
+    std::string end_prefix = rockstore::prefix_end(prefix);
 
     rocksdb::WriteBatch batch;
     batch.DeleteRange(prefix, end_prefix);
