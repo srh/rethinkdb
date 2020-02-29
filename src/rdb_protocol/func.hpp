@@ -1,4 +1,5 @@
 // Copyright 2010-2015 RethinkDB, all rights reserved.
+// Changes copyright 2020 Sam Hughes, all rights reserved.
 #ifndef RDB_PROTOCOL_FUNC_HPP_
 #define RDB_PROTOCOL_FUNC_HPP_
 
@@ -10,6 +11,7 @@
 #include "errors.hpp"
 #include <boost/variant/static_visitor.hpp>
 
+#include "config/args.hpp"
 #include "containers/counted.hpp"
 #include "containers/uuid.hpp"
 #include "rdb_protocol/datum.hpp"
@@ -20,7 +22,9 @@
 #include "rdb_protocol/term_storage.hpp"
 #include "rpc/serialize_macros.hpp"
 
+#if JS_SUPPORT
 class js_runner_t;
+#endif
 
 namespace ql {
 
@@ -129,6 +133,7 @@ private:
     DISABLE_COPYING(reql_func_t);
 };
 
+#if JS_SUPPORT
 class js_func_t : public func_t {
 public:
     js_func_t(const std::string &_js_source,
@@ -160,11 +165,14 @@ private:
 
     DISABLE_COPYING(js_func_t);
 };
+#endif  // JS_SUPPORT
 
 class func_visitor_t {
 public:
     virtual void on_reql_func(const reql_func_t *reql_func) = 0;
+#if JS_SUPPORT
     virtual void on_js_func(const js_func_t *js_func) = 0;
+#endif
 protected:
     func_visitor_t() { }
     virtual ~func_visitor_t() { }
@@ -195,8 +203,10 @@ public:
     val_t *operator()(const std::string &err_val) const;
     // This JS call resulted in a JSON value
     val_t *operator()(const datum_t &json_val) const;
+#if JS_SUPPORT
     // This JS evaluation resulted in an id for a js function
     val_t *operator()(const js_id_t id_val) const;
+#endif
 
 private:
     std::string code;

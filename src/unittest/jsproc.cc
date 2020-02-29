@@ -1,4 +1,8 @@
 // Copyright 2010-2013 RethinkDB, all rights reserved.
+// Changes copyright 2020 Sam Hughes, all rights reserved.
+#include "config/args.hpp"
+#if JS_SUPPORT
+
 #include "containers/archive/archive.hpp"
 #include "extproc/extproc_pool.hpp"
 #include "extproc/extproc_spawner.hpp"
@@ -332,3 +336,5 @@ SPAWNER_TEST(JSProc, Passthrough) {
         passthrough_test_internal(&pool, nested_datum);
     }
 }
+
+#endif  // JS_SUPPORT

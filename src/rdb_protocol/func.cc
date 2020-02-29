@@ -1,6 +1,8 @@
 // Copyright 2010-2015 RethinkDB, all rights reserved.
+// Changes copyright 2020 Sam Hughes, all rights reserved.
 #include "rdb_protocol/func.hpp"
 
+#include "config/args.hpp"
 #include "pprint/js_pprint.hpp"
 #include "pprint/pprint.hpp"
 #include "rdb_protocol/env.hpp"
@@ -99,6 +101,7 @@ bool reql_func_t::is_simple_selector() const {
     return body->is_simple_selector();
 }
 
+#if JS_SUPPORT
 js_func_t::js_func_t(const std::string &_js_source,
                      uint64_t timeout_ms,
                      backtrace_id_t _backtrace)
@@ -144,12 +147,13 @@ deterministic_t js_func_t::is_deterministic() const {
     return deterministic_t::no();
 }
 
-void reql_func_t::visit(func_visitor_t *visitor) const {
-    visitor->on_reql_func(this);
-}
-
 void js_func_t::visit(func_visitor_t *visitor) const {
     visitor->on_js_func(this);
+}
+#endif  // JS_SUPPORT
+
+void reql_func_t::visit(func_visitor_t *visitor) const {
+    visitor->on_reql_func(this);
 }
 
 func_term_t::func_term_t(compile_env_t *env, const raw_term_t &t)
@@ -302,6 +306,7 @@ std::string reql_func_t::print_js_function() const {
     return ret;
 }
 
+#if JS_SUPPORT
 std::string js_func_t::print_source() const {
     std::string ret = strprintf("javascript timeout=%" PRIu64 "ms, source=", js_timeout_ms);
     ret += js_source;
@@ -316,6 +321,7 @@ bool js_func_t::filter_helper(env_t *env, datum_t arg) const {
     datum_t d = call(env, make_vector(arg), NO_FLAGS)->as_datum();
     return d.as_bool();
 }
+#endif  // JS_SUPPORT
 
 bool func_t::filter_call(env_t *env, datum_t arg, counted_t<const func_t> default_filter_val) const {
     // We have to catch every exception type and save it so we can rethrow it later
@@ -422,6 +428,7 @@ counted_t<const func_t> new_page_func(datum_t method, backtrace_id_t bt) {
     return counted_t<const func_t>();
 }
 
+#if JS_SUPPORT
 val_t *js_result_visitor_t::operator()(const std::string &err_val) const {
     rfail_target(parent, base_exc_t::LOGIC, "%s", err_val.c_str());
     unreachable();
@@ -437,5 +444,6 @@ val_t *js_result_visitor_t::operator()(UNUSED const js_id_t id_val) const {
                                                            parent->backtrace());
     return new val_t(func, parent->backtrace());
 }
+#endif  // JS_SUPPORT
 
 } // namespace ql

@@ -1,6 +1,10 @@
 // Copyright 2010-2013 RethinkDB, all rights reserved.
+// Changes copyright 2020 Sam Hughes, all rights reserved.
 #ifndef EXTPROC_JS_RUNNER_HPP_
 #define EXTPROC_JS_RUNNER_HPP_
+
+#include "config/args.hpp"
+#if JS_SUPPORT
 
 #include <string>
 #include <vector>
@@ -73,5 +77,7 @@ private:
 
     DISABLE_COPYING(js_runner_t);
 };
+
+#endif  // JS_SUPPORT
 
 #endif /* EXTPROC_JS_RUNNER_HPP_ */

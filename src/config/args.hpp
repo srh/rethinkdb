@@ -1,4 +1,5 @@
 // Copyright 2010-2012 RethinkDB, all rights reserved.
+// Changes copyright 2020 Sam Hughes, all rights reserved.
 #ifndef CONFIG_ARGS_HPP_
 #define CONFIG_ARGS_HPP_
 
@@ -197,6 +198,8 @@
 #define CORO_PRIORITY_RESET_DATA                (-2)
 #define CORO_PRIORITY_DIRECTORY_CHANGES         (-2)
 #define CORO_PRIORITY_LBA_GC                    (-2)
+
+#define JS_SUPPORT 0
 
 #endif  // CONFIG_ARGS_HPP_
 

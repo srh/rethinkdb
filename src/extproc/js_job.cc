@@ -1,5 +1,9 @@
 // Copyright 2010-2014 RethinkDB, all rights reserved.
+// Changes copyright 2020 Sam Hughes, all rights reserved.
 #include "extproc/js_job.hpp"
+
+#include "config/args.hpp"
+#if JS_SUPPORT
 
 #include <v8.h>
 #include <libplatform/libplatform.h>
@@ -757,3 +761,5 @@ v8::Handle<v8::Value> js_from_datum(const ql::datum_t &datum,
         return v8::Handle<v8::Value>();
     }
 }
+
+#endif  // JS_SUPPORT

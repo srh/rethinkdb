@@ -1,5 +1,9 @@
 // Copyright 2010-2014 RethinkDB, all rights reserved.
+// Changes copyright 2020 Sam Hughes, all rights reserved.
 #include "extproc/js_runner.hpp"
+
+#include "config/args.hpp"
+#if JS_SUPPORT
 
 #include <inttypes.h>   // For PRIu64
 
@@ -266,3 +270,5 @@ void js_runner_t::trim_cache() {
         throw;
     }
 }
+
+#endif  // JS_SUPPORT
