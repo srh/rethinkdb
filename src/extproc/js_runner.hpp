@@ -2,6 +2,9 @@
 #ifndef EXTPROC_JS_RUNNER_HPP_
 #define EXTPROC_JS_RUNNER_HPP_
 
+#include "config/args.hpp"
+#if JS_SUPPORT
+
 #include <string>
 #include <vector>
 #include <set>
@@ -73,5 +76,7 @@ private:
 
     DISABLE_COPYING(js_runner_t);
 };
+
+#endif  // JS_SUPPORT
 
 #endif /* EXTPROC_JS_RUNNER_HPP_ */

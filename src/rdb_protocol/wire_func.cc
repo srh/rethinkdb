@@ -1,9 +1,11 @@
 // Copyright 2010-2015 RethinkDB, all rights reserved.
 #include "rdb_protocol/wire_func.hpp"
 
+#include "config/args.hpp"
 #include "containers/archive/optional.hpp"
 #include "containers/archive/stl_types.hpp"
 #include "containers/archive/archive.hpp"
+#include "logger.hpp"
 #include "rdb_protocol/env.hpp"
 #include "rdb_protocol/func.hpp"
 #include "rdb_protocol/protocol.hpp"
@@ -72,6 +74,7 @@ public:
         serialize<W>(wm, backtrace);
     }
 
+#if JS_SUPPORT
     void on_js_func(const js_func_t *js_func) {
         serialize<W>(wm, wire_func_type_t::JS);
         const std::string &js_source = js_func->js_source;
@@ -81,6 +84,7 @@ public:
         backtrace_id_t backtrace = js_func->backtrace();
         serialize<W>(wm, backtrace);
     }
+#endif
 
 private:
     write_message_t *wm;
@@ -144,8 +148,13 @@ archive_result_t deserialize(read_stream_t *s, wire_func_t *wf) {
         res = deserialize_protobuf(s, &dummy_bt);
         if (bad(res)) { return res; }
 
+#if JS_SUPPORT
         wf->func = make_counted<js_func_t>(js_source, js_timeout_ms,
                                            backtrace_id_t::empty());
+#else  // JS_SUPPORT
+        logWRN("Attempted deserialization of js function with source `%s`", js_source.c_str());
+        res = archive_result_t::RANGE_ERROR;
+#endif
         return res;
     }
     default:
@@ -210,7 +219,13 @@ archive_result_t deserialize_wire_func(
         res = deserialize<W>(s, &bt);
         if (bad(res)) { return res; }
 
+#if JS_SUPPORT
         wf->func = make_counted<js_func_t>(js_source, js_timeout_ms, bt);
+#else  // JS_SUPPORT
+        logWRN("Attempted deserialization of js function with source `%s`", js_source.c_str());
+        res = archive_result_t::RANGE_ERROR;
+#endif
+
         return res;
     }
     default:

@@ -2,6 +2,9 @@
 #ifndef EXTPROC_JS_JOB_HPP_
 #define EXTPROC_JS_JOB_HPP_
 
+#include "config/args.hpp"
+#if JS_SUPPORT
+
 #include <string>
 #include <vector>
 
@@ -34,5 +37,7 @@ private:
     ql::configured_limits_t limits;
     DISABLE_COPYING(js_job_t);
 };
+
+#endif  // JS_SUPPORT
 
 #endif /* EXTPROC_JS_JOB_HPP_ */

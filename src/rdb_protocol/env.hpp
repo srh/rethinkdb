@@ -72,9 +72,11 @@ public:
 
     extproc_pool_t *get_extproc_pool();
 
+#if JS_SUPPORT
     // Returns js_runner, but first calls js_runner->begin() if it hasn't
     // already been called.
     js_runner_t *get_js_runner();
+#endif
 
     reql_cluster_interface_t *reql_cluster_interface();
 
@@ -164,7 +166,9 @@ private:
 
     rdb_context_t *const rdb_ctx_;
 
+#if JS_SUPPORT
     js_runner_t js_runner_;
+#endif
 
     eval_callback_t *eval_callback_;
 

@@ -3,6 +3,7 @@
 
 #include <string>
 
+#include "config/args.hpp"
 #include "rdb_protocol/error.hpp"
 #include "rdb_protocol/func.hpp"
 #include "rdb_protocol/op.hpp"
@@ -34,6 +35,7 @@ private:
 
         std::string source = args->arg(env, 0)->as_datum().as_str().to_std();
 
+#if JS_SUPPORT
         // JS runner configuration is limited to setting an execution timeout.
         js_runner_t::req_config_t config;
         config.timeout_ms = timeout_ms;
@@ -48,6 +50,12 @@ private:
                   "Javascript query `%s` caused a crash in a worker process.",
                   source.c_str());
         }
+#else  // JS_SUPPORT
+        // We might want to consider using a different clustering magic when JS_SUPPORT
+        // is disabled, but because the function is non-deterministic, we don't need to.
+        rfail(base_exc_t::LOGIC,
+            "JavaScript support is not enabled on this node.");
+#endif  // JS_SUPPORT
     }
     virtual const char *name() const { return "javascript"; }
 
