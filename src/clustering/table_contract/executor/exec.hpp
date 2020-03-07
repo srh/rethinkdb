@@ -1,10 +1,12 @@
 // Copyright 2010-2015 RethinkDB, all rights reserved.
+// Changes copyright 2020 Sam Hughes, all rights reserved.
 #ifndef CLUSTERING_TABLE_CONTRACT_EXECUTOR_EXEC_HPP_
 #define CLUSTERING_TABLE_CONTRACT_EXECUTOR_EXEC_HPP_
 
 #include "clustering/id_types.hpp"
 #include "clustering/immediate_consistency/backfill_metadata.hpp"
 #include "clustering/immediate_consistency/remote_replicator_metadata.hpp"
+#include "clustering/query_routing/metadata.hpp"
 #include "paths.hpp"
 #include "store_view.hpp"
 

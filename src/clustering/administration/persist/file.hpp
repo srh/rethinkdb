@@ -1,4 +1,5 @@
 // Copyright 2010-2015 RethinkDB, all rights reserved.
+// Changes copyright 2020 Sam Hughes, all rights reserved.
 #ifndef CLUSTERING_ADMINISTRATION_PERSIST_FILE_HPP_
 #define CLUSTERING_ADMINISTRATION_PERSIST_FILE_HPP_
 
@@ -23,6 +24,8 @@ public:
     }
 };
 
+class metadata_file_t;
+
 namespace metadata {
 class read_txn_t;
 class write_txn_t;
@@ -39,7 +42,7 @@ public:
         return copy;
     }
 private:
-    friend class metadata_file_t;
+    friend class ::metadata_file_t;
     friend class read_txn_t;
     friend class write_txn_t;
     store_key_t key;

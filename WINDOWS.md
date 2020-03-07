@@ -32,6 +32,7 @@ From a Cygwin shell:
 
 ```
 ./configure
+# You might need to comment out FETCH_LIST += admin-deps from config.mk here -srh
 make -j
 ```
 
@@ -45,3 +46,4 @@ On some systems, you might get permission errors like the ones described in
 https://github.com/npm/npm/issues/10826 during the build from npm.
 Try running `npm install -g JSONStream` and then run `make -j` again to work
 around this issue.
+

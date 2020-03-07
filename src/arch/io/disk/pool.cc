@@ -1,4 +1,5 @@
 // Copyright 2010-2013 RethinkDB, all rights reserved.
+// Changes copyright 2020 Sam Hughes, all rights reserved.
 #include "arch/io/disk/pool.hpp"
 
 #include <fcntl.h>
@@ -6,6 +7,8 @@
 #include <sys/types.h>
 #include <sys/uio.h>
 #include <unistd.h>
+
+#include <algorithm>
 
 #include "arch/io/disk.hpp"
 #include "config/args.hpp"

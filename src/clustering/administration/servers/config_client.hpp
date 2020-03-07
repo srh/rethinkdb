@@ -1,4 +1,5 @@
 // Copyright 2010-2014 RethinkDB, all rights reserved.
+// Changes copyright 2020 Sam Hughes, all rights reserved.
 #ifndef CLUSTERING_ADMINISTRATION_SERVERS_CONFIG_CLIENT_HPP_
 #define CLUSTERING_ADMINISTRATION_SERVERS_CONFIG_CLIENT_HPP_
 
@@ -8,12 +9,12 @@
 
 #include "clustering/administration/servers/server_metadata.hpp"
 #include "concurrency/watchable_map.hpp"
+#include "containers/empty_value.hpp"
 #include "containers/incremental_lenses.hpp"
 #include "rpc/semilattice/view.hpp"
 
 struct admin_err_t;
 class cluster_directory_metadata_t;
-class empty_value_t;
 class mailbox_manager_t;
 
 struct server_connectivity_t {
