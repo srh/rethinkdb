@@ -1,4 +1,5 @@
 // Copyright 2010-2012 RethinkDB, all rights reserved.
+// Changes copyright 2020 Sam Hughes, all rights reserved.
 #include "arch/address.hpp"
 
 #include <errno.h>
@@ -19,6 +20,7 @@
 #include "arch/io/network.hpp"
 #include "arch/runtime/thread_pool.hpp"
 #include "logger.hpp"
+#include "utils.hpp"
 
 host_lookup_exc_t::host_lookup_exc_t(const std::string &_host,
                                      int _res, int _errno_res)

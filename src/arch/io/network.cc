@@ -1,5 +1,5 @@
 // Copyright 2010-2013 RethinkDB, all rights reserved.
-
+// Changes copyright 2020 Sam Hughes, all rights reserved.
 #include "arch/io/network.hpp"
 
 #include <errno.h>
@@ -28,9 +28,10 @@
 #include "concurrency/exponential_backoff.hpp"
 #include "concurrency/wait_any.hpp"
 #include "containers/printf_buffer.hpp"
+#include "errors.hpp"
 #include "logger.hpp"
 #include "perfmon/perfmon.hpp"
-#include "errors.hpp"
+#include "utils.hpp"
 
 #ifdef _WIN32
 #include "concurrency/pmap.hpp"
