@@ -2,6 +2,8 @@
 // Copyright 2010-2014 RethinkDB, all rights reserved.
 #include "clustering/administration/tables/table_metadata.hpp"
 
+#include <math.h>
+
 #include "clustering/administration/tables/database_metadata.hpp"
 #include "containers/archive/archive.hpp"
 #include "containers/archive/boost_types.hpp"
