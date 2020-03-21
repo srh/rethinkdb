@@ -327,6 +327,12 @@ RDB_IMPL_SEMILATTICE_JOINABLE_1(databases_semilattice_metadata_t, databases);
 RDB_IMPL_EQUALITY_COMPARABLE_1(databases_semilattice_metadata_t, databases);
 
 flush_interval_t get_flush_interval(const table_config_t &config) {
+    // datum should never be not an R_OBJECT -- we should gate that when the user
+    // updates the config -- but just in case that happens...
+    if (config.user_value.datum.get_type() != ql::datum_t::R_OBJECT) {
+        return flush_interval_t{DEFAULT_FLUSH_INTERVAL};
+    }
+
     ql::datum_t field = config.user_value.datum.get_field("srh/flush_interval",
                                                           ql::NOTHROW);
 
