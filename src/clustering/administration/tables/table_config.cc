@@ -632,6 +632,11 @@ bool convert_table_config_and_name_from_datum(
         if (!converter.get("user_value", &user_value_datum, error_out)) {
             return false;
         }
+        if (user_value_datum.get_type() != ql::datum_t::R_OBJECT) {
+            error_out->msg = "The `user_value` field must contain an object.";
+            return false;
+        }
+
         config_out->user_value = {std::move(user_value_datum)};
     } else {
         config_out->user_value = default_user_value();
