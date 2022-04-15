@@ -5,7 +5,8 @@ from __future__ import division
 
 import binascii
 import struct
-import biplist
+import mac_alias
+import sys
 
 try:
     next
@@ -32,24 +33,48 @@ class ILocCodec(object):
             x, y = struct.unpack(b'>II', bytesData[:8])
         return (x, y)
 
-class PlistCodec(object):
+if sys.version_info < (3, 4):
+    import biplist
+
+    class PlistCodec(object):
+        @staticmethod
+        def encode(plist):
+            return biplist.writePlistToString(plist)
+
+        @staticmethod
+        def decode(bytes):
+            return biplist.readPlistFromString(bytes)
+else:
+    import plistlib
+
+    class PlistCodec(object):
+        @staticmethod
+        def encode(plist):
+            return plistlib.dumps(plist, fmt=plistlib.FMT_BINARY)
+
+        @staticmethod
+        def decode(bytes):
+            return plistlib.loads(bytes)
+
+class BookmarkCodec(object):
     @staticmethod
-    def encode(plist):
-        return biplist.writePlistToString(plist)
+    def encode(bmk):
+        return bmk.to_bytes()
 
     @staticmethod
     def decode(bytes):
-        return biplist.readPlistFromString(bytes)
+        return mac_alias.Bookmark.from_bytes(bytes)
 
 # This list tells the code how to decode particular kinds of entry in the
 # .DS_Store file.  This is really a convenience, and we currently only
 # support a tiny subset of the possible entry types.
 codecs = {
-    'Iloc': ILocCodec,
-    'bwsp': PlistCodec,
-    'lsvp': PlistCodec,
-    'lsvP': PlistCodec,
-    'icvp': PlistCodec,
+    b'Iloc': ILocCodec,
+    b'bwsp': PlistCodec,
+    b'lsvp': PlistCodec,
+    b'lsvP': PlistCodec,
+    b'icvp': PlistCodec,
+    b'pBBk': BookmarkCodec
     }
 
 class DSStoreEntry(object):
@@ -65,6 +90,10 @@ class DSStoreEntry(object):
     def __init__(self, filename, code, typecode, value=None):
         if str != bytes and type(filename) == bytes:
             filename = filename.decode('utf-8')
+
+        if not isinstance(code, bytes):
+            code = code.encode('latin_1')
+
         self.filename = filename
         self.code = code
         self.type = typecode
@@ -176,25 +205,28 @@ class DSStoreEntry(object):
         utf16 = self.filename.encode('utf-16be')
         l = 4 + len(utf16) + 8
 
-        if isinstance(self.type, (str, unicode)):
+        if isinstance(self.type, unicode):
+            entry_type = self.type.encode('latin_1')
+            value = self.value
+        elif isinstance(self.type, (bytes, str)):
             entry_type = self.type
             value = self.value
         else:
-            entry_type = 'blob'
+            entry_type = b'blob'
             value = self.type.encode(self.value)
             
-        if entry_type == 'bool':
+        if entry_type == b'bool':
             l += 1
-        elif entry_type == 'long' or entry_type == 'shor':
+        elif entry_type == b'long' or entry_type == b'shor':
             l += 4
-        elif entry_type == 'blob':
+        elif entry_type == b'blob':
             l += 4 + len(value)
-        elif entry_type == 'ustr':
+        elif entry_type == b'ustr':
             utf16 = value.encode('utf-16be')
             l += 4 + len(utf16)
-        elif entry_type == 'type':
+        elif entry_type == b'type':
             l += 4
-        elif entry_type == 'comp' or entry_type == 'dutc':
+        elif entry_type == b'comp' or entry_type == b'dutc':
             l += 8
         else:
             raise ValueError('Unknown type code "%s"' % entry_type)
@@ -207,33 +239,38 @@ class DSStoreEntry(object):
             w = block.insert
         else:
             w = block.write
-        
-        if isinstance(self.type, (str, unicode)):
+
+        if isinstance(self.type, unicode):
+            entry_type = self.type.encode('latin_1')
+            value = self.value
+        elif isinstance(self.type, (bytes, str)):
             entry_type = self.type
             value = self.value
         else:
-            entry_type = 'blob'
+            entry_type = b'blob'
             value = self.type.encode(self.value)
-            
+
         utf16 = self.filename.encode('utf-16be')
         w(b'>I', len(utf16) // 2)
         w(utf16)
-        w(b'>4s4s', self.code.encode('utf-8'), entry_type.encode('utf-8'))
+        w(b'>4s4s', self.code, entry_type)
 
-        if entry_type == 'bool':
+        if entry_type == b'bool':
             w(b'>?', value)
-        elif entry_type == 'long' or entry_type == 'shor':
+        elif entry_type == b'long' or entry_type == b'shor':
             w(b'>I', value)
-        elif entry_type == 'blob':
+        elif entry_type == b'blob':
             w(b'>I', len(value))
             w(value)
-        elif entry_type == 'ustr':
+        elif entry_type == b'ustr':
             utf16 = value.encode('utf-16be')
             w(b'>I', len(utf16) // 2)
             w(utf16)
-        elif entry_type == 'type':
-            w(b'>4s', value.encode('utf-8'))
-        elif entry_type == 'comp' or entry_type == 'dutc':
+        elif entry_type == b'type':
+            if isinstance(value, unicode):
+                value = value.encode('latin_1')
+            w(b'>4s', value)
+        elif entry_type == b'comp' or entry_type == b'dutc':
             w(b'>Q', value)
         else:
             raise ValueError('Unknown type code "%s"' % entry_type)
@@ -257,7 +294,7 @@ class DSStore(object):
 
     Currently, we know how to decode "Iloc", "bwsp", "lsvp", "lsvP" and "icvp"
     blobs.  "Iloc" decodes to an (x, y) tuple, while the others are all decoded
-    using ``biplist``.
+    using ``biplist`` or ``plistlib`` depending on Python version.
 
     Assignment also works, e.g.::
 
@@ -278,7 +315,7 @@ class DSStore(object):
             self._nodes, self._page_size = s.read(b'>IIIII')
         self._min_usage = 2 * self._page_size // 3
         self._dirty = False
-        
+
     @classmethod
     def open(cls, file_or_name, mode='r+', initial_entries=None):
         """Open a ``.DS_Store`` file; pass either a Python file object, or a
@@ -552,7 +589,7 @@ class DSStore(object):
                     entries.append(entry)
                     pointers.append(right_ptr)
                     before.append(total)
-                    total += entry_Size
+                    total += entry_size
                 entries.append(e)
                 before.append(total)
                 total += block.tell() - pos
@@ -560,7 +597,7 @@ class DSStore(object):
             if next_node:
                 pointers.append(next_node)
 
-            pivot = self._split2([left_block, right_block],
+            pivot = self._split2([block, right_block],
                                  entries, pointers, before,
                                  bool(next_node))[0]
             
@@ -1123,6 +1160,8 @@ class DSStore(object):
 
     # Find implementation
     def _find(self, node, filename_lc, code=None):
+        if code is not None and not isinstance(code, bytes):
+            code = code.encode('latin_1')
         with self._get_block(node) as block:
             next_node, count = block.read(b'>II')
             if next_node:
@@ -1178,14 +1217,17 @@ class DSStore(object):
         def __getitem__(self, code):
             if code is None:
                 raise KeyError('no such key - [%s][None]' % self._filename)
-            
+
+            if not isinstance(code, bytes):
+                code = code.encode('latin_1')
+
             try:
                 item = next(self._store.find(self._filename, code))
             except StopIteration:
                 raise KeyError('no such key - [%s][%s]' % (self._filename,
                                code))
 
-            if not isinstance(item.type, (str, unicode)):
+            if not isinstance(item.type, (bytes, str, unicode)):
                 return item.value
             
             return (item.type, item.value)
@@ -1193,6 +1235,9 @@ class DSStore(object):
         def __setitem__(self, code, value):
             if code is None:
                 raise KeyError('bad key - [%s][None]' % self._filename)
+
+            if not isinstance(code, bytes):
+                code = code.encode('latin_1')
 
             codec = codecs.get(code, None)
             if codec:
