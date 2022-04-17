@@ -1,3 +1,4 @@
 ds_store: http://alastairs-place.net/projects/ds_store
 
-We use an unchanged version of checkin c80c237
+We use an unchanged version of checkin
+67e238d3dc8427891d2c1c7f1d1fa6194c44a5a6, Thu Oct 15 07:19:09 2020.
