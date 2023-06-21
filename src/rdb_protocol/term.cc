@@ -261,9 +261,11 @@ const raw_term_t &term_t::get_src() const {
 }
 
 scoped_ptr_t<val_t> runtime_term_t::eval_on_current_stack(
+        eval_error *err_out,
         scope_env_t *env,
         eval_flags_t eval_flags) const {
-        PROFILE_STARTER_IF_ENABLED(
+    (void)err_out;  // TODO: Make use.
+    PROFILE_STARTER_IF_ENABLED(
         env->env->profile() == profile_bool_t::PROFILE,
         strprintf("Evaluating %s.", name()),
         env->env->trace);
@@ -280,7 +282,11 @@ scoped_ptr_t<val_t> runtime_term_t::eval_on_current_stack(
     try {
 #endif // INSTRUMENT
         try {
-            scoped_ptr_t<val_t> ret = term_eval(env, eval_flags);
+            eval_error err;
+            scoped_ptr_t<val_t> ret = term_eval(&err, env, eval_flags);
+            if (err.has()) {
+                err.throw_exc();
+            }
             DEC_DEPTH;
             DBG("%s returned %s\n", name(), ret->print().c_str());
             return ret;
@@ -299,10 +305,11 @@ scoped_ptr_t<val_t> runtime_term_t::eval_on_current_stack(
 }
 
 scoped_ptr_t<val_t> runtime_term_t::eval(
+        eval_error *err_out,
         scope_env_t *env,
         eval_flags_t eval_flags) const {
     return call_with_enough_stack<scoped_ptr_t<val_t> >([&]() {
-            return eval_on_current_stack(env, std::move(eval_flags));
+            return eval_on_current_stack(err_out, env, std::move(eval_flags));
         }, MIN_EVAL_STACK_SPACE);
 }
 

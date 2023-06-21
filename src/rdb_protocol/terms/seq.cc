@@ -767,7 +767,12 @@ private:
 
                 std::vector<scoped_ptr_t<val_t> > array_args_evaluated;
                 for (auto &arg : array_args) {
-                    array_args_evaluated.push_back(arg->eval(env, eval_flags));
+                    eval_error err;
+                    auto val = arg->eval(&err, env, eval_flags);
+                    if (err.has()) {
+                        err.throw_exc();
+                    }
+                    array_args_evaluated.push_back(std::move(val));
                 }
 
                 union_stream = make_counted<ordered_union_datum_stream_t>(

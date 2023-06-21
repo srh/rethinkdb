@@ -199,8 +199,9 @@ private:
                             counted_t<grouped_data_t> *grouped_data_out,
                             scoped_ptr_t<val_t> *arg0_out) const;
 
-    virtual scoped_ptr_t<val_t> term_eval(scope_env_t *env,
-                                          eval_flags_t eval_flags) const;
+    scoped_ptr_t<val_t> term_eval(eval_error *err_out,
+        scope_env_t *env,
+        eval_flags_t eval_flags) const override;
     virtual scoped_ptr_t<val_t> eval_impl(scope_env_t *env,
                                           args_t *args,
                                           eval_flags_t eval_flags) const = 0;

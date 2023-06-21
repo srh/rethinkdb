@@ -292,6 +292,21 @@ private:
     std::string message;
 };
 
+struct eval_error {
+    bool has() const { return exc.has() || datum_exc.has(); }
+    bool throw_exc() const {
+        if (exc.has()) {
+            throw *exc;
+        } else {
+            rassert(datum_exc.has());
+            throw *datum_exc;
+        }
+    }
+
+    scoped_ptr_t<exc_t> exc;
+    scoped_ptr_t<datum_exc_t> datum_exc;
+};
+
 } // namespace ql
 
 #endif  // RDB_PROTOCOL_ERROR_HPP_

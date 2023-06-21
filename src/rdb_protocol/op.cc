@@ -59,7 +59,7 @@ public:
     deterministic_t is_deterministic() const final { return deterministic; }
     const char *name() const final { return "<EXPANDED FROM r.args>"; }
 private:
-    scoped_ptr_t<val_t> term_eval(scope_env_t *, eval_flags_t) const final {
+    scoped_ptr_t<val_t> term_eval(eval_error *, scope_env_t *, eval_flags_t) const final {
         return new_val(d);
     }
     datum_t d;
@@ -111,7 +111,11 @@ argvec_t arg_terms_t::start_eval(scope_env_t *env, eval_flags_t flags) const {
     for (const auto &arg : original_args) {
         if (arg->get_src().type() == Term::ARGS) {
             deterministic_t det = arg->is_deterministic();
-            scoped_ptr_t<val_t> v = arg->eval(env, new_flags);
+            eval_error err;
+            scoped_ptr_t<val_t> v = arg->eval(&err, env, new_flags);
+            if (err.has()) {
+                err.throw_exc();
+            }
             datum_t d = v->as_datum();
             for (size_t i = 0; i < d.arr_size(); ++i) {
                 // This is a little hacky because the determinism flag is for
@@ -159,7 +163,12 @@ scoped_ptr_t<val_t> args_t::arg(scope_env_t *env, size_t i, eval_flags_t flags) 
         arg0.reset();
         return v;
     } else {
-        return argv.remove(i)->eval(env, flags);
+        eval_error err;
+        scoped_ptr_t<val_t> ret = argv.remove(i)->eval(&err, env, flags);
+        if (err.has()) {
+            err.throw_exc();
+        }
+        return ret;
     }
 }
 
@@ -208,8 +217,11 @@ op_term_t::~op_term_t() {
     }, MIN_TERM_DESTRUCT_STACK_SPACE);
 }
 
-scoped_ptr_t<val_t> op_term_t::term_eval(scope_env_t *env,
+scoped_ptr_t<val_t> op_term_t::term_eval(eval_error *err_out,
+                                         scope_env_t *env,
                                          eval_flags_t eval_flags) const {
+    (void)err_out;  // TODO: Make use of
+
     argvec_t argv = arg_terms->start_eval(env, eval_flags);
     if (can_be_grouped()) {
         counted_t<grouped_data_t> gd;
@@ -244,7 +256,12 @@ scoped_ptr_t<val_t> op_term_t::optarg(scope_env_t *env, const std::string &key) 
     std::map<std::string, counted_t<const term_t> >::const_iterator it
         = optargs.find(key);
     if (it != optargs.end()) {
-        return it->second->eval(env);
+        eval_error err;
+        auto ret = it->second->eval(&err, env);
+        if (err.has()) {
+            err.throw_exc();
+        }
+        return ret;
     }
     // returns scoped_ptr_t<val_t>() if the key isn't found
     return env->env->get_optarg(env->env, key);
@@ -305,7 +322,11 @@ void op_term_t::maybe_grouped_data(scope_env_t *env,
         grouped_data_out->reset();
         arg0_out->reset();
     } else {
-        scoped_ptr_t<val_t> arg0 = argv->remove(0)->eval(env, flags);
+        eval_error err;
+        scoped_ptr_t<val_t> arg0 = argv->remove(0)->eval(&err, env, flags);
+        if (err.has()) {
+            err.throw_exc();
+        }
 
         counted_t<grouped_data_t> gd = is_grouped_seq_op()
             ? arg0->maybe_as_grouped_data()

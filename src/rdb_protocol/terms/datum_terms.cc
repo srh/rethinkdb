@@ -27,7 +27,7 @@ private:
     virtual deterministic_t is_deterministic() const {
         return deterministic_t::always();
     }
-    virtual scoped_ptr_t<val_t> term_eval(scope_env_t *, eval_flags_t) const {
+    virtual scoped_ptr_t<val_t> term_eval(eval_error *, scope_env_t *, eval_flags_t) const {
         return new_val(datum);
     }
     virtual const char *name() const { return "datum"; }
@@ -90,15 +90,20 @@ public:
             });
     }
 
-    scoped_ptr_t<val_t> term_eval(scope_env_t *env, eval_flags_t flags) const {
+    scoped_ptr_t<val_t> term_eval(eval_error *err_out, scope_env_t *env, eval_flags_t flags) const {
+        rassert(!err_out->has());
         bool literal_ok = flags & LITERAL_OK;
         eval_flags_t new_flags = literal_ok ? LITERAL_OK : NO_FLAGS;
         datum_object_builder_t acc;
         {
             profile::sampler_t sampler("Evaluating elements in make_obj.", env->env->trace);
             for (const auto &pair : optargs) {
+                scoped_ptr_t<val_t> eval_result = pair.second->eval(err_out, env, new_flags);
+                if (err_out->has()) {
+                    return scoped_ptr_t<val_t>();
+                }
                 bool dup = acc.add(datum_string_t(pair.first),
-                                   pair.second->eval(env, new_flags)->as_datum());
+                                   eval_result->as_datum());
                 rcheck(!dup, base_exc_t::LOGIC,
                        strprintf("Duplicate object key: %s.",
                                  pair.first.c_str()));
