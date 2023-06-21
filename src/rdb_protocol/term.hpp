@@ -32,6 +32,7 @@ class runtime_term_t : public slow_atomic_countable_t<runtime_term_t>,
                        public bt_rcheckable_t {
 public:
     virtual ~runtime_term_t();
+    static inline scoped_ptr_t<val_t> noval() { return scoped_ptr_t<val_t>(); }
     scoped_ptr_t<val_t> eval(eval_error *err_out, scope_env_t *env, eval_flags_t eval_flags = NO_FLAGS) const;
     virtual deterministic_t is_deterministic() const = 0;
     virtual const char *name() const = 0;
