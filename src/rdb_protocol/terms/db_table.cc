@@ -1010,7 +1010,7 @@ public:
     get_all_term_t(compile_env_t *env, const raw_term_t &term)
         : op_term_t(env, term, argspec_t(1, -1), optargspec_t({ "index" })) { }
 private:
-    datum_t get_key_arg(const scoped_ptr_t<val_t> &arg) const {
+    datum_t get_key_arg(eval_error *err_out, const scoped_ptr_t<val_t> &arg) const {
         datum_t datum_arg = arg->as_datum();
 
         rcheck_target(arg,
@@ -1018,9 +1018,12 @@ private:
                       base_exc_t::LOGIC,
                       "Cannot use a geospatial index with `get_all`. "
                       "Use `get_intersecting` instead.");
-        rcheck_target(arg, datum_arg.get_type() != datum_t::R_NULL,
-                      base_exc_t::NON_EXISTENCE,
-                      "Keys cannot be NULL.");
+        if (datum_arg.get_type() != datum_t::R_NULL) {
+            err_out->exc = make_scoped<exc_t>(base_exc_t::NON_EXISTENCE,
+                                              "Keys cannot be NULL.",
+                                              arg->backtrace());
+            return datum_t();
+        }
         return datum_arg;
     }
 
@@ -1040,7 +1043,8 @@ private:
             auto v_i = args->arg(err_out, env, i);
             if (err_out->has()) { return noval(); }
 
-            auto key = get_key_arg(v_i);
+            auto key = get_key_arg(err_out, v_i);
+            if (err_out->has()) { return noval(); }
             keys.insert(std::make_pair(std::move(key), 0)).first->second += 1;
         }
 
