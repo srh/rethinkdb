@@ -34,11 +34,29 @@ private:
         scoped_ptr_t<exc_t> err;
         scoped_ptr_t<val_t> v;
         try {
-            eval_error err;
-            v = args->arg(&err, env, 0);
-            if (err.has()) {
-                err.throw_exc();
+            eval_error eval_err;
+            v = args->arg(&eval_err, env, 0);
+            /* Duplicates code in the catch blocks. */
+            if (eval_err.exc.has()) {
+                if (eval_err.exc->get_type() == base_exc_t::NON_EXISTENCE) {
+                    err.init(new exc_t(*eval_err.exc));  // TODO: Just std::move(eval_err.exc)?
+                    func_arg = datum_t(eval_err.exc->what());  // TODO: <- take care here if we std::move.
+                } else {
+                    *err_out = std::move(eval_err);
+                    return noval();
+                }
+
+            } else if (eval_err.datum_exc.has()) {
+                if (eval_err.datum_exc->get_type() == base_exc_t::NON_EXISTENCE) {
+                    const datum_exc_t& e = *eval_err.datum_exc;
+                    err.init(new exc_t(e.get_type(), e.what(), backtrace()));
+                    func_arg = datum_t(e.what());
+                } else {
+                    *err_out = std::move(eval_err);
+                    return noval();
+                }
             }
+
             if (v->get_type().is_convertible(val_t::type_t::DATUM)) {
                 func_arg = v->as_datum();
                 if (func_arg.get_type() != datum_t::R_NULL) {
@@ -48,6 +66,7 @@ private:
                 return v;
             }
         } catch (const exc_t &e) {
+            /* Duplicated above. */
             if (e.get_type() == base_exc_t::NON_EXISTENCE) {
                 err.init(new exc_t(e));
                 func_arg = datum_t(e.what());
@@ -66,10 +85,10 @@ private:
         r_sanity_check(func_arg.get_type() == datum_t::R_NULL
                        || func_arg.get_type() == datum_t::R_STR);
         try {
-            eval_error err;
-            scoped_ptr_t<val_t> def = args->arg(&err, env, 1);
-            if (err.has()) {
-                err.throw_exc();
+            eval_error eval_err;
+            scoped_ptr_t<val_t> def = args->arg(&eval_err, env, 1);
+            if (eval_err.has()) {
+                eval_err.throw_exc();
             }
             if (def->get_type().is_convertible(val_t::type_t::FUNC)) {
                 return def->as_func()->call(env->env, func_arg);
