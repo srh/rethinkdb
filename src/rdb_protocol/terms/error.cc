@@ -14,8 +14,10 @@ public:
 private:
     virtual scoped_ptr_t<val_t> eval_impl(eval_error *err_out, scope_env_t *env, args_t *args, eval_flags_t) const {
         if (args->num_args() == 0) {
-            // TODO: Return this via err_out.
-            rfail(base_exc_t::EMPTY_USER, "Empty ERROR term outside a default block.");
+            err_out->exc.init(new exc_t(base_exc_t::EMPTY_USER,
+                                        "Empty ERROR term outside a default block.",
+                                        backtrace()));
+            return noval();
         } else {
             auto v = args->arg(err_out, env, 0);
             if (err_out->has()) { return noval(); }
