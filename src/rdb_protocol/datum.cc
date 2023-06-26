@@ -1452,6 +1452,7 @@ datum_t datum_t::get(size_t index, throw_bool_t throw_bool) const {
     if (index < array_size) {
         return unchecked_get(index);
     } else if (throw_bool == THROW) {
+        // TODO: Either change this or make a separate version of get that takes the param.
         rfail(base_exc_t::NON_EXISTENCE, "Index out of bounds: %zu", index);
     } else {
         return datum_t();
