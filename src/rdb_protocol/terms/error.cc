@@ -14,6 +14,7 @@ public:
 private:
     virtual scoped_ptr_t<val_t> eval_impl(eval_error *err_out, scope_env_t *env, args_t *args, eval_flags_t) const {
         if (args->num_args() == 0) {
+            // TODO: Return this via err_out.
             rfail(base_exc_t::EMPTY_USER, "Empty ERROR term outside a default block.");
         } else {
             auto v = args->arg(err_out, env, 0);
@@ -87,8 +88,25 @@ private:
         try {
             eval_error eval_err;
             scoped_ptr_t<val_t> def = args->arg(&eval_err, env, 1);
-            if (eval_err.has()) {
-                eval_err.throw_exc();
+            if (eval_err.exc.has()) {
+                // Duplicates code in catch block below.
+                const auto& e = *eval_err.exc;
+                if (e.get_type() == base_exc_t::EMPTY_USER) {
+                    if (err.has()) {
+                        err_out->exc = std::move(err);
+                        return noval();
+                    } else {
+                        r_sanity_check(func_arg.get_type() == datum_t::R_NULL);
+                        return v;
+                    }
+                } else {
+                    *err_out = std::move(eval_err);
+                    return noval();
+                }
+
+            } else if (eval_err.datum_exc.has()) {
+                *err_out = std::move(eval_err);
+                return noval();
             }
             if (def->get_type().is_convertible(val_t::type_t::FUNC)) {
                 return def->as_func()->call(env->env, func_arg);
@@ -96,6 +114,7 @@ private:
                 return def;
             }
         } catch (const base_exc_t &e) {
+            /* Duplicated by the code above. */
             if (e.get_type() == base_exc_t::EMPTY_USER) {
                 if (err.has()) {
                     throw *err;
