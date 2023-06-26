@@ -41,6 +41,7 @@ private:
             v = args->arg(&eval_err, env, 0);
             /* Duplicates code in the catch blocks. */
             if (eval_err.exc.has()) {
+                // TODO: Instead of throwing NON_EXISTENCE errors, pass them out.
                 if (eval_err.exc->get_type() == base_exc_t::NON_EXISTENCE) {
                     err.init(new exc_t(*eval_err.exc));  // TODO: Just std::move(eval_err.exc)?
                     func_arg = datum_t(eval_err.exc->what());  // TODO: <- take care here if we std::move.
