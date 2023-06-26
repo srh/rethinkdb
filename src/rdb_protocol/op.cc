@@ -157,23 +157,18 @@ size_t args_t::num_args() const {
 deterministic_t args_t::arg_is_deterministic(size_t i) const {
     return argv.is_deterministic(i);
 }
-scoped_ptr_t<val_t> args_t::arg(scope_env_t *env, size_t i, eval_flags_t flags) {
+scoped_ptr_t<val_t> args_t::arg(eval_error *err_out, scope_env_t *env, size_t i, eval_flags_t flags) {
     if (i == 0 && arg0.has()) {
         scoped_ptr_t<val_t> v = std::move(arg0);
         arg0.reset();
         return v;
     } else {
-        eval_error err;
-        scoped_ptr_t<val_t> ret = argv.remove(i)->eval(&err, env, flags);
-        if (err.has()) {
-            err.throw_exc();
-        }
-        return ret;
+        return argv.remove(i)->eval(err_out, env, flags);
     }
 }
 
-scoped_ptr_t<val_t> args_t::optarg(scope_env_t *env, const std::string &key) const {
-    return op_term->optarg(env, key);
+scoped_ptr_t<val_t> args_t::optarg(eval_error *err_out, scope_env_t *env, const std::string &key) const {
+    return op_term->optarg(err_out, env, key);
 }
 
 args_t::args_t(const op_term_t *_op_term, argvec_t _argv)
@@ -220,8 +215,6 @@ op_term_t::~op_term_t() {
 scoped_ptr_t<val_t> op_term_t::term_eval(eval_error *err_out,
                                          scope_env_t *env,
                                          eval_flags_t eval_flags) const {
-    (void)err_out;  // TODO: Make use of
-
     argvec_t argv = arg_terms->start_eval(env, eval_flags);
     if (can_be_grouped()) {
         counted_t<grouped_data_t> gd;
@@ -236,32 +229,29 @@ scoped_ptr_t<val_t> op_term_t::term_eval(eval_error *err_out,
             for (auto kv = gd->begin(); kv != gd->end(); ++kv) {
                 arg_terms->start_eval(env, eval_flags);
                 args_t args(this, argv, make_scoped<val_t>(kv->second, backtrace()));
-                (*out)[kv->first] = eval_impl(env, &args, eval_flags)->as_datum();
+                scoped_ptr_t<val_t> val = eval_impl(err_out, env, &args, eval_flags);
+                if (err_out->has()) { return noval(); }
+                (*out)[kv->first] = val->as_datum();
             }
             return make_scoped<val_t>(out, backtrace());
         } else {
             args_t args(this, std::move(argv), std::move(arg0));
-            return eval_impl(env, &args, eval_flags);
+            return eval_impl(err_out, env, &args, eval_flags);
         }
     } else {
         args_t args(this, std::move(argv));
-        return eval_impl(env, &args, eval_flags);
+        return eval_impl(err_out, env, &args, eval_flags);
     }
 }
 
 bool op_term_t::can_be_grouped() const { return true; }
 bool op_term_t::is_grouped_seq_op() const { return false; }
 
-scoped_ptr_t<val_t> op_term_t::optarg(scope_env_t *env, const std::string &key) const {
+scoped_ptr_t<val_t> op_term_t::optarg(eval_error *err_out, scope_env_t *env, const std::string &key) const {
     std::map<std::string, counted_t<const term_t> >::const_iterator it
         = optargs.find(key);
     if (it != optargs.end()) {
-        eval_error err;
-        auto ret = it->second->eval(&err, env);
-        if (err.has()) {
-            err.throw_exc();
-        }
-        return ret;
+        return it->second->eval(err_out, env);
     }
     // returns scoped_ptr_t<val_t>() if the key isn't found
     return env->env->get_optarg(env->env, key);
@@ -347,17 +337,18 @@ bounded_op_term_t::bounded_op_term_t(compile_env_t *env, const raw_term_t &term,
     : op_term_t(env, term, argspec,
                 optargspec.with({"left_bound", "right_bound"})) { }
 
-bool bounded_op_term_t::is_left_open(scope_env_t *env, args_t *args) const {
-    return open_bool(env, args, "left_bound", false);
+bool bounded_op_term_t::is_left_open(eval_error *err_out, scope_env_t *env, args_t *args) const {
+    return open_bool(err_out, env, args, "left_bound", false);
 }
 
-bool bounded_op_term_t::is_right_open(scope_env_t *env, args_t *args) const {
-    return open_bool(env, args, "right_bound", true);
+bool bounded_op_term_t::is_right_open(eval_error *err_out, scope_env_t *env, args_t *args) const {
+    return open_bool(err_out, env, args, "right_bound", true);
 }
 
 bool bounded_op_term_t::open_bool(
-        scope_env_t *env, args_t *args, const std::string &key, bool def/*ault*/) const {
-    scoped_ptr_t<val_t> v = args->optarg(env, key);
+        eval_error *err_out, scope_env_t *env, args_t *args, const std::string &key, bool def/*ault*/) const {
+    scoped_ptr_t<val_t> v = args->optarg(err_out, env, key);
+    if (err_out->has()) { return false; }
     if (!v.has()) {
         return def;
     }

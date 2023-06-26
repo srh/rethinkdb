@@ -188,7 +188,7 @@ private:
     // Union term is a friend so we can steal arguments from an array.
     friend class union_term_t;
     // Tries to get an optional argument, returns `scoped_ptr_t<val_t>()` if not found.
-    scoped_ptr_t<val_t> optarg(scope_env_t *env, const std::string &key) const;
+    scoped_ptr_t<val_t> optarg(eval_error *err_out, scope_env_t *env, const std::string &key) const;
 
     // Evaluates args[0] and sets *grouped_data_out to non-nil if it's grouped.
     // (Sets *arg0_out to non-nil if it's not grouped.  Both outputs are set to nil
@@ -231,11 +231,11 @@ public:
     virtual ~bounded_op_term_t() { }
 
 protected:
-    bool is_left_open(scope_env_t *env, args_t *args) const;
-    bool is_right_open(scope_env_t *env, args_t *args) const;
+    bool is_left_open(eval_error *err_out, scope_env_t *env, args_t *args) const;
+    bool is_right_open(eval_error *err_out, scope_env_t *env, args_t *args) const;
 
 private:
-    bool open_bool(scope_env_t *env, args_t *args, const std::string &key,
+    bool open_bool(eval_error *err_out, scope_env_t *env, args_t *args, const std::string &key,
                    bool def/*ault*/) const;
 };
 

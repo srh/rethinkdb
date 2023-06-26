@@ -55,7 +55,8 @@ private:
     virtual scoped_ptr_t<val_t>
     eval_impl(eval_error *err_out, scope_env_t *env, args_t *args, eval_flags_t) const {
         std::vector<std::pair<order_direction_t, counted_t<const func_t> > > comparisons
-            = build_comparisons_from_raw_term(this, env, args, get_src());
+            = build_comparisons_from_raw_term(err_out, this, env, args, get_src());
+        if (err_out->has()) { return noval(); }
         raw_term_t raw_term = get_src();
         lt_cmp_t lt_cmp(comparisons);
 

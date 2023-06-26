@@ -768,8 +768,10 @@ private:
         auto v0 = args->arg(err_out, env, 0);
         if (err_out->has()) { return noval(); }
         counted_t<table_slice_t> tbl_slice = v0->as_table_slice();
-        bool left_open = is_left_open(env, args);
-        bool right_open = is_right_open(env, args);
+        bool left_open = is_left_open(err_out, env, args);
+        if (err_out->has()) { return noval(); }
+        bool right_open = is_right_open(err_out, env, args);
+        if (err_out->has()) { return noval(); }
         auto v1 = args->arg(err_out, env, 1);
         if (err_out->has()) { return noval(); }
         auto v2 = args->arg(err_out, env, 2);

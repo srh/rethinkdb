@@ -285,11 +285,20 @@ private:
     virtual scoped_ptr_t<val_t> eval_impl(eval_error *err_out, scope_env_t *env, args_t *args, eval_flags_t) const {
         scoped_ptr_t<val_t> v = args->arg(err_out, env, 0);
         if (err_out->has()) { return noval(); }
-        bool left_open = is_left_open(env, args);
+        bool left_open = is_left_open(err_out, env, args);
+        if (err_out->has()) { return noval(); }
         auto v1 = args->arg(err_out, env, 1);
         if (err_out->has()) { return noval(); }
         int64_t fake_l = v1->as_int<int64_t>();
-        bool right_open = args->num_args() == 3 ? is_right_open(env, args) : false;
+
+        bool right_open;
+        if (args->num_args() == 3) {
+            right_open = is_right_open(err_out, env, args);
+            if (err_out->has()) { return noval(); }
+        } else {
+            right_open = false;
+        }
+
         int64_t fake_r;
         if (args->num_args() == 3) {
             auto v2 = args->arg(err_out, env, 2);
