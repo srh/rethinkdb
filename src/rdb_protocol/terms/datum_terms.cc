@@ -40,7 +40,7 @@ public:
                     double constant, const char *_name)
         : op_term_t(env, term, argspec_t(0)), constant_(constant), name_(_name) { }
 private:
-    virtual scoped_ptr_t<val_t> eval_impl(scope_env_t *, args_t *, eval_flags_t) const {
+    virtual scoped_ptr_t<val_t> eval_impl(eval_error *, scope_env_t *, args_t *, eval_flags_t) const {
         return new_val(datum_t(constant_));
     }
     virtual const char *name() const { return name_; }
@@ -54,13 +54,15 @@ public:
         : op_term_t(env, term, argspec_t(0, -1)) { }
 
 private:
-    virtual scoped_ptr_t<val_t> eval_impl(scope_env_t *env, args_t *args, eval_flags_t) const {
+    virtual scoped_ptr_t<val_t> eval_impl(eval_error *err_out, scope_env_t *env, args_t *args, eval_flags_t) const {
         datum_array_builder_t acc(env->env->limits());
         acc.reserve(args->num_args());
         {
             profile::sampler_t sampler("Evaluating elements in make_array.", env->env->trace);
             for (size_t i = 0; i < args->num_args(); ++i) {
-                acc.add(args->arg(env, i)->as_datum());
+                auto v_i = args->arg(err_out, env, i);
+                if (err_out->has()) { return noval(); }
+                acc.add(v_i->as_datum());
                 sampler.new_sample();
             }
         }
@@ -137,8 +139,9 @@ public:
     binary_term_t(compile_env_t *env, const raw_term_t &term)
         : op_term_t(env, term, argspec_t(1, 1)) { }
 private:
-    virtual scoped_ptr_t<val_t> eval_impl(scope_env_t *env, args_t *args, eval_flags_t) const {
-        scoped_ptr_t<val_t> arg = args->arg(env, 0);
+    virtual scoped_ptr_t<val_t> eval_impl(eval_error *err_out, scope_env_t *env, args_t *args, eval_flags_t) const {
+        scoped_ptr_t<val_t> arg = args->arg(err_out, env, 0);
+        if (err_out->has()) { return noval(); }
         datum_t datum_arg = arg->as_datum();
 
         if (datum_arg.get_type() == datum_t::type_t::R_BINARY) {
