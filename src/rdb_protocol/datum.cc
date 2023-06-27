@@ -1453,7 +1453,7 @@ datum_t datum_t::get(size_t index, throw_bool_t throw_bool) const {
     }
 }
 
-datum_t datum_t::get(eval_error *err_out, size_t index) const {
+datum_t datum_t::get_with_err(eval_error *err_out, size_t index) const {
     // Calling `arr_size()` here also makes sure this this is actually an R_ARRAY.
     const size_t array_size = arr_size();
     if (index < array_size) {
@@ -1532,7 +1532,7 @@ datum_t datum_t::get_field(const datum_string_t &key, throw_bool_t throw_bool) c
     return field;
 }
 
-datum_t datum_t::get_field(eval_error *err_out, const datum_string_t &key) const {
+datum_t datum_t::get_field_with_err(eval_error *err_out, const datum_string_t &key) const {
     datum_t field = get_field_nothrow(key);
     if (!field.has()) {
         err_out->datum_exc = make_scoped<datum_exc_t>(
@@ -1546,8 +1546,8 @@ datum_t datum_t::get_field(const char *key, throw_bool_t throw_bool) const {
     return get_field(datum_string_t(key), throw_bool);
 }
 
-datum_t datum_t::get_field(eval_error *err_out, const char *key) const {
-    return get_field(err_out, datum_string_t(key));
+datum_t datum_t::get_field_with_err(eval_error *err_out, const char *key) const {
+    return get_field_with_err(err_out, datum_string_t(key));
 }
 
 template <class json_writer_t>
