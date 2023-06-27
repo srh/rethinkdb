@@ -302,7 +302,9 @@ private:
         datum_t d = v0->as_datum();
         auto v1 = args->arg(err_out, env, 1);
         if (err_out->has()) { return noval(); }
-        return new_val(d.get_field(v1->as_str()));
+        datum_t d_field = d.get_field_with_err(err_out, v1->as_str());
+        if (err_out->has()) { return noval(); }
+        return new_val(std::move(d_field));
     }
     virtual const char *name() const { return "get_field"; }
 };
@@ -320,9 +322,11 @@ public:
 
 private:
     scoped_ptr_t<val_t> obj_eval_dereferenced(
-        const scoped_ptr_t<val_t> &v0, const scoped_ptr_t<val_t> &v1) const {
+        eval_error *err_out, const scoped_ptr_t<val_t> &v0, const scoped_ptr_t<val_t> &v1) const {
         datum_t d = v0->as_datum();
-        return new_val(d.get_field(v1->as_str()));
+        datum_t d_field = d.get_field_with_err(err_out, v1->as_str());
+        if (err_out->has()) { return noval(); }
+        return new_val(std::move(d_field));
     }
     virtual scoped_ptr_t<val_t> eval_impl(
         eval_error *err_out, scope_env_t *env, args_t *args, eval_flags_t) const {
@@ -342,7 +346,7 @@ private:
         case datum_t::R_STR:
             return impl.eval_impl_dereferenced(
                 err_out, this, env, args, v0,
-                [&](eval_error *) { return this->obj_eval_dereferenced(v0, v1); });
+                [&](eval_error *err_out) { return this->obj_eval_dereferenced(err_out, v0, v1); });
         case datum_t::MINVAL:
         case datum_t::R_ARRAY:
         case datum_t::R_BINARY:

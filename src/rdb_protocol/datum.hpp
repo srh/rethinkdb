@@ -282,15 +282,9 @@ public:
     datum_t get_field_nothrow(const datum_string_t &key) const;  // Still throws if not an object.
     datum_t get_field(const datum_string_t &key,
                       throw_bool_t throw_bool = THROW) const;
-    datum_t get_field_throw(const datum_string_t &key) const {
-        return get_field(key, THROW);
-    }
     datum_t get_field_with_err(eval_error *err_out, const datum_string_t &key) const;
     datum_t get_field(const char *key,
                       throw_bool_t throw_bool = THROW) const;
-    datum_t get_field_throw(const char *key) const {
-        return get_field(key, THROW);
-    }
     datum_t get_field_with_err(eval_error *err_out, const char *key) const;
     datum_t merge(const datum_t &rhs) const;
     // "Consumer defined" merge resolutions; these take limits unlike

@@ -239,6 +239,7 @@ bool contains(datum_t datum,
     try {
         bool res = true;
         if (const datum_string_t *str = pathspec.as_str()) {
+            // TODO: Perf: repeat calls to get_field.
             if (!(res &= (datum.get_field(*str, NOTHROW).has() &&
                           datum.get_field(*str).get_type() != datum_t::R_NULL))) {
                 return res;
