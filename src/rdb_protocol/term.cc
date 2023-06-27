@@ -264,7 +264,6 @@ scoped_ptr_t<val_t> runtime_term_t::eval_on_current_stack(
         eval_error *err_out,
         scope_env_t *env,
         eval_flags_t eval_flags) const {
-    (void)err_out;  // TODO: Make use.
     PROFILE_STARTER_IF_ENABLED(
         env->env->profile() == profile_bool_t::PROFILE,
         strprintf("Evaluating %s.", name()),
@@ -278,17 +277,27 @@ scoped_ptr_t<val_t> runtime_term_t::eval_on_current_stack(
     env->env->maybe_yield();
     INC_DEPTH;
 
+    // TODO: If INSTRUMENT is defined, we doubly invoke DEC_DEPTH if a datum_exc_t was thrown.
 #ifdef INSTRUMENT
     try {
 #endif // INSTRUMENT
         try {
-            eval_error err;
-            scoped_ptr_t<val_t> ret = term_eval(&err, env, eval_flags);
-            if (err.has()) {
-                err.throw_exc();
-            }
+            scoped_ptr_t<val_t> ret = term_eval(err_out, env, eval_flags);
             DEC_DEPTH;
-            DBG("%s returned %s\n", name(), ret->print().c_str());
+            // TODO: Make no exceptions the fast path.
+            if (err_out->exc.has()) {
+                DBG("%s THREW (using exc, eval_error)\n", name());
+            } else if (err_out->datum_exc.has()) {
+                // This duplicates the rfail logic below, in the datum_exc_t catch block,
+                // turning the datum_exc_t into an exc_t with a backtrace.
+                DBG("%s THREW (using datum_exc, eval_error)\n", name());
+                err_out->exc = make_scoped<exc_t>(err_out->datum_exc->get_type(),
+                                                  err_out->datum_exc->what(),
+                                                  backtrace());
+                err_out->datum_exc.reset();
+            } else {
+                DBG("%s returned %s\n", name(), ret->print().c_str());
+            }
             return ret;
         } catch (const datum_exc_t &e) {
             DEC_DEPTH;

@@ -228,10 +228,9 @@ void func_term_t::accumulate_captures(var_captures_t *captures) const {
     captures->implicit_is_captured |= external_captures.implicit_is_captured;
 }
 
-scoped_ptr_t<val_t> func_term_t::term_eval(eval_error *err_out,
+scoped_ptr_t<val_t> func_term_t::term_eval(UNUSED eval_error *err_out,
                                            scope_env_t *env,
                                            UNUSED eval_flags_t flags) const {
-    (void)err_out;  // TODO: Make use
     return new_val(eval_to_func(env->scope));
 }
 

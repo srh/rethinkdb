@@ -340,8 +340,7 @@ public:
     db_list_term_t(compile_env_t *env, const raw_term_t &term)
         : meta_op_term_t(env, term, argspec_t(0)) { }
 private:
-    virtual scoped_ptr_t<val_t> eval_impl(eval_error *err_out, scope_env_t *env, args_t *, eval_flags_t) const {
-        (void)err_out;  // TODO: Make use of?  Maybe not.
+    virtual scoped_ptr_t<val_t> eval_impl(eval_error *, scope_env_t *env, args_t *, eval_flags_t) const {
         std::set<name_string_t> dbs;
         admin_err_t error;
         if (!env->env->reql_cluster_interface()->db_list(
@@ -768,10 +767,9 @@ public:
         : table_or_db_meta_term_t(env, term, optargspec_t({})) { }
 private:
     virtual scoped_ptr_t<val_t> eval_impl_on_table_or_db(
-            eval_error *err_out, scope_env_t *env, args_t *args, eval_flags_t,
+            eval_error *, scope_env_t *env, args_t *args, eval_flags_t,
             const counted_t<const ql::db_t> &db,
             const optional<name_string_t> &name_if_table) const {
-        (void)err_out;  // TODO: Make use of?  Maybe not.
         // Don't allow a rebalance call without explicit database
         if (args->num_args() == 0) {
 	  rfail(base_exc_t::LOGIC, "`rebalance` can only be called on a table or database.");
