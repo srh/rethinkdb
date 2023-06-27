@@ -277,7 +277,6 @@ scoped_ptr_t<val_t> runtime_term_t::eval_on_current_stack(
     env->env->maybe_yield();
     INC_DEPTH;
 
-    // TODO: If INSTRUMENT is defined, we doubly invoke DEC_DEPTH if a datum_exc_t was thrown.
 #ifdef INSTRUMENT
     try {
 #endif // INSTRUMENT
@@ -300,7 +299,6 @@ scoped_ptr_t<val_t> runtime_term_t::eval_on_current_stack(
             }
             return ret;
         } catch (const datum_exc_t &e) {
-            DEC_DEPTH;
             DBG("%s THREW\n", name());
             rfail(e.get_type(), "%s", e.what());
         }
