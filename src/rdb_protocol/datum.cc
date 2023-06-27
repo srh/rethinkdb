@@ -1447,9 +1447,20 @@ datum_t datum_t::get(size_t index, throw_bool_t throw_bool) const {
     if (index < array_size) {
         return unchecked_get(index);
     } else if (throw_bool == THROW) {
-        // TODO: Either change this or make a separate version of get that takes the param.
         rfail(base_exc_t::NON_EXISTENCE, "Index out of bounds: %zu", index);
     } else {
+        return datum_t();
+    }
+}
+
+datum_t datum_t::get(eval_error *err_out, size_t index) const {
+    // Calling `arr_size()` here also makes sure this this is actually an R_ARRAY.
+    const size_t array_size = arr_size();
+    if (index < array_size) {
+        return unchecked_get(index);
+    } else {
+        err_out->datum_exc = make_scoped<datum_exc_t>(base_exc_t::NON_EXISTENCE,
+                                                      strprintf("Index out of bounds: %zu", index));
         return datum_t();
     }
 }
@@ -1521,8 +1532,22 @@ datum_t datum_t::get_field(const datum_string_t &key, throw_bool_t throw_bool) c
     return field;
 }
 
+datum_t datum_t::get_field(eval_error *err_out, const datum_string_t &key) const {
+    datum_t field = get_field_nothrow(key);
+    if (!field.has()) {
+        err_out->datum_exc = make_scoped<datum_exc_t>(
+            base_exc_t::NON_EXISTENCE,
+            strprintf("No attribute `%s` in object:\n%s", key.to_std().c_str(), print().c_str()));
+    }
+    return field;
+}
+
 datum_t datum_t::get_field(const char *key, throw_bool_t throw_bool) const {
     return get_field(datum_string_t(key), throw_bool);
+}
+
+datum_t datum_t::get_field(eval_error *err_out, const char *key) const {
+    return get_field(err_out, datum_string_t(key));
 }
 
 template <class json_writer_t>
