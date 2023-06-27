@@ -283,7 +283,6 @@ scoped_ptr_t<val_t> runtime_term_t::eval_on_current_stack(
         try {
             scoped_ptr_t<val_t> ret = term_eval(err_out, env, eval_flags);
             DEC_DEPTH;
-            // TODO: Make no exceptions the fast path.
             if (err_out->exc.has()) {
                 DBG("%s THREW (using exc, eval_error)\n", name());
             } else if (err_out->datum_exc.has()) {

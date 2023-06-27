@@ -391,7 +391,6 @@ private:
                     break;
                 }
 
-                // TODO: Why the allocation?
                 scoped_ptr_t<std::vector<datum_t> > keys;
                 if (!f->is_deterministic().test(single_server_t::no, constant_now_t::yes)) {
                     keys = make_scoped<std::vector<datum_t> >();

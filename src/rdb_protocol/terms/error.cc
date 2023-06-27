@@ -39,14 +39,14 @@ private:
         try {
             eval_error eval_err;
             v = args->arg(&eval_err, env, 0);
-            /* Duplicates code in the catch blocks. */
+            /* Duplicates code in the catch blocks (because we have duplicate paths by
+               which to return errors, for now). */
             if (eval_err.exc.has()) {
-                // TODO: Instead of throwing NON_EXISTENCE errors, pass them out.
                 if (eval_err.exc->get_type() == base_exc_t::NON_EXISTENCE) {
-                    err.init(new exc_t(*eval_err.exc));  // TODO: Just std::move(eval_err.exc)?
-                    func_arg = datum_t(eval_err.exc->what());  // TODO: <- take care here if we std::move.
+                    err = std::move(eval_err.exc);  // exc_t is final, so we know this is identical to the exc_t catch block
+                    func_arg = datum_t(err->what());
                 } else {
-                    *err_out = std::move(eval_err);
+                    err_out->exc = std::move(eval_err.exc);
                     return noval();
                 }
 
@@ -56,7 +56,7 @@ private:
                     err.init(new exc_t(e.get_type(), e.what(), backtrace()));
                     func_arg = datum_t(e.what());
                 } else {
-                    *err_out = std::move(eval_err);
+                    err_out->datum_exc = std::move(eval_err.datum_exc);
                     return noval();
                 }
             } else {
