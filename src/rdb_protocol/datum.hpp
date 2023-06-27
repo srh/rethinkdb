@@ -151,7 +151,7 @@ public:
 
     // Construct an uninitialized datum_t. This is to ease the transition from
     // counted_t<const datum_t>
-    datum_t();
+    datum_t() : data() { }
 
     // Construct a datum_t from a shared buffer.
     // type can be one of R_BINARY, R_STR, R_OBJECT or R_ARRAY. _buf_ref must point
@@ -278,6 +278,7 @@ public:
     // get_pair does not perform boundary checking. Its primary use is for
     // iterating over the object in combination with num_pairs().
     std::pair<datum_string_t, datum_t> get_pair(size_t index) const;
+    datum_t get_field_nothrow(const datum_string_t &key) const;
     datum_t get_field(const datum_string_t &key,
                       throw_bool_t throw_bool = THROW) const;
     datum_t get_field(const char *key,
@@ -416,7 +417,8 @@ private:
         data_wrapper_t(data_wrapper_t &&movee) noexcept;
 
         // Mirror the same constructors of datum_t
-        data_wrapper_t();
+        data_wrapper_t() :
+            internal_type(internal_type_t::UNINITIALIZED) { }
         explicit data_wrapper_t(construct_minval_t);
         explicit data_wrapper_t(construct_maxval_t);
         explicit data_wrapper_t(construct_null_t);

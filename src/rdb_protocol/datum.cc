@@ -81,9 +81,6 @@ datum_t::data_wrapper_t &datum_t::data_wrapper_t::operator=(
     return *this;
 }
 
-datum_t::data_wrapper_t::data_wrapper_t() :
-    internal_type(internal_type_t::UNINITIALIZED) { }
-
 datum_t::data_wrapper_t::data_wrapper_t(datum_t::construct_minval_t) :
     internal_type(internal_type_t::MINVAL) { }
 
@@ -297,8 +294,6 @@ void datum_t::data_wrapper_t::assign_move(datum_t::data_wrapper_t &&movee) noexc
     movee.destruct();
 #endif
 }
-
-datum_t::datum_t() : data() { }
 
 datum_t::datum_t(type_t type, shared_buf_ref_t<char> &&buf_ref)
     : data(type, std::move(buf_ref)) { }
@@ -1495,18 +1490,18 @@ std::pair<datum_string_t, datum_t> datum_t::unchecked_get_pair(size_t index) con
     }
 }
 
-datum_t datum_t::get_field(const datum_string_t &key, throw_bool_t throw_bool) const {
+datum_t datum_t::get_field_nothrow(const datum_string_t &key) const {
     // Use binary search on top of unchecked_get_pair()
     size_t range_beg = 0;
     // The obj_size() also makes sure that this has the right type (R_OBJECT)
     size_t range_end = obj_size();
     while (range_beg < range_end) {
         const size_t center = range_beg + ((range_end - range_beg) / 2);
-        auto center_pair = unchecked_get_pair(center);
+        std::pair<datum_string_t, datum_t> center_pair = unchecked_get_pair(center);
         const int cmp_res = key.compare(center_pair.first);
         if (cmp_res == 0) {
             // Found it
-            return center_pair.second;
+            return std::move(center_pair.second);
         } else if (cmp_res < 0) {
             range_end = center;
         } else {
@@ -1514,13 +1509,16 @@ datum_t datum_t::get_field(const datum_string_t &key, throw_bool_t throw_bool) c
         }
         rassert(range_beg <= range_end);
     }
+    return datum_t();
+}
 
-    // Didn't find it
-    if (throw_bool == THROW) {
+datum_t datum_t::get_field(const datum_string_t &key, throw_bool_t throw_bool) const {
+    datum_t field = get_field_nothrow(key);
+    if (throw_bool == THROW && !field.has()) {
         rfail(base_exc_t::NON_EXISTENCE,
               "No attribute `%s` in object:\n%s", key.to_std().c_str(), print().c_str());
     }
-    return datum_t();
+    return field;
 }
 
 datum_t datum_t::get_field(const char *key, throw_bool_t throw_bool) const {
