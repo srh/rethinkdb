@@ -58,15 +58,15 @@ private:
                     *err_out = std::move(eval_err);
                     return noval();
                 }
-            }
-
-            if (v->get_type().is_convertible(val_t::type_t::DATUM)) {
-                func_arg = v->as_datum();
-                if (func_arg.get_type() != datum_t::R_NULL) {
+            } else {
+                if (v->get_type().is_convertible(val_t::type_t::DATUM)) {
+                    func_arg = v->as_datum();
+                    if (func_arg.get_type() != datum_t::R_NULL) {
+                        return v;
+                    }
+                } else {
                     return v;
                 }
-            } else {
-                return v;
             }
         } catch (const exc_t &e) {
             /* Duplicated above. */
