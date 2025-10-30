@@ -4,6 +4,7 @@ Priority: optional
 Maintainer: RethinkDB <packaging@rethinkdb.com>
 Build-Depends: DEB_BUILD_DEPENDS
 Homepage: http://www.rethinkdb.com
+Standards-Version: 3.9.6
 
 Package: VERSIONED_QUALIFIED_PACKAGE_NAME
 Architecture: any
